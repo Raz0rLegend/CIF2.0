@@ -40,6 +40,7 @@ header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:4px;p
 header h1{flex:1;margin:0 0 0 6px;font-size:19px;font-weight:600}
 .ib{background:none;border:0;width:44px;height:44px;display:grid;place-items:center;border-radius:10px}
 .ib:active{background:#2c2c2c}
+.ib.on{background:#fff;color:#111}
 .ib svg{width:24px;height:24px}
 #searchbar{padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
 #list{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
@@ -59,6 +60,14 @@ header h1{flex:1;margin:0 0 0 6px;font-size:19px;font-weight:600}
 .empty{text-align:center;color:var(--muted);padding:60px 24px}
 #fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom));width:62px;height:62px;border-radius:50%;background:#fff;color:#111;border:0;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:6}
 #fab svg{width:30px;height:30px}
+#selBar{position:fixed;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:7}
+#selBar button{flex:1;height:50px;border:0;border-radius:14px;background:#2b2b2b;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+#selBar button.primary{background:#fff;color:#111}
+#selBar button:disabled{opacity:.4}
+.card .chk{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid #777;align-self:center;display:grid;place-items:center}
+.card.sel{background:#22303f}
+.card.sel .chk{background:#fff;border-color:#fff;color:#111}
+.card .chk svg{width:16px;height:16px}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
 nav.tabs button{flex:1;height:60px;border:0;background:none;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 nav.tabs button svg{width:22px;height:22px}
@@ -78,6 +87,7 @@ input,select,textarea{width:100%;background:var(--field);color:var(--text);borde
 input:focus,select:focus,textarea:focus{outline:none;border-color:#bbb}
 textarea{min-height:110px;resize:vertical}
 input[type=datetime-local]{min-height:48px}
+select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-gradient(135deg,#aaa 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 14px) 50%;background-size:6px 6px;background-repeat:no-repeat;padding-right:36px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips label{position:relative}
 .chips input{position:absolute;opacity:0;pointer-events:none}
@@ -159,15 +169,22 @@ input[type=datetime-local]{min-height:48px}
   <header>
     <button class="ib" id="btnSettings" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h11M4 18h7"/></svg></button>
     <h1 id="title">Renseignement</h1>
+    <button class="ib" id="btnSelect" aria-label="Sélectionner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></button>
+    <button class="ib" id="btnArchives" aria-label="Archives"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>
     <button class="ib" id="btnSearch" aria-label="Rechercher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
     <button class="ib" id="btnLock" aria-label="Verrouiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
   </header>
   <div id="searchbar" class="hidden"><input id="q" type="search" placeholder="Nom, date, lieu, véhicule…" autocomplete="off"></div>
   <main id="list"></main>
   <button id="fab" aria-label="Nouvelle fiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <div id="selBar" class="hidden">
+    <button id="selAll">Tout</button>
+    <button id="selArchive">Archiver</button>
+    <button id="selSend" class="primary">Envoyer</button>
+  </div>
   <nav class="tabs">
-    <button data-tab="pending" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg><span id="tabPending">En cours</span></button>
-    <button data-tab="archived"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg><span id="tabArchived">Archives</span></button>
+    <button data-tab="CIF" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg><span id="tabCIF">CIF</span></button>
+    <button data-tab="CI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg><span id="tabCI">CI</span></button>
   </nav>
 </div>
 
@@ -184,6 +201,8 @@ input[type=datetime-local]{min-height:48px}
 
     <label class="f" for="f_dateHeure">Date &amp; heure</label>
     <input id="f_dateHeure" type="datetime-local">
+    <label class="f" for="f_resultat">Résultat</label>
+    <select id="f_resultat"><option value="">—</option><option>NDN</option><option>Oméga</option><option>CDPA</option><option>CDPU</option><option>CDPJ</option></select>
 
     <div class="sect">Identité</div>
     <label class="f" for="f_nom">Nom</label>
@@ -228,8 +247,6 @@ input[type=datetime-local]{min-height:48px}
     <button type="button" class="addveh" id="addVeh">＋ Ajouter un véhicule</button>
 
     <div class="sect">Contexte</div>
-    <label class="f" for="f_resultat">Résultat</label>
-    <input id="f_resultat" autocomplete="off" placeholder="Résultat des vérifications">
     <label class="f">Qualité</label>
     <div class="chips" id="qualites"></div>
     <label class="f" for="f_lieuControle">Lieu</label>
@@ -322,6 +339,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const te = new TextEncoder(), td = new TextDecoder();
 const uid = () => Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
 const DAY = 864e5;
+const RES_COLORS = {'NDN':'#3ccf4e','Oméga':'#b77cff','CDPA':'#ff5a52','CDPU':'#ff5a52','CDPJ':'#ff5a52'};
+const resColor = f => RES_COLORS[f.resultat] || '#cfcfcf';
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
 const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docNumero','docDate','docLieu','lieuControle','motif','observations'];
 const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
@@ -382,7 +401,8 @@ const encJSON = (key, o) => encBytes(key, te.encode(JSON.stringify(o)));
 const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
 
 /* ---------- État ---------- */
-let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1}, TAB='pending', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
+let SEL = null;
+let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
 const urlCache = new Map();
 
 async function saveFiche(f){
@@ -421,7 +441,7 @@ function showLock(setup){
   setTimeout(()=>$('#pin').focus(), 150);
 }
 function lock(){
-  KEY = null; FICHES = []; EDIT = null;
+  KEY = null; FICHES = []; EDIT = null; SEL = null;
   for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear();
   DETAIL = null;
   ['#form','#detail','#settings','#viewer','#modal','#shareSheet'].forEach(s=>$(s).classList.add('hidden'));
@@ -474,16 +494,24 @@ document.addEventListener('visibilitychange', ()=>{
 /* ---------- Liste ---------- */
 function render(){
   const q = QUERY.trim().toLowerCase();
-  const nP = FICHES.filter(f=>f.status==='pending').length, nA = FICHES.length - nP;
-  $('#tabPending').textContent = `En cours${nP?` (${nP})`:''}`;
-  $('#tabArchived').textContent = `Archives${nA?` (${nA})`:''}`;
+  const pend = FICHES.filter(f=>f.status==='pending'), nA = FICHES.length - pend.length;
+  const nCIF = pend.filter(f=>f.type==='CIF').length, nCI = pend.length - nCIF;
+  $('#tabCIF').textContent = `CIF${nCIF?` (${nCIF})`:''}`;
+  $('#tabCI').textContent = `CI${nCI?` (${nCI})`:''}`;
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===TAB));
-  $('#fab').classList.toggle('hidden', TAB!=='pending');
-  let items = FICHES.filter(f=>f.status===TAB);
+  $('#btnArchives').classList.toggle('on', TAB==='archived');
+  $('#title').textContent = TAB==='archived' ? `Archives${nA?` (${nA})`:''}` : 'Renseignement';
+  $('#fab').classList.toggle('hidden', TAB==='archived' || !!SEL);
+  $('#btnSelect').classList.toggle('on', !!SEL);
+  $('#selBar').classList.toggle('hidden', !SEL);
+  if (SEL) { const n=SEL.size; $('#selSend').textContent = `Envoyer${n?` (${n})`:''}`; $('#selSend').disabled = $('#selArchive').disabled = !n;
+    $('#selArchive').textContent = TAB==='archived' ? 'Remettre' : 'Archiver'; $('#title').textContent = n ? `${n} choisie${n>1?'s':''}` : 'Sélection'; }
+  let items = TAB==='archived' ? FICHES.filter(f=>f.status==='archived') : pend.filter(f=>(f.type||'CI')===TAB);
   if (q) items = items.filter(f => [...FIELDS.map(k=>f[k]||''), f.qualite, f.type, ...(f.vehicules||[]).flatMap(v=>Object.values(v))].join(' ').toLowerCase().includes(q));
   items.sort((a,b)=> TAB==='archived' ? b.archivedAt - a.archivedAt : (b.dateHeure||'').localeCompare(a.dateHeure||''));
+  window.visibleIds = items.map(f=>f.id);
   if (!items.length) {
-    $('#list').innerHTML = `<div class="empty">${q ? 'Aucun résultat.' : TAB==='pending' ? 'Aucune fiche en cours.<br>Touche + pour en créer une.' : 'Aucune archive.'}</div>`;
+    $('#list').innerHTML = `<div class="empty">${q ? 'Aucun résultat.' : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
     return;
   }
   $('#list').innerHTML = items.map(f=>{
@@ -491,17 +519,18 @@ function render(){
     const sub = [f.dateNaissance, f.qualite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
     const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
-    return `<article class="card" data-id="${f.id}">
+    return `<article class="card${SEL&&SEL.has(f.id)?' sel':''}" data-id="${f.id}">
+      ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
-        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.nom||f.prenom ? esc(name) : name}</div><div class="date">${esc(fmtDT(f.dateHeure))}</div></div>
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${f.resultat?`<b>${esc(f.resultat)}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
         ${purgeInfo ? `<div class="note">${purgeInfo}</div>` : ''}
         <div class="r2">
           <div class="meta">${n ? ICON.cam + n : ''}</div>
-          <div class="acts">
+          <div class="acts${SEL?' hidden':''}">
             <button class="ib" data-act="del" aria-label="Supprimer">${ICON.trash}</button>
             <button class="ib" data-act="edit" aria-label="Modifier">${ICON.edit}</button>
             ${f.status==='pending'
@@ -517,6 +546,7 @@ function render(){
 $('#list').addEventListener('click', async e=>{
   const card = e.target.closest('.card'); if (!card) return;
   const f = FICHES.find(x=>x.id===card.dataset.id); if (!f) return;
+  if (SEL) { SEL.has(f.id) ? SEL.delete(f.id) : SEL.add(f.id); return render(); }
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (!act) return openDetail(f);
   if (act==='edit') return openForm(f);
@@ -525,10 +555,22 @@ $('#list').addEventListener('click', async e=>{
   if (act==='restore') { f.status='pending'; f.archivedAt=null; await saveFiche(f); render(); toast('Remise en cours'); }
   if (act==='share') shareFiche(f);
 });
-document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{ TAB=b.dataset.tab; render(); window.scrollTo(0,0); });
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{ SEL=null; TAB=b.dataset.tab; window.lastTab=TAB; render(); window.scrollTo(0,0); });
 $('#btnSearch').onclick = ()=>{ const s=$('#searchbar'); s.classList.toggle('hidden'); if(!s.classList.contains('hidden')) $('#q').focus(); else { $('#q').value=''; QUERY=''; render(); } };
 $('#q').oninput = e=>{ QUERY=e.target.value; render(); };
 $('#fab').onclick = ()=>openForm(null);
+$('#btnSelect').onclick = ()=>{ SEL = SEL ? null : new Set(); render(); };
+$('#selAll').onclick = ()=>{ const ids = window.visibleIds||[]; if (ids.every(id=>SEL.has(id))) SEL.clear(); else ids.forEach(id=>SEL.add(id)); render(); };
+$('#selArchive').onclick = async ()=>{
+  const list = FICHES.filter(f=>SEL.has(f.id)); if (!list.length) return;
+  for (const f of list) { if (TAB==='archived') { f.status='pending'; f.archivedAt=null; } else { f.status='archived'; f.archivedAt=Date.now(); } await saveFiche(f); }
+  toast(TAB==='archived' ? `${list.length} fiche(s) remise(s) en cours` : `${list.length} fiche(s) archivée(s)`); SEL=null; render();
+};
+$('#selSend').onclick = async ()=>{
+  const list = FICHES.filter(f=>SEL.has(f.id)).sort((a,b)=>(a.dateHeure||'').localeCompare(b.dateHeure||'')); if (!list.length) return;
+  await shareFiches(list);
+};
+$('#btnArchives').onclick = ()=>{ SEL=null; TAB = TAB==='archived' ? (window.lastTab||'CIF') : (window.lastTab=TAB, 'archived'); render(); window.scrollTo(0,0); };
 
 /* ---------- Fiche (lecture) ---------- */
 let DETAIL = null;
@@ -538,7 +580,7 @@ async function openDetail(f){
   const n = (f.photos||[]).length;
   $('#detBody').innerHTML = ficheSections(f).map(([t,rows],i)=>
       (t ? `<div class="sect">${esc(t)}</div>` : '') +
-      rows.map(([l,v])=>`<div class="dl"><div class="dk">${esc(l)}</div><div class="dv${i===0&&l==='Date & heure'?' acc':''}">${esc(v)}</div></div>`).join('')).join('')
+      rows.map(([l,v])=>`<div class="dl"><div class="dk">${esc(l)}</div><div class="dv"${i===0&&(l==='Date & heure'||l==='Résultat')?` style="color:${resColor(f)}"`:''}>${esc(v)}</div></div>`).join('')).join('')
     + (n ? `<div class="sect">Photos</div><div class="photos">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div>` : '')
     + (f.status==='archived' ? `<p class="hint" style="margin-top:20px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '');
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore : ICON.archive;
@@ -568,7 +610,7 @@ $('#detDelete').onclick = async ()=>{
 $('#qualites').innerHTML = QUALITES.map(q=>`<label><input type="radio" name="qualite" value="${q}"><span>${q}</span></label>`).join('');
 function openForm(f){
   const isNew = !f;
-  EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:'CI', docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
+  EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
   document.querySelectorAll('input[name=qualite]').forEach(r=>r.checked = r.value===EDIT.f.qualite);
@@ -593,6 +635,7 @@ async function closeForm(save){
     if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
     for (const id of E.removed) await removePhoto(id);
     await saveFiche(E.f); toast('Fiche enregistrée');
+    if (E.f.status==='pending') { TAB = E.f.type; window.lastTab = TAB; }
   } else {
     for (const id of E.added) await removePhoto(id);
   }
@@ -691,22 +734,23 @@ async function shrink(file, max=1600, q=.82){
 function ficheSections(f){
   const cif = f.type === 'CIF', S = [];
   const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
-  add('', [['Date & heure',fmtDT(f.dateHeure)],['Lieu du contrôle',f.lieuControle],['Résultat',f.resultat]]);
+  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat',f.resultat],['Lieu du contrôle',f.lieuControle]]);
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation]] : [])]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
-    : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
+    : !(f.docType||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, v[k]])));
   add('Contexte', [['Qualité',f.qualite],['Motif',f.motif],['Observations',f.observations]]);
   return S;
 }
 function ficheText(f){
   const n = (f.photos||[]).length;
-  return `FICHE DE RENSEIGNEMENT — ${f.type==='CIF'?'CIF':'CI'}\n`
+  return `${ficheName(f)} — ${f.type==='CIF'?'CIF':'CI'}\n`
     + ficheSections(f).map(([t,rows])=>(t?t.toUpperCase()+'\n':'') + rows.map(r=>`${r[0]} : ${r[1]}`).join('\n')).join('\n\n')
     + (n ? `\n\nPhotos jointes : ${n}` : '');
 }
-const ficheSubject = f => `Fiche ${f.type||'CI'} — ${[(f.nom||'').toUpperCase(), f.prenom].filter(Boolean).join(' ') || 'sans identité'} — ${fmtDT(f.dateHeure)}`;
+const ficheName = f => [(f.nom||'').toUpperCase(), f.prenom].filter(Boolean).join(' ') || 'Sans identité';
+const ficheSubject = f => ficheName(f);
 async function shareOut(data, fallbackText){
   try {
     if (data.files?.length && !(navigator.canShare && navigator.canShare({files:data.files}))) delete data.files;
@@ -722,20 +766,28 @@ function openOutlook(subject, body){
   const url = `ms-outlook://compose?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   location.href = url;
 }
-async function shareFiche(f){
-  const n = (f.photos||[]).length;
+const shareFiche = f => shareFiches([f]);
+async function shareFiches(list){
+  const n = list.reduce((a,f)=>a+(f.photos||[]).length, 0);
   const choice = await new Promise(res=>{
     const m = $('#shareSheet'); m.classList.remove('hidden');
     $('#shOutlookHint').textContent = 'Texte seul, tu saisis le destinataire' + (n ? ' (sans les photos)' : '');
     $('#shShareHint').textContent = n ? `Texte + ${n} photo(s), choisis Outlook dans la liste` : 'Outlook, Mail, AirDrop…';
     m.onclick = e=>{ const b=e.target.closest('[data-sh]'); if (!b && e.target!==m) return; m.classList.add('hidden'); m.onclick=null; res(b?.dataset.sh); };
   });
-  if (choice === 'outlook') return openOutlook(ficheSubject(f), ficheText(f));
-  if (choice !== 'share') return;
-  const text = ficheText(f), base = ((f.nom||'fiche')+'_'+(f.prenom||'')).replace(/[^\w-]+/g,'_');
-  const files = [];
-  for (const [i,id] of (f.photos||[]).entries()) { const b = await photoBuf(id); if (b) files.push(new File([b], `${base}_${i+1}.jpg`, {type:'image/jpeg'})); }
-  shareOut({title:ficheSubject(f), text, files}, text);
+  if (!choice || choice === 'cancel') return;
+  const subject = list.map(ficheSubject).join(' / ');
+  const text = list.map(ficheText).join('\n\n— — — — —\n\n');
+  if (choice === 'outlook') openOutlook(subject, text);
+  else {
+    const files = [];
+    for (const f of list) {
+      const base = ((f.nom||'fiche')+'_'+(f.prenom||'')).replace(/[^\w-]+/g,'_');
+      for (const [i,id] of (f.photos||[]).entries()) { const b = await photoBuf(id); if (b) files.push(new File([b], `${base}_${i+1}.jpg`, {type:'image/jpeg'})); }
+    }
+    await shareOut({title:subject, text, files}, text);
+  }
+  if (SEL) { SEL = null; render(); }
 }
 
 /* ---------- Réglages ---------- */
