@@ -378,7 +378,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 
 <script>
 'use strict';
-const APP_VERSION = '0.7';
+const APP_VERSION = '0.8';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -657,7 +657,6 @@ async function openDetail(f){
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
-      ${born || f.nationalite ? `<div class="sub2">${esc([born, f.nationalite].filter(Boolean).join(' · '))}</div>` : ''}
       <div class="chips2">
         ${f.resultat ? `<span class="chip" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(f.resultat)}</span>` : ''}
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
@@ -667,7 +666,7 @@ async function openDetail(f){
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
       v.plaque ? plateHTML(v) : '')).join('');
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
-  const ident = panel('Identité', [['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
+  const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
