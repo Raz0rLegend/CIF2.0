@@ -6,7 +6,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 svg{display:block}
 
 /* Écran de verrouillage */
-#lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));background:var(--bg);z-index:50}
+#lock{position:fixed;inset:0;bottom:calc(-1 * var(--gb,0px));display:flex;align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));background:var(--bg);z-index:50}
 #lock .box{width:100%;max-width:340px;text-align:center}
 #lock img{height:170px;width:auto;margin:0 auto 22px;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
 #lock h2{margin:0 0 6px;font-size:22px}
@@ -48,9 +48,9 @@ header h1{flex:1;margin:0 0 0 8px;font-size:19px;font-weight:600}
 .acts{display:flex}
 .acts .ib svg{width:22px;height:22px;color:#bdbdbd}
 .empty{text-align:center;color:var(--muted);padding:60px 24px}
-#fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom));width:62px;height:62px;border-radius:50%;background:#fff;color:#111;border:0;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:6}
+#fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom) - var(--gb,0px));width:62px;height:62px;border-radius:50%;background:#fff;color:#111;border:0;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:6}
 #fab svg{width:30px;height:30px}
-#selBar{position:fixed;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom));display:flex;gap:8px;z-index:7}
+#selBar{position:fixed;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom) - var(--gb,0px));display:flex;gap:8px;z-index:7}
 #selBar button{flex:1;height:50px;border:0;border-radius:14px;background:#2b2b2b;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.5)}
 #selBar button.primary{background:#fff;color:#111}
 #selBar button:disabled{opacity:.4}
@@ -58,13 +58,13 @@ header h1{flex:1;margin:0 0 0 8px;font-size:19px;font-weight:600}
 .card.sel{background:#22303f}
 .card.sel .chk{background:#fff;border-color:#fff;color:#111}
 .card .chk svg{width:16px;height:16px}
-nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav.tabs{position:fixed;left:0;right:0;bottom:calc(-1 * var(--gb,0px));display:flex;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
 nav.tabs button{flex:1;height:60px;border:0;background:none;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button.on{background:#fff;color:#111}
 
 /* Feuilles plein écran */
-.sheet{position:fixed;inset:0;z-index:20;background:var(--panel);display:flex;flex-direction:column}
+.sheet{position:fixed;inset:0;bottom:calc(-1 * var(--gb,0px));z-index:20;background:var(--panel);display:flex;flex-direction:column}
 .sheet .top{display:flex;align-items:center;gap:6px;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;border-bottom:1px solid var(--line)}
 .sheet .top h2{flex:1;margin:0;font-size:18px;font-weight:600}
 .sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 18px 30px}
@@ -143,7 +143,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 #modal .box{background:#262626;border-radius:16px;padding:20px;width:100%;max-width:340px}
 #modal p{margin:0 0 18px;white-space:pre-line}
 #modal .row .btn{height:46px;font-size:16px}
-#shareSheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
+#shareSheet{position:fixed;inset:0;bottom:calc(-1 * var(--gb,0px));z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
 #shareSheet .box{width:100%;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
 #shareSheet button{border:0;border-radius:14px;background:#2a2a2a;padding:14px 16px;text-align:left;display:flex;flex-direction:column;gap:2px}
 #shareSheet button b{font-size:17px}
@@ -152,7 +152,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 #toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);background:#f2f2f2;color:#111;padding:10px 16px;border-radius:22px;font-size:15px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center}
 #toast.on{opacity:1}
 #updBanner{position:fixed;left:12px;right:12px;top:calc(64px + env(safe-area-inset-top));z-index:65;border:0;border-radius:12px;background:#2d4a7a;color:#fff;font-weight:600;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
-#cover{position:fixed;inset:0;background:var(--bg);z-index:80}
+#cover{position:fixed;inset:0;bottom:calc(-1 * var(--gb,0px));background:var(--bg);z-index:80}
 #sg{position:fixed;z-index:90;background:#2a2a2a;border:1px solid #444;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.6);max-height:300px;overflow-y:auto}
 #sg button{display:block;width:100%;text-align:left;border:0;background:none;padding:12px 14px;font-size:16px;border-bottom:1px solid #383838}
 #sg button:last-child{border-bottom:0}

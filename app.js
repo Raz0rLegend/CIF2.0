@@ -1,6 +1,21 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
+/* Correctif iPhone (appli sur l'écran d'accueil) : iOS calcule parfois une zone d'affichage
+   plus courte que l'écran, ce qui laisse une bande vide en bas. On mesure l'écart réel
+   et on prolonge les barres du bas jusqu'au bord de l'écran. */
+(function fitScreen(){
+  let last = 0;
+  const apply = () => {
+    if (!(navigator.standalone || matchMedia('(display-mode: standalone)').matches)) return;
+    const portrait = matchMedia('(orientation: portrait)').matches;
+    const sh = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    const gap = sh - window.innerHeight;
+    if (gap >= 0 && gap <= 100) last = gap; // au-delà : clavier ouvert, on garde la dernière valeur
+    document.documentElement.style.setProperty('--gb', last + 'px');
+  };
+  apply(); addEventListener('resize', apply); addEventListener('orientationchange', ()=>setTimeout(apply, 300));
+})();
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,6 +29,7 @@ const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
 const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge'];
 const ACC_FIELDS = ['sitFam','email','nbEnfants','nbCharge'];
+const MEMO = [['memoCG','Carte grise','carte grise'],['memoAss','Assurance','assurance'],['memoPR','Permis (recto)','permis recto'],['memoPV','Permis (verso)','permis verso']];
 const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
 const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
 const plateHTML = v => `<span class="plate"><i>${esc(v.pays||'F')}</i>${esc(v.plaque)}</span>`;
@@ -290,9 +306,9 @@ async function openDetail(f){
   const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
-  const ok = b => b ? '<span style="color:#3ccf4e">✓ photographiée</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
+  const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
   const acc = !f.accident ? '' : panel('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email?`<a href="mailto:${esc(f.email)}">${esc(f.email)}</a>`:'',true],
-      ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge],['Carte grise',ok(f.memoCG),true],['Assurance',ok(f.memoAss),true]]);
+      ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, ok(f[k]), true])]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
   const arch = f.status==='archived' ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '';
@@ -326,7 +342,7 @@ function openForm(f){
   EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
-  $('#f_accident').checked = !!EDIT.f.accident; $('#f_memoCG').checked = !!EDIT.f.memoCG; $('#f_memoAss').checked = !!EDIT.f.memoAss; syncAcc();
+  $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc();
   setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
   renderVehicles();
   $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
@@ -341,16 +357,14 @@ async function closeForm(save){
   if (save) {
     for (const k of FIELDS) E.f[k] = $('#f_'+k).value.trim();
     E.f.type = segVal('typeSeg'); E.f.docMode = segVal('docSeg');
-    E.f.accident = $('#f_accident').checked; E.f.memoCG = E.f.accident && $('#f_memoCG').checked; E.f.memoAss = E.f.accident && $('#f_memoAss').checked;
+    E.f.accident = $('#f_accident').checked; for (const [k] of MEMO) E.f[k] = E.f.accident && $('#f_'+k).checked;
     if (!E.f.accident) for (const k of ACC_FIELDS) E.f[k] = '';
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
     if (E.f.type === 'CI') for (const k of CIF_FIELDS) E.f[k] = '';
     if (E.f.type === 'CIF' && E.f.docMode === 'Sur dires') for (const k of ['docType','docNumero','docDate','docLieu']) E.f[k] = '';
     if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
-    if (E.f.accident && !(E.f.memoCG && E.f.memoAss)) {
-      const miss = [!E.f.memoCG && 'la carte grise', !E.f.memoAss && 'l\'assurance'].filter(Boolean).join(' et ');
-      if (!await ask(`Accident : tu n'as pas coché ${miss}.\nEnregistrer quand même ?`, 'Enregistrer', false)) return;
-    }
+    const miss = E.f.accident ? MEMO.filter(([k])=>!E.f[k]).map(m=>m[2]) : [];
+    if (miss.length && !await ask(`Accident — photos non cochées :\n• ${miss.join('\n• ')}\n\nEnregistrer quand même ?`, 'Enregistrer', false)) return;
     for (const id of E.removed) await removePhoto(id);
     await saveFiche(E.f); toast('Fiche enregistrée');
     if (learnFrom(E.f)) saveLearn().catch(()=>{});
@@ -468,7 +482,7 @@ function ficheSections(f){
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation]] : [])]);
   if (f.accident) add('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
-    ['Carte grise',f.memoCG?'photographiée':'non photographiée'],['Assurance',f.memoAss?'photographiée':'non photographiée']]);
+    ...MEMO.map(([k,l])=>[l, f[k]?'photographié(e)':'non photographié(e)'])]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
     : !(f.docType||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   if (cif) addVeh();
