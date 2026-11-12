@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -332,8 +332,9 @@ async function openDetail(f){
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
+  const recu = f.recu ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Reçue par QR code le ${fmtD(f.recu)}</p>` : '';
   const arch = f.status==='archived' ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '';
-  $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + doc + veh : veh + ident + acc + dep) + ctx + photos + arch;
+  $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + doc + veh : veh + ident + acc + dep) + ctx + photos + recu + arch;
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore + '<span>Remettre</span>' : ICON.archive + '<span>Archiver</span>';
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
   if ($('#detRes')) $('#detRes').onchange = async e=>{ const sc = $('#detail .body').scrollTop; f.resultat = e.target.value; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.resultat ? `Résultat : ${f.resultat}` : 'Résultat effacé'); };
@@ -572,6 +573,7 @@ async function shareFiches(list){
     m.onclick = e=>{ const b=e.target.closest('[data-sh]'); if (!b && e.target!==m) return; m.classList.add('hidden'); m.onclick=null; res(b?.dataset.sh); };
   });
   if (!choice || choice === 'cancel') return;
+  if (choice === 'qr') { if (SEL) { SEL = null; render(); } return window.QRS?.show(list); }
   const subject = list.map(ficheSubject).join(' / ');
   const text = list.map(ficheText).join('\n\n— — — — —\n\n');
   if (choice === 'outlook') openOutlook(subject, text);
@@ -872,3 +874,5 @@ $('#detSend').innerHTML = ICON.send + '<span>Envoyer</span>'; $('#detEdit').inne
 })();
 /* Outil Matières dangereuses (ADR) : module séparé */
 (()=>{ const sc = document.createElement('script'); sc.src = 'adr.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
+/* Partage de fiches par QR code : module séparé */
+(()=>{ const sc = document.createElement('script'); sc.src = 'share.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
