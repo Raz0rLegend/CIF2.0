@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.5';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -650,7 +650,7 @@ $('#btnSettings').onclick = async ()=>{
   $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_lock').value = String(SETTINGS.lockMinutes);
   ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
   $('#storageInfo').textContent = ''; $('#verTag').textContent = `v${APP_VERSION}`; syncBioUI();
-  $('#versionInfo').textContent = `Version installée : ${APP_VERSION}. Tes fiches sont conservées lors des mises à jour.`;
+  $('#versionInfo').textContent = `Version installée : ${APP_VERSION}. Tes fiches sont conservées lors des mises à jour.` + ` (écran ${screen.height} · fenêtre ${window.innerHeight})`;
   try { const est = await navigator.storage.estimate(); const persisted = await navigator.storage.persisted?.();
     $('#storageInfo').textContent = `Espace utilisé : ${(est.usage/1048576).toFixed(1)} Mo · ${FICHES.length} fiche(s)` + (persisted ? ' · stockage persistant' : ''); } catch {}
   $('#settings').classList.remove('hidden');
