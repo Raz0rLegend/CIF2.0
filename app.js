@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -751,6 +751,27 @@ $('#wipe').onclick = async ()=>{
 };
 
 $('#detSend').innerHTML = ICON.send + '<span>Envoyer</span>'; $('#detEdit').innerHTML = ICON.edit + '<span>Modifier</span>';
+
+/* ---------- Correctif iPhone : bande noire après le clavier ----------
+   En mode « écran d'accueil », iOS rétrécit la fenêtre à la première ouverture du clavier
+   (saisie du code) et ne la rétablit pas : d'où la bande noire en bas.
+   À la fermeture du clavier, on force iOS à remesurer l'écran. */
+(function(){
+  const peak = {}; const key = () => window.innerWidth;
+  const note = () => { peak[key()] = Math.max(peak[key()]||0, window.innerHeight); };
+  note(); window.addEventListener('resize', note);
+  function remeasure(){
+    const ae = document.activeElement;
+    if (ae && ae.matches && ae.matches('input,textarea,select')) return; // clavier encore ouvert
+    if ((peak[key()]||0) - window.innerHeight <= 4) return;               // pas bloqué
+    const scrolls = [...document.querySelectorAll('.sheet .body, #list')].map(el=>[el, el.scrollTop]);
+    const y = window.scrollY, b = document.body;
+    b.style.display = 'none'; void b.offsetHeight; b.style.display = '';
+    scrolls.forEach(([el,t])=>el.scrollTop = t); window.scrollTo(0, y);
+  }
+  document.addEventListener('focusout', ()=>{ setTimeout(remeasure, 350); setTimeout(remeasure, 900); });
+  document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) setTimeout(remeasure, 300); });
+})();
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
