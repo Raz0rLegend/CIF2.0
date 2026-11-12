@@ -114,6 +114,12 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 .veh .vh b{font-size:15px}
 .veh .ib svg{width:20px;height:20px;color:#bdbdbd}
 .veh .chips span{padding:7px 12px;font-size:14px}
+.platerow{display:flex;border:2px solid #d8d8d8;border-radius:9px;overflow:hidden;background:#f4f4f4}
+.platerow .pays{position:relative;flex:0 0 58px;background:#1f4fbf;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:16px;line-height:1}
+.platerow .pays small{font-size:10px;opacity:.8;margin-top:2px}
+.platerow .pays select{position:absolute;inset:0;opacity:0;width:100%;height:100%}
+.platerow input{flex:1;border:0;border-radius:0;background:#f4f4f4;color:#111;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:20px;letter-spacing:.1em}
+.platerow input:focus{border:0}
 .addveh{width:100%;height:48px;margin-top:10px;border:1px dashed #666;border-radius:10px;background:none;color:var(--text);font-size:16px}
 .dl{padding:10px 0}
 .dk{color:var(--muted);font-size:14px}
@@ -175,7 +181,9 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 .cell .k{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8d8d8d}
 .cell .v{font-size:16px;margin-top:1px;word-break:break-word;white-space:pre-wrap;line-height:1.3}
 .cell .v a{color:#7fb3ff;text-decoration:none}
-.plate{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px;letter-spacing:.06em;background:#f4f4f4;color:#111;border-radius:4px;padding:1px 7px 1px 5px;border-left:6px solid #1f4fbf;text-transform:none}
+.plate{display:inline-flex;align-items:stretch;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px;letter-spacing:.06em;background:#f4f4f4;color:#111;border-radius:4px;overflow:hidden;text-transform:none;line-height:1.5}
+.plate i{font-style:normal;background:#1f4fbf;color:#fff;font-size:9px;letter-spacing:0;padding:0 4px;display:flex;align-items:flex-end;padding-bottom:1px;margin-right:6px}
+.plate{padding-right:7px}
 .actbar{display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--panel)}
 .actbar button{flex:1;height:52px;border:0;border-radius:12px;background:#2b2b2b;display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:600}
 .actbar button#detSend{background:#fff;color:#111}
@@ -370,7 +378,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 
 <script>
 'use strict';
-const APP_VERSION = '0.6';
+const APP_VERSION = '0.7';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -392,6 +400,11 @@ const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
 const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docNumero','docDate','docLieu','lieuControle','motif','observations'];
 const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
+const PAYS_TOP = [['F','France'],['MC','Monaco'],['I','Italie'],['D','Allemagne'],['CH','Suisse'],['B','Belgique'],['NL','Pays-Bas'],['L','Luxembourg'],['GB','Royaume-Uni'],['E','Espagne'],['P','Portugal']];
+const PAYS_ALL = [['AL','Albanie'],['DZ','Algérie'],['AND','Andorre'],['ARM','Arménie'],['A','Autriche'],['AZ','Azerbaïdjan'],['BY','Biélorussie'],['BIH','Bosnie-Herzégovine'],['BG','Bulgarie'],['CDN','Canada'],['CY','Chypre'],['HR','Croatie'],['DK','Danemark'],['EST','Estonie'],['USA','États-Unis'],['FIN','Finlande'],['GE','Géorgie'],['GR','Grèce'],['H','Hongrie'],['IRL','Irlande'],['IS','Islande'],['IL','Israël'],['RKS','Kosovo'],['LV','Lettonie'],['FL','Liechtenstein'],['LT','Lituanie'],['NMK','Macédoine du Nord'],['M','Malte'],['MA','Maroc'],['MD','Moldavie'],['MNE','Monténégro'],['N','Norvège'],['PL','Pologne'],['RO','Roumanie'],['RUS','Russie'],['RSM','Saint-Marin'],['SRB','Serbie'],['SK','Slovaquie'],['SLO','Slovénie'],['S','Suède'],['CZ','Tchéquie'],['TN','Tunisie'],['TR','Turquie'],['UA','Ukraine'],['V','Vatican'],['?','Autre / inconnu']];
+const PAYS_NAME = Object.fromEntries([...PAYS_TOP, ...PAYS_ALL]);
+const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
+const plateHTML = v => `<span class="plate"><i>${esc(v.pays||'F')}</i>${esc(v.plaque)}</span>`;
 const VEH_TYPES = ['VL','2RM','Camion','Vélo','Autre'];
 const VEH_FIELDS = [['marque','Marque'],['modele','Type / modèle'],['couleur','Couleur'],['plaque','Plaque'],['proprio','Propriétaire']];
 const ICON = {
@@ -575,7 +588,7 @@ function render(){
         <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${f.resultat?`<b>${esc(f.resultat)}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
-        ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
+        ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
         ${purgeInfo ? `<div class="note">${purgeInfo}</div>` : ''}
         <div class="r2">
           <div class="meta"><span class="vics">${vehIcons(f)}</span>${n ? ICON.cam + n : ''}</div>
@@ -652,7 +665,7 @@ async function openDetail(f){
       </div></div><div class="vics">${vehIcons(f)}</div></div>`;
   const veh = (f.vehicules||[]).map((v,i)=>panel(`Véhicule ${i+1}${v.type?` · ${v.type}`:''}`,
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
-      v.plaque ? `<span class="plate">${esc(v.plaque)}</span>` : '')).join('');
+      v.plaque ? plateHTML(v) : '')).join('');
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
   const ident = panel('Identité', [['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
@@ -747,21 +760,25 @@ function readVehicles(){
     const v = EDIT.f.vehicules[i]; if (!v) return;
     v.type = el.querySelector('input[type=radio]:checked')?.value || '';
     for (const [k] of VEH_FIELDS) v[k] = el.querySelector(`[data-k=${k}]`).value.trim();
+    v.pays = el.querySelector('[data-k=pays]').value;
   });
 }
 function renderVehicles(){
   $('#vehicles').innerHTML = EDIT.f.vehicules.map((v,i)=>`<div class="veh">
     <div class="vh"><b>Véhicule ${i+1}</b><button type="button" class="ib" data-rmveh="${i}" aria-label="Retirer le véhicule">${ICON.trash}</button></div>
     <div class="chips">${VEH_TYPES.map(t=>`<label><input type="radio" name="vt${i}" value="${t}" ${v.type===t?'checked':''}><span>${t}</span></label>`).join('')}</div>
-    ${VEH_FIELDS.map(([k,l])=>`<label class="f">${l}</label><input data-k="${k}" value="${esc(v[k]||'')}" autocomplete="off" spellcheck="false" ${k==='plaque'?'autocapitalize="characters"':''}${k==='marque'?' data-sg="brands"':''}${k==='couleur'?' data-sg="colors"':''}>`).join('')}
+    ${VEH_FIELDS.map(([k,l])=> k==='plaque'
+      ? `<label class="f">Plaque</label><div class="platerow"><label class="pays"><span>${esc(v.pays||'F')}</span><small>▾</small><select data-k="pays" aria-label="Pays de la plaque">${paysOptions(v.pays||'F')}</select></label><input data-k="plaque" value="${esc(v.plaque||'')}" autocomplete="off" spellcheck="false" autocapitalize="characters"></div>`
+      : `<label class="f">${l}</label><input data-k="${k}" value="${esc(v[k]||'')}" autocomplete="off" spellcheck="false"${k==='marque'?' data-sg="brands"':''}${k==='couleur'?' data-sg="colors"':''}>`).join('')}
   </div>`).join('');
 }
-$('#addVeh').onclick = ()=>{ readVehicles(); EDIT.f.vehicules.push({type:'VL'}); renderVehicles(); $('#vehicles .veh:last-child').scrollIntoView({behavior:'smooth', block:'start'}); };
+$('#addVeh').onclick = ()=>{ readVehicles(); EDIT.f.vehicules.push({type:'VL', pays:'F'}); renderVehicles(); $('#vehicles .veh:last-child').scrollIntoView({behavior:'smooth', block:'start'}); };
 $('#vehicles').addEventListener('click', async e=>{
   const b = e.target.closest('[data-rmveh]'); if (!b) return;
   if (!await ask('Retirer ce véhicule ?', 'Retirer')) return;
   readVehicles(); EDIT.f.vehicules.splice(+b.dataset.rmveh, 1); renderVehicles();
 });
+$('#vehicles').addEventListener('change', e=>{ if (e.target.dataset.k==='pays') e.target.closest('.pays').querySelector('span').textContent = e.target.value; });
 $('#vehicles').addEventListener('input', e=>{ if (e.target.dataset.k==='plaque') { const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); } });
 $('#f_nom').addEventListener('input', e=>{ const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); });
 
@@ -811,7 +828,7 @@ function ficheSections(f){
   const cif = f.type === 'CIF', S = [];
   const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
   add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat',f.resultat],['Lieu du contrôle',f.lieuControle]]);
-  const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, v[k]])));
+  const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, k==='plaque' && v.plaque ? `${v.plaque} (${v.pays||'F'} — ${PAYS_NAME[v.pays||'F']||''})` : v[k]])));
   if (!cif) addVeh(); // CI : le véhicule passe en premier
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation]] : [])]);
