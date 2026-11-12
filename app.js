@@ -1,21 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.2';
-/* Correctif iPhone (appli sur l'écran d'accueil) : iOS calcule parfois une zone d'affichage
-   plus courte que l'écran, ce qui laisse une bande vide en bas. On mesure l'écart réel
-   et on prolonge les barres du bas jusqu'au bord de l'écran. */
-(function fitScreen(){
-  let last = 0;
-  const apply = () => {
-    if (!(navigator.standalone || matchMedia('(display-mode: standalone)').matches)) return;
-    const portrait = matchMedia('(orientation: portrait)').matches;
-    const sh = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
-    const gap = sh - window.innerHeight;
-    if (gap >= 0 && gap <= 100) last = gap; // au-delà : clavier ouvert, on garde la dernière valeur
-    document.documentElement.style.setProperty('--gb', last + 'px');
-  };
-  apply(); addEventListener('resize', apply); addEventListener('orientationchange', ()=>setTimeout(apply, 300));
-})();
+const APP_VERSION = '1.3';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
