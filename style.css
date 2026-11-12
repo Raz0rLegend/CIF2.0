@@ -118,6 +118,10 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 .memo-t{font-weight:700;color:#ffcf8a;margin-bottom:6px}
 .mc{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:16px}
 .mc input{width:22px;height:22px;accent-color:#f08a24;-webkit-appearance:checkbox;appearance:auto;padding:0;margin:0;flex:none}
+.test{margin-top:10px;padding:2px 12px 12px;border:1px solid var(--line);border-radius:10px;background:#191919}
+.test-t{font-weight:700;margin-top:10px}
+.test label.f{margin-top:8px}
+input[type=time]{min-height:46px}
 .badge.acc{background:#7a3f0c;color:#ffd7ad}
 .addveh{width:100%;height:48px;margin-top:10px;border:1px dashed #666;border-radius:10px;background:none;color:var(--text);font-size:16px}
 .dl{padding:10px 0}

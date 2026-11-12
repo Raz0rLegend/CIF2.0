@@ -80,6 +80,23 @@
         <label class="mc"><input type="checkbox" id="f_memoPV"><span>Permis de conduire — verso</span></label>
         <button type="button" class="btn sec" id="memoPhoto" style="height:42px;font-size:15px;margin-top:8px">Prendre une photo</button>
       </div>
+      <div class="sect" style="margin-top:18px">Dépistages</div>
+      <div class="test">
+        <div class="test-t">Test alcool</div>
+        <div class="row">
+          <div style="flex:0 0 38%"><label class="f" for="f_alcHeure">Heure</label><input id="f_alcHeure" type="time"></div>
+          <div style="flex:1"><label class="f" for="f_alcRes">Résultat</label><select id="f_alcRes"><option value="">—</option><option>Négatif</option><option>Positif</option></select></div>
+        </div>
+        <label class="f" for="f_alcTaux">Taux (mg/L d'air expiré)</label>
+        <input id="f_alcTaux" inputmode="decimal" placeholder="ex. 0,25" autocomplete="off">
+      </div>
+      <div class="test">
+        <div class="test-t">Test stupéfiants</div>
+        <div class="row">
+          <div style="flex:0 0 38%"><label class="f" for="f_stupHeure">Heure</label><input id="f_stupHeure" type="time"></div>
+          <div style="flex:1"><label class="f" for="f_stupRes">Résultat</label><select id="f_stupRes"><option value="">—</option><option>Négatif</option><option>Positif</option></select></div>
+        </div>
+      </div>
       <label class="f" for="f_sitFam">Situation familiale</label>
       <select id="f_sitFam"><option value="">—</option><option>Célibataire</option><option>Marié(e)</option><option>Pacsé(e)</option><option>En concubinage</option><option>Séparé(e)</option><option>Divorcé(e)</option><option>Veuf / veuve</option></select>
       <label class="f" for="f_email">E-mail</label>
@@ -227,7 +244,7 @@
 <div id="toast"></div>
 <div id="cover" class="hidden"></div>
 
-<!-- APP_VERSION = '1.1' (la version de référence est dans app.js) -->
+<!-- APP_VERSION = '1.2' (la version de référence est dans app.js) -->
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>
