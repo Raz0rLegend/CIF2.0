@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -78,7 +78,7 @@ const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
 
 /* ---------- État ---------- */
 let SEL = null, PIN = null;
-let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
+let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1, groupMin:10}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
 const urlCache = new Map();
 
 async function saveFiche(f){
@@ -177,17 +177,17 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
-/* ---------- Contrôles groupés (même créneau de 20 min) ---------- */
-const GROUP_MIN = 20, GROUP_COLORS = ['#f0b429','#4fb3ff','#ff7ab6','#7ee081','#c49bff','#ff9a52'];
-let GROUPS = new Map(); // id -> {n, color, ids}
+/* ---------- Contrôles groupés (même créneau, réglable) ---------- */
+let GROUPS = new Map(); // id -> {n, ids}
 function computeGroups(){
   GROUPS = new Map();
+  const win = +SETTINGS.groupMin; if (!win) return;
   const list = FICHES.filter(f=>f.dateHeure && !isNaN(new Date(f.dateHeure))).sort((a,b)=>a.dateHeure.localeCompare(b.dateHeure));
-  let cur = [], start = 0, gi = 0;
-  const flush = () => { if (cur.length > 1) { const g = {n:cur.length, color:GROUP_COLORS[gi++ % GROUP_COLORS.length], ids:cur.map(f=>f.id)}; cur.forEach(f=>GROUPS.set(f.id, g)); } };
+  let cur = [], start = 0;
+  const flush = () => { if (cur.length > 1) { const g = {n:cur.length, ids:cur.map(f=>f.id)}; cur.forEach(f=>GROUPS.set(f.id, g)); } };
   for (const f of list) {
     const t = new Date(f.dateHeure).getTime();
-    if (cur.length && t - start <= GROUP_MIN*6e4) cur.push(f);
+    if (cur.length && t - start <= win*6e4) cur.push(f);
     else { flush(); cur = [f]; start = t; }
   }
   flush();
@@ -219,19 +219,19 @@ function render(){
     $('#list').innerHTML = `<div class="empty">${q ? 'Aucun résultat.' : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
     return;
   }
-  $('#list').innerHTML = items.map(f=>{
+  $('#list').innerHTML = items.map((f,i)=>{
     const name = [ (f.nom||'').toUpperCase(), f.prenom ].filter(Boolean).join(' | ') || '<span style="color:var(--muted)">Sans identité</span>';
     const sub = [f.dateNaissance, f.nationalite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
     const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
-    const g = GROUPS.get(f.id);
-    return `<article class="card${SEL&&SEL.has(f.id)?' sel':''}${g?' grp':''}" data-id="${f.id}"${g?` style="--gc:${g.color}"`:''}>
+    const g = GROUPS.get(f.id), prev = items[i-1];
+    const link = g && prev && GROUPS.get(prev.id) === g ? `<div class="glink" title="Contrôlés ensemble">${ICON_LINK}</div>` : '';
+    return `${link}<article class="card${SEL&&SEL.has(f.id)?' sel':''}" data-id="${f.id}">
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
         <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${f.resultat?`<b>${esc(f.resultat)}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
-        ${g ? `<div class="gtag">${ICON_LINK}Contrôlés ensemble · ${g.n}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
         ${purgeInfo ? `<div class="note">${purgeInfo}</div>` : ''}
@@ -307,7 +307,7 @@ async function openDetail(f){
         ${f.resultat ? `<span class="chip" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(f.resultat)}</span>` : ''}
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
         ${f.lieuControle ? `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>` : ''}
-      </div>${mates.length ? `<div class="mates" style="--gc:${GROUPS.get(f.id).color}">${ICON_LINK}<span>Avec ${mates.map(m=>`<button type="button" data-mate="${m.id}">${esc(ficheName(m))}</button>`).join(', ')}</span></div>` : ''}</div><div class="vics">${vehIcons(f)}</div></div>`;
+      </div>${mates.length ? `<div class="mates">${ICON_LINK}<span>Avec ${mates.map(m=>`<button type="button" data-mate="${m.id}">${esc(ficheName(m))}</button>`).join(', ')}</span></div>` : ''}</div><div class="vics">${vehIcons(f)}</div></div>`;
   const veh = (f.vehicules||[]).map((v,i)=>panel(`Véhicule ${i+1}${v.type?` · ${v.type}`:''}`,
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
       v.plaque ? plateHTML(v) : '')).join('');
@@ -669,8 +669,11 @@ $('#bioToggle').onclick = async ()=>{
 };
 
 /* ---------- Réglages ---------- */
+(()=>{ const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Sécurité'); h.insertAdjacentHTML('beforebegin', `<h3>Contrôles groupés</h3>
+    <label class="f" for="s_group">Relier les contrôles effectués à moins de</label>
+    <select id="s_group"><option value="5">5 minutes d'écart</option><option value="10">10 minutes d'écart</option><option value="15">15 minutes d'écart</option><option value="20">20 minutes d'écart</option><option value="0">Ne pas relier</option></select>`); })();
 $('#btnSettings').onclick = async ()=>{
-  $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_lock').value = String(SETTINGS.lockMinutes);
+  $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_group').value = String(SETTINGS.groupMin); $('#s_lock').value = String(SETTINGS.lockMinutes);
   ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
   $('#storageInfo').textContent = ''; $('#verTag').textContent = `v${APP_VERSION}`; syncBioUI();
   $('#versionInfo').textContent = `Version installée : ${APP_VERSION}. Tes fiches sont conservées lors des mises à jour.` + ` (écran ${screen.height} · fenêtre ${window.innerHeight})`;
@@ -703,6 +706,7 @@ $('#btnUpdate').onclick = ()=>checkUpdate(true);
 $('#updBanner').onclick = applyUpdate;
 $('#setBack').onclick = ()=>$('#settings').classList.add('hidden');
 $('#s_purge').onchange = async e=>{ SETTINGS.purgeDays = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); await purge(); render(); };
+$('#s_group').onchange = async e=>{ SETTINGS.groupMin = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); render(); };
 $('#s_lock').onchange = async e=>{ SETTINGS.lockMinutes = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); };
 
 $('#c_btn').onclick = async ()=>{
