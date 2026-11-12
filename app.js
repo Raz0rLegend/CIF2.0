@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -23,7 +23,7 @@ const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','doc
 const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
 const plateHTML = v => `<span class="plate"><i>${esc(v.pays||'F')}</i>${esc(v.plaque)}</span>`;
 const VEH_TYPES = ['VL','2RM','Camion','Vélo','Autre'];
-const VEH_FIELDS = [['marque','Marque'],['modele','Type / modèle'],['couleur','Couleur'],['plaque','Plaque'],['proprio','Propriétaire']];
+const VEH_FIELDS = [['plaque','Plaque'],['marque','Marque'],['modele','Type / modèle'],['couleur','Couleur'],['proprio','Propriétaire']];
 const ICON = {
   trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
   edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>',
@@ -443,7 +443,7 @@ function renderVehicles(){
     <div class="vh"><b>Véhicule ${i+1}</b><button type="button" class="ib" data-rmveh="${i}" aria-label="Retirer le véhicule">${ICON.trash}</button></div>
     <div class="chips">${VEH_TYPES.map(t=>`<label><input type="radio" name="vt${i}" value="${t}" ${v.type===t?'checked':''}><span>${t}</span></label>`).join('')}</div>
     ${VEH_FIELDS.map(([k,l])=> k==='plaque'
-      ? `<label class="f">Plaque</label><div class="platerow"><label class="pays"><span>${esc(v.pays||'F')}</span><small>▾</small><select data-k="pays" aria-label="Pays de la plaque">${paysOptions(v.pays||'F')}</select></label><input data-k="plaque" value="${esc(v.plaque||'')}" autocomplete="off" spellcheck="false" autocapitalize="characters"></div>`
+      ? `<label class="f">Plaque</label><div class="platerow"><label class="pays"><span>${esc(v.pays||'F')}</span><small>▾</small><select data-k="pays" aria-label="Pays de la plaque">${paysOptions(v.pays||'F')}</select></label><input data-k="plaque" value="${esc(v.plaque||'')}" autocomplete="off" spellcheck="false" autocapitalize="characters"></div><div class="phint" data-k="hint" style="font-size:13px;color:#9cc0ff;margin-top:6px;min-height:0"></div>`
       : `<label class="f">${l}</label><input data-k="${k}" value="${esc(v[k]||'')}" autocomplete="off" spellcheck="false"${k==='marque'?' data-sg="brands"':''}${k==='couleur'?' data-sg="colors"':''}>`).join('')}
   </div>`).join('');
 }
@@ -454,7 +454,27 @@ $('#vehicles').addEventListener('click', async e=>{
   readVehicles(); EDIT.f.vehicules.splice(+b.dataset.rmveh, 1); renderVehicles();
 });
 $('#vehicles').addEventListener('change', e=>{ if (e.target.dataset.k==='pays') e.target.closest('.pays').querySelector('span').textContent = e.target.value; });
-$('#vehicles').addEventListener('input', e=>{ if (e.target.dataset.k==='plaque') { const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); } });
+$('#vehicles').addEventListener('input', e=>{ if (e.target.dataset.k==='plaque') { const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); plateInherit(e.target); } });
+/* Plaque déjà connue dans une ancienne fiche : on reprend le véhicule (champs vides uniquement) */
+const normPlate = s => String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function plateLookup(plate){
+  const np = normPlate(plate); if (np.length < 4) return null;
+  let best = null;
+  for (const f of FICHES) { if (EDIT && f.id === EDIT.f.id) continue;
+    for (const v of (f.vehicules||[])) if (normPlate(v.plaque) === np && (!best || (f.dateHeure||'') > (best.f.dateHeure||''))) best = {f, v}; }
+  return best;
+}
+function plateInherit(inp){
+  const box = inp.closest('.veh'), hint = box.querySelector('[data-k=hint]'), np = normPlate(inp.value);
+  if (box.dataset.known === np) return;
+  const m = plateLookup(inp.value);
+  if (!m) { hint.textContent = ''; box.dataset.known = ''; return; }
+  box.dataset.known = np; let n = 0;
+  for (const k of ['marque','modele','couleur','proprio']) { const el = box.querySelector(`[data-k=${k}]`); if (!el.value.trim() && m.v[k]) { el.value = m.v[k]; n++; } }
+  if (m.v.type) { const r = box.querySelector(`input[type=radio][value="${m.v.type}"]`); if (r) r.checked = true; }
+  if (m.v.pays) { const s = box.querySelector('[data-k=pays]'); s.value = m.v.pays; s.closest('.pays').querySelector('span').textContent = m.v.pays; }
+  hint.textContent = `↺ Véhicule déjà contrôlé le ${fmtDT(m.f.dateHeure)} (${ficheName(m.f)})` + (n ? ' — infos reprises' : '');
+}
 $('#f_nom').addEventListener('input', e=>{ const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); });
 
 async function renderPhotos(){
@@ -778,6 +798,18 @@ async function doBackup(){
   toast('Sauvegarde effectuée'); render(); syncBackupInfo();
 }
 $('#backupOut').onclick = doBackup;
+/* Outil : recherche de plaque en ligne, hors appli (rien n'est envoyé depuis les fiches) */
+(()=>{ const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Application'); h.insertAdjacentHTML('beforebegin', `<h3>Outils</h3>
+    <label class="f" for="t_plate">Recherche de plaque (site externe)</label>
+    <input id="t_plate" placeholder="AB-123-CD" autocapitalize="characters" autocomplete="off" spellcheck="false" style="font-family:ui-monospace,Menlo,monospace;font-weight:700;letter-spacing:.08em">
+    <button class="btn sec" id="t_plateGo">Rechercher sur internet</button>
+    <p class="hint">Ouvre un site externe (carverif.fr) dans Safari, la plaque est copiée : colle-la sur le site. Aucune fiche ni donnée de l'appli n'est transmise.</p>`); })();
+$('#t_plate').addEventListener('input', e=>{ e.target.value = e.target.value.toUpperCase(); });
+$('#t_plateGo').onclick = async ()=>{
+  const p = normPlate($('#t_plate').value); if (!p) return toast('Saisis une plaque');
+  try { await navigator.clipboard.writeText(p); toast('Plaque copiée — colle-la sur le site'); } catch {}
+  window.open('https://carverif.fr/pages/historique-vehicule-immatriculation', '_blank', 'noopener');
+};
 /* Rappel de sauvegarde périodique */
 const backupDue = () => +SETTINGS.backupDays > 0 && FICHES.length > 0 && Date.now() - (+SETTINGS.lastBackup||0) > SETTINGS.backupDays*DAY;
 function backupBanner(){
@@ -848,3 +880,5 @@ $('#detSend').innerHTML = ICON.send + '<span>Envoyer</span>'; $('#detEdit').inne
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
+/* Outil Matières dangereuses (ADR) : module séparé */
+(()=>{ const sc = document.createElement('script'); sc.src = 'adr.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
