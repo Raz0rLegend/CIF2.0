@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.5';
+const APP_VERSION = '1.6';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -177,8 +177,27 @@ document.addEventListener('visibilitychange', ()=>{
   }
 });
 
+/* ---------- Contrôles groupés (même créneau de 20 min) ---------- */
+const GROUP_MIN = 20, GROUP_COLORS = ['#f0b429','#4fb3ff','#ff7ab6','#7ee081','#c49bff','#ff9a52'];
+let GROUPS = new Map(); // id -> {n, color, ids}
+function computeGroups(){
+  GROUPS = new Map();
+  const list = FICHES.filter(f=>f.dateHeure && !isNaN(new Date(f.dateHeure))).sort((a,b)=>a.dateHeure.localeCompare(b.dateHeure));
+  let cur = [], start = 0, gi = 0;
+  const flush = () => { if (cur.length > 1) { const g = {n:cur.length, color:GROUP_COLORS[gi++ % GROUP_COLORS.length], ids:cur.map(f=>f.id)}; cur.forEach(f=>GROUPS.set(f.id, g)); } };
+  for (const f of list) {
+    const t = new Date(f.dateHeure).getTime();
+    if (cur.length && t - start <= GROUP_MIN*6e4) cur.push(f);
+    else { flush(); cur = [f]; start = t; }
+  }
+  flush();
+}
+const groupMates = f => { const g = GROUPS.get(f.id); return g ? g.ids.filter(id=>id!==f.id).map(id=>FICHES.find(x=>x.id===id)).filter(Boolean) : []; };
+const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
+
 /* ---------- Liste ---------- */
 function render(){
+  computeGroups();
   const q = QUERY.trim().toLowerCase();
   const pend = FICHES.filter(f=>f.status==='pending'), nA = FICHES.length - pend.length;
   const nCIF = pend.filter(f=>f.type==='CIF').length, nCI = pend.length - nCIF;
@@ -205,12 +224,14 @@ function render(){
     const sub = [f.dateNaissance, f.nationalite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
     const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
-    return `<article class="card${SEL&&SEL.has(f.id)?' sel':''}" data-id="${f.id}">
+    const g = GROUPS.get(f.id);
+    return `<article class="card${SEL&&SEL.has(f.id)?' sel':''}${g?' grp':''}" data-id="${f.id}"${g?` style="--gc:${g.color}"`:''}>
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
         <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${f.resultat?`<b>${esc(f.resultat)}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
+        ${g ? `<div class="gtag">${ICON_LINK}Contrôlés ensemble · ${g.n}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
         ${purgeInfo ? `<div class="note">${purgeInfo}</div>` : ''}
@@ -277,6 +298,7 @@ function panel(title, rows, right=''){
 async function openDetail(f){
   DETAIL = f.id;
   const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length;
+  computeGroups(); const mates = groupMates(f);
   $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
@@ -285,7 +307,7 @@ async function openDetail(f){
         ${f.resultat ? `<span class="chip" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(f.resultat)}</span>` : ''}
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
         ${f.lieuControle ? `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>` : ''}
-      </div></div><div class="vics">${vehIcons(f)}</div></div>`;
+      </div>${mates.length ? `<div class="mates" style="--gc:${GROUPS.get(f.id).color}">${ICON_LINK}<span>Avec ${mates.map(m=>`<button type="button" data-mate="${m.id}">${esc(ficheName(m))}</button>`).join(', ')}</span></div>` : ''}</div><div class="vics">${vehIcons(f)}</div></div>`;
   const veh = (f.vehicules||[]).map((v,i)=>panel(`Véhicule ${i+1}${v.type?` · ${v.type}`:''}`,
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
       v.plaque ? plateHTML(v) : '')).join('');
@@ -310,7 +332,7 @@ async function openDetail(f){
 const detFiche = () => FICHES.find(x=>x.id===DETAIL);
 const closeDetail = () => { DETAIL = null; $('#detail').classList.add('hidden'); };
 $('#detBack').onclick = closeDetail;
-$('#detBody').addEventListener('click', async e=>{ const ph=e.target.closest('.ph'); if (!ph) return; $('#viewer img').src = await photoURL(ph.dataset.id); $('#viewer').classList.remove('hidden'); });
+$('#detBody').addEventListener('click', async e=>{ const mt=e.target.closest('[data-mate]'); if (mt) { const m=FICHES.find(x=>x.id===mt.dataset.mate); if (m) openDetail(m); return; } const ph=e.target.closest('.ph'); if (!ph) return; $('#viewer img').src = await photoURL(ph.dataset.id); $('#viewer').classList.remove('hidden'); });
 $('#detEdit').onclick = ()=>{ const f=detFiche(); closeDetail(); openForm(f); };
 $('#detSend').onclick = ()=>shareFiche(detFiche());
 $('#detArchive').onclick = async ()=>{
@@ -465,7 +487,7 @@ async function shrink(file, max=1600, q=.82){
 function ficheSections(f){
   const cif = f.type === 'CIF', S = [];
   const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
-  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat',f.resultat],['Lieu du contrôle',f.lieuControle]]);
+  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat',f.resultat],['Lieu du contrôle',f.lieuControle],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
   const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, k==='plaque' && v.plaque ? `${v.plaque} (${v.pays||'F'} — ${PAYS_NAME[v.pays||'F']||''})` : v[k]])));
   if (!cif) addVeh(); // CI : le véhicule passe en premier
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
@@ -505,6 +527,7 @@ function openOutlook(subject, body){
 }
 const shareFiche = f => shareFiches([f]);
 async function shareFiches(list){
+  computeGroups();
   const n = list.reduce((a,f)=>a+(f.photos||[]).length, 0);
   const choice = await new Promise(res=>{
     const m = $('#shareSheet'); m.classList.remove('hidden');

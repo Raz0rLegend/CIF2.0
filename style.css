@@ -192,6 +192,14 @@ input[type=time]{min-height:46px}
 .actbar button#detSend{background:#fff;color:#111}
 .actbar button svg{width:20px;height:20px}
 
+/* Contrôles groupés */
+.card.grp{box-shadow:inset 4px 0 0 var(--gc)}
+.gtag{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:var(--gc);background:color-mix(in srgb,var(--gc) 16%,transparent)}
+.gtag svg{width:13px;height:13px}
+.mates{display:flex;align-items:flex-start;gap:6px;margin-top:8px;font-size:13px;color:var(--gc);font-weight:600}
+.mates svg{width:15px;height:15px;flex:none;margin-top:2px}
+.mates button{border:0;background:none;padding:0;color:inherit;font:inherit;text-decoration:underline}
+
 /* iOS 26 (WebKit 301108) : en appli écran d'accueil, la fenêtre est raccourcie de la hauteur
    de la barre d'état tant que la page est moins haute que l'écran → bande en bas.
    Une page au moins aussi haute que l'écran récupère la fenêtre complète. */
