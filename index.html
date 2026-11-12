@@ -119,10 +119,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 .dk{color:var(--muted);font-size:14px}
 .dv{font-size:19px;margin-top:2px;white-space:pre-wrap;word-break:break-word}
 .dv.acc{color:var(--accent)}
-#detBody{padding-bottom:calc(240px + env(safe-area-inset-bottom))}
-.fabs{position:absolute;right:14px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
-.fabs button{width:54px;height:54px;border-radius:50%;border:0;background:#fff;color:#111;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}
-.fabs button svg{width:26px;height:26px}
+#detBody{padding:4px 14px 18px}
 .badge{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;background:#333;color:#ddd}
 .badge.cif{background:#2d4a7a;color:#e6eeff}
 
@@ -157,21 +154,32 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 #sg button:active{background:#3a3a3a}
 #sg b{color:#fff;font-weight:700}
 /* Détail */
-.hero{padding:14px 2px 4px}
-.hero .nm{font-size:27px;font-weight:700;line-height:1.15;letter-spacing:.01em;word-break:break-word}
+.hero{display:flex;align-items:flex-start;gap:12px;padding:10px 2px 2px}
+.hero .hl{flex:1;min-width:0}
+.hero .nm{font-size:24px;font-weight:700;line-height:1.15;word-break:break-word}
 .hero .nm span{font-weight:400}
-.hero .sub2{color:#c4c4c4;margin-top:6px;font-size:15px}
-.chips2{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600;background:#2a2a2a;color:#ddd}
-.chip svg{width:15px;height:15px}
-.panel{background:#191919;border:1px solid #2e2e2e;border-radius:14px;margin-top:14px;overflow:hidden}
-.panel h4{margin:0;padding:10px 14px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a8a8a8;background:#212121;border-bottom:1px solid #2e2e2e;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.kv{display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid #262626}
-.kv:last-child{border-bottom:0}
-.kv .k{flex:0 0 36%;color:var(--muted);font-size:14px;padding-top:2px}
-.kv .v{flex:1;font-size:17px;word-break:break-word;white-space:pre-wrap}
-.kv .v a{color:#7fb3ff;text-decoration:none}
-.plate{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:15px;letter-spacing:.06em;background:#f4f4f4;color:#111;border-radius:5px;padding:2px 8px 2px 6px;border-left:7px solid #1f4fbf;text-transform:none}
+.hero .sub2{color:#c4c4c4;margin-top:4px;font-size:14px}
+.hero .vics{display:flex;gap:6px;flex:none}
+.hero .vic{width:46px;height:46px;border-radius:12px;background:#262626;border:1px solid #3a3a3a;display:grid;place-items:center;color:#f0f0f0}
+.hero .vic svg{width:30px;height:30px}
+.card .vics{display:inline-flex;gap:4px;margin-right:8px}
+.card .vic svg{width:18px;height:18px;color:#bdbdbd}
+.chips2{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:600;background:#2a2a2a;color:#ddd}
+.chip svg{width:14px;height:14px}
+.panel{background:#191919;border:1px solid #2e2e2e;border-radius:12px;margin-top:10px;overflow:hidden}
+.panel h4{margin:0;padding:6px 12px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#a8a8a8;background:#212121;display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:30px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#2a2a2a;border-top:1px solid #2a2a2a}
+.cell{background:#191919;padding:5px 12px 6px;min-width:0}
+.cell.full{grid-column:1/-1}
+.cell .k{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8d8d8d}
+.cell .v{font-size:16px;margin-top:1px;word-break:break-word;white-space:pre-wrap;line-height:1.3}
+.cell .v a{color:#7fb3ff;text-decoration:none}
+.plate{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:14px;letter-spacing:.06em;background:#f4f4f4;color:#111;border-radius:4px;padding:1px 7px 1px 5px;border-left:6px solid #1f4fbf;text-transform:none}
+.actbar{display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--panel)}
+.actbar button{flex:1;height:52px;border:0;border-radius:12px;background:#2b2b2b;display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:600}
+.actbar button#detSend{background:#fff;color:#111}
+.actbar button svg{width:20px;height:20px}
 </style>
 </head>
 <body>
@@ -273,8 +281,6 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
     <button type="button" class="addveh" id="addVeh">＋ Ajouter un véhicule</button>
 
     <div class="sect">Contexte</div>
-    <label class="f">Qualité</label>
-    <div class="chips" id="qualites"></div>
     <label class="f" for="f_lieuControle">Lieu</label>
     <input id="f_lieuControle" data-sg="lieux" autocomplete="off" placeholder="Lieu du contrôle / de l'observation">
     <label class="f" for="f_motif">Motif</label>
@@ -301,11 +307,11 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
     <button class="ib" id="detDelete" aria-label="Supprimer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
   </div>
   <div class="body" id="detBody"></div>
-  <div class="fabs">
+  <footer class="actbar">
     <button id="detArchive" aria-label="Archiver"></button>
     <button id="detSend" aria-label="Envoyer"></button>
     <button id="detEdit" aria-label="Modifier"></button>
-  </div>
+  </footer>
 </div>
 
 <!-- Réglages -->
@@ -364,7 +370,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 
 <script>
 'use strict';
-const APP_VERSION = '0.5';
+const APP_VERSION = '0.6';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -373,6 +379,16 @@ const uid = () => Date.now().toString(36) + crypto.getRandomValues(new Uint32Arr
 const DAY = 864e5;
 const RES_COLORS = {'NDN':'#3ccf4e','Oméga':'#b77cff','CDPA':'#ff5a52','CDPU':'#ff5a52','CDPJ':'#ff5a52'};
 const resColor = f => RES_COLORS[f.resultat] || '#cfcfcf';
+const VICON = {
+  'VL':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.3 16H2.8a.8.8 0 0 1-.8-.8v-2.4c0-.6.4-1.1 1-1.3l3-.9 2.6-3a2 2 0 0 1 1.5-.6h4.6a2 2 0 0 1 1.5.7l2.7 2.9 2.2.5c.6.2 1 .7 1 1.3v2.8a.8.8 0 0 1-.8.8h-1.5M9 16h6"/><path d="M7 10.6h12.5"/><path d="M12 7.2v3.4"/><circle cx="6.7" cy="16.2" r="2.2"/><circle cx="17.3" cy="16.2" r="2.2"/></svg>',
+  '2RM':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="16.5" r="3"/><circle cx="19" cy="16.5" r="3"/><path d="M5 16.5 8.5 12h6l1.5 1.5"/><path d="M7.5 12 9 9.5h4.5l1 2.5z" fill="currentColor"/><path d="M9.5 16.5h4.5l1.5-3"/><path d="M19 16.5 16.5 8H18.5"/><path d="M15.5 6.5h3.5"/></svg>',
+  'Camion':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h11.5V17H2zM13.5 9h4.2L21 12.5V17h-7.5"/><circle cx="6" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/></svg>',
+  'Vélo':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16 9 9.5h7l2.5 6.5M9 9.5l3.5 6.5H5.5M8 6.5h3M16 9.5l-1.2-3H17"/></svg>',
+  'Autre':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2"/><path d="M12 3.5V10M5 16.5l5.3-3.3M19 16.5l-5.3-3.3"/></svg>',
+  'Piéton':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4.5" r="2"/><path d="M9.5 21l2.2-6.5 2.8 2.8V21M8 12.5l2-4.5 3.5 1 2 3H18M11.5 8.5l-1 5.5"/></svg>'
+};
+const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
+const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
 const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docNumero','docDate','docLieu','lieuControle','motif','observations'];
 const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
@@ -549,7 +565,7 @@ function render(){
   }
   $('#list').innerHTML = items.map(f=>{
     const name = [ (f.nom||'').toUpperCase(), f.prenom ].filter(Boolean).join(' | ') || '<span style="color:var(--muted)">Sans identité</span>';
-    const sub = [f.dateNaissance, f.qualite].filter(Boolean).join(' | ');
+    const sub = [f.dateNaissance, f.nationalite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
     const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
     return `<article class="card${SEL&&SEL.has(f.id)?' sel':''}" data-id="${f.id}">
@@ -562,7 +578,7 @@ function render(){
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
         ${purgeInfo ? `<div class="note">${purgeInfo}</div>` : ''}
         <div class="r2">
-          <div class="meta">${n ? ICON.cam + n : ''}</div>
+          <div class="meta"><span class="vics">${vehIcons(f)}</span>${n ? ICON.cam + n : ''}</div>
           <div class="acts${SEL?' hidden':''}">
             <button class="ib" data-act="del" aria-label="Supprimer">${ICON.trash}</button>
             <button class="ib" data-act="edit" aria-label="Modifier">${ICON.edit}</button>
@@ -610,35 +626,42 @@ let DETAIL = null;
 const ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 const ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
 function panel(title, rows, right=''){
-  rows = rows.filter(r=>r[1]); if (!rows.length) return '';
-  return `<section class="panel"><h4><span>${esc(title)}</span>${right}</h4>${rows.map(([k,v,raw])=>`<div class="kv"><div class="k">${esc(k)}</div><div class="v">${raw ? v : esc(v)}</div></div>`).join('')}</section>`;
+  rows = rows.filter(r=>r[1]); if (!rows.length && !right) return '';
+  const LONG = /Adresse|Observations|Filiation|Motif/;
+  let col = 0; const cells = [];
+  rows.forEach(([k,v,raw],i)=>{
+    let full = LONG.test(k) || String(raw ? '' : v).length > 22;
+    if (!full && col===0) { const nx = rows[i+1]; if (!nx || LONG.test(nx[0]) || String(nx[2]?'':nx[1]).length > 22) full = true; }
+    cells.push(`<div class="cell${full?' full':''}"><div class="k">${esc(k)}</div><div class="v">${raw ? v : esc(v)}</div></div>`);
+    col = full ? 0 : 1 - col;
+  });
+  return `<section class="panel"><h4><span>${esc(title)}</span>${right}</h4>${cells.length?`<div class="grid">${cells.join('')}</div>`:''}</section>`;
 }
 async function openDetail(f){
   DETAIL = f.id;
   const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length;
   $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
-  const hero = `<div class="hero">
+  const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
       ${born || f.nationalite ? `<div class="sub2">${esc([born, f.nationalite].filter(Boolean).join(' · '))}</div>` : ''}
       <div class="chips2">
         ${f.resultat ? `<span class="chip" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(f.resultat)}</span>` : ''}
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
         ${f.lieuControle ? `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>` : ''}
-      </div></div>`;
+      </div></div><div class="vics">${vehIcons(f)}</div></div>`;
   const veh = (f.vehicules||[]).map((v,i)=>panel(`Véhicule ${i+1}${v.type?` · ${v.type}`:''}`,
-      [['Marque',v.marque],['Type / modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio], ...(v.plaque?[]:[])],
-      v.plaque ? `<span class="plate">${esc(v.plaque)}</span>` : '') || (v.plaque ? `<section class="panel"><h4><span>Véhicule ${i+1}${v.type?` · ${v.type}`:''}</span><span class="plate">${esc(v.plaque)}</span></h4></section>` : '')).join('');
+      [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
+      v.plaque ? `<span class="plate">${esc(v.plaque)}</span>` : '')).join('');
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
-  const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse],
-      ...(cif ? [['Téléphone',tel,true],['Filiation',f.filiation]] : [])]);
+  const ident = panel('Identité', [['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
-  const ctx = panel('Contexte', [['Qualité',f.qualite],['Motif',f.motif],['Observations',f.observations]]);
+  const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
   const arch = f.status==='archived' ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '';
   $('#detBody').innerHTML = hero + (cif ? ident + doc + veh : veh + ident) + ctx + photos + arch;
-  $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore : ICON.archive;
+  $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore + '<span>Remettre</span>' : ICON.archive + '<span>Archiver</span>';
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
   $('#detail').classList.remove('hidden'); $('#detail .body').scrollTop = 0;
   for (const el of $('#detBody').querySelectorAll('.ph')) el.querySelector('img').src = await photoURL(el.dataset.id);
@@ -662,13 +685,11 @@ $('#detDelete').onclick = async ()=>{
 };
 
 /* ---------- Formulaire ---------- */
-$('#qualites').innerHTML = QUALITES.map(q=>`<label><input type="radio" name="qualite" value="${q}"><span>${q}</span></label>`).join('');
 function openForm(f){
   const isNew = !f;
   EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
-  document.querySelectorAll('input[name=qualite]').forEach(r=>r.checked = r.value===EDIT.f.qualite);
   setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
   renderVehicles();
   $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
@@ -682,7 +703,6 @@ async function closeForm(save){
   const E = EDIT;
   if (save) {
     for (const k of FIELDS) E.f[k] = $('#f_'+k).value.trim();
-    E.f.qualite = document.querySelector('input[name=qualite]:checked')?.value || '';
     E.f.type = segVal('typeSeg'); E.f.docMode = segVal('docSeg');
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
     if (E.f.type === 'CI') for (const k of CIF_FIELDS) E.f[k] = '';
@@ -798,7 +818,7 @@ function ficheSections(f){
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
     : !(f.docType||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   if (cif) addVeh();
-  add('Contexte', [['Qualité',f.qualite],['Motif',f.motif],['Observations',f.observations]]);
+  add('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   return S;
 }
 function ficheText(f){
@@ -1009,7 +1029,7 @@ $('#wipe').onclick = async ()=>{
   await wipeAll();
 };
 
-$('#detSend').innerHTML = ICON.send; $('#detEdit').innerHTML = ICON.edit;
+$('#detSend').innerHTML = ICON.send + '<span>Envoyer</span>'; $('#detEdit').innerHTML = ICON.edit + '<span>Modifier</span>';
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
