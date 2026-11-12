@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rens.">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" id="touchIcon" href="icon.svg">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Renseignement</title>
+<style>
+:root{--bg:#121212;--panel:#1e1e1e;--card:#1c1c1c;--line:#323232;--text:#ececec;--muted:#9a9a9a;--accent:#3ccf4e;--danger:#ff5a52;--field:#1a1a1a;--border:#565656}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+.hidden{display:none!important}
+svg{display:block}
+
+/* Écran de verrouillage */
+#lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));background:var(--bg);z-index:50}
+#lock .box{width:100%;max-width:340px;text-align:center}
+#lock img{width:84px;height:84px;border-radius:20px;margin-bottom:16px}
+#lock h2{margin:0 0 6px;font-size:22px}
+#lock p{color:var(--muted);font-size:14px;margin:0 0 18px}
+#lock input{text-align:center;font-size:22px;letter-spacing:.3em;margin-bottom:10px}
+#lockErr{color:var(--danger);min-height:20px;font-size:14px;margin:4px 0 8px}
+.btn{width:100%;height:50px;border:0;border-radius:12px;background:#fff;color:#111;font-weight:600;font-size:17px}
+.btn:disabled{opacity:.5}
+.btn.sec{background:#2b2b2b;color:var(--text)}
+.btn.danger{background:#3a1d1c;color:var(--danger)}
+.link{background:none;border:0;color:var(--muted);font-size:14px;margin-top:18px;text-decoration:underline}
+
+/* En-tête et liste */
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:4px;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{flex:1;margin:0 0 0 6px;font-size:19px;font-weight:600}
+.ib{background:none;border:0;width:44px;height:44px;display:grid;place-items:center;border-radius:10px}
+.ib:active{background:#2c2c2c}
+.ib svg{width:24px;height:24px}
+#searchbar{padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+#list{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+.card{display:flex;gap:12px;padding:14px 12px 8px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+.card .thumb{width:58px;height:58px;border-radius:8px;object-fit:cover;background:#000;flex:none}
+.card .main{flex:1;min-width:0}
+.card .r1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.card .name{font-size:17px;word-break:break-word}
+.card .date{color:var(--accent);font-size:14px;white-space:nowrap}
+.card .sub{color:#cfcfcf;margin-top:4px;font-size:15px}
+.card .note{color:var(--muted);font-size:13px;margin-top:4px}
+.card .r2{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+.card .meta{color:var(--muted);font-size:13px;display:flex;gap:6px;align-items:center}
+.card .meta svg{width:16px;height:16px}
+.acts{display:flex}
+.acts .ib svg{width:22px;height:22px;color:#bdbdbd}
+.empty{text-align:center;color:var(--muted);padding:60px 24px}
+#fab{position:fixed;right:20px;bottom:calc(84px + env(safe-area-inset-bottom));width:62px;height:62px;border-radius:50%;background:#fff;color:#111;border:0;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:6}
+#fab svg{width:30px;height:30px}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:6}
+nav.tabs button{flex:1;height:60px;border:0;background:none;color:var(--muted);font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button.on{background:#fff;color:#111}
+
+/* Feuilles plein écran */
+.sheet{position:fixed;inset:0;z-index:20;background:var(--panel);display:flex;flex-direction:column}
+.sheet .top{display:flex;align-items:center;gap:6px;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;border-bottom:1px solid var(--line)}
+.sheet .top h2{flex:1;margin:0;font-size:18px;font-weight:600}
+.sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 18px 30px}
+.sheet footer{display:flex;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.sheet footer button{flex:1;height:56px;border:0;background:none;font-size:18px}
+.sheet footer button.primary{font-weight:700}
+label.f{display:block;margin:16px 0 6px;color:#d0d0d0;font-size:15px}
+label.f .req{color:var(--muted)}
+input,select,textarea{width:100%;background:var(--field);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:16px;font-family:inherit;-webkit-appearance:none;appearance:none}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#bbb}
+textarea{min-height:110px;resize:vertical}
+input[type=datetime-local]{min-height:48px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{position:relative}
+.chips input{position:absolute;opacity:0;pointer-events:none}
+.chips span{display:inline-block;padding:9px 14px;border:1px solid var(--border);border-radius:20px;font-size:15px}
+.chips input:checked+span{background:#fff;color:#111;border-color:#fff}
+.sect{margin:26px 0 4px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.06em}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;background:#000}
+.ph img{width:100%;height:100%;object-fit:cover}
+.ph .x{position:absolute;top:5px;right:5px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;display:grid;place-items:center}
+.ph .x svg{width:16px;height:16px}
+.addph{aspect-ratio:1;border:1px dashed #666;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:13px;background:none}
+.addph svg{width:28px;height:28px}
+.err{color:var(--danger);font-size:14px;margin-top:12px;min-height:18px}
+.seg{display:flex;background:var(--field);border:1px solid var(--border);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;height:42px;border:0;border-radius:8px;background:none;color:var(--muted);font-size:16px;font-weight:600}
+.seg button.on{background:#fff;color:#111}
+.veh{border:1px solid var(--line);border-radius:12px;padding:4px 12px 12px;margin-top:10px;background:#191919}
+.veh .vh{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.veh .vh b{font-size:15px}
+.veh .ib svg{width:20px;height:20px;color:#bdbdbd}
+.veh .chips span{padding:7px 12px;font-size:14px}
+.addveh{width:100%;height:48px;margin-top:10px;border:1px dashed #666;border-radius:10px;background:none;color:var(--text);font-size:16px}
+.dl{padding:10px 0}
+.dk{color:var(--muted);font-size:14px}
+.dv{font-size:19px;margin-top:2px;white-space:pre-wrap;word-break:break-word}
+.dv.acc{color:var(--accent)}
+#detBody{padding-bottom:calc(240px + env(safe-area-inset-bottom))}
+.fabs{position:absolute;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
+.fabs button{width:60px;height:60px;border-radius:50%;border:0;background:#fff;color:#111;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.fabs button svg{width:26px;height:26px}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;background:#333;color:#ddd}
+.badge.cif{background:#2d4a7a;color:#e6eeff}
+
+/* Réglages */
+.set{margin-top:14px}
+.set h3{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:24px 0 8px}
+.set .btn{margin-top:8px}
+.set .hint{color:var(--muted);font-size:13px;margin:6px 0 0}
+.row{display:flex;gap:8px}
+
+/* Visionneuse, fenêtre de confirmation, toast, masque */
+#viewer{position:fixed;inset:0;background:#000;z-index:40;display:flex;align-items:center;justify-content:center}
+#viewer img{max-width:100%;max-height:100%}
+#viewer .ib{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:10px;color:#fff;background:rgba(40,40,40,.7)}
+#modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px}
+#modal .box{background:#262626;border-radius:16px;padding:20px;width:100%;max-width:340px}
+#modal p{margin:0 0 18px;white-space:pre-line}
+#modal .row .btn{height:46px;font-size:16px}
+#shareSheet{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}
+#shareSheet .box{width:100%;padding:10px 10px calc(10px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+#shareSheet button{border:0;border-radius:14px;background:#2a2a2a;padding:14px 16px;text-align:left;display:flex;flex-direction:column;gap:2px}
+#shareSheet button b{font-size:17px}
+#shareSheet button small{color:var(--muted);font-size:13px}
+#shareSheet button.cancel{text-align:center;font-weight:600;font-size:17px;background:#fff;color:#111}
+#toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);background:#f2f2f2;color:#111;padding:10px 16px;border-radius:22px;font-size:15px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center}
+#toast.on{opacity:1}
+#cover{position:fixed;inset:0;background:var(--bg);z-index:80}
+</style>
+</head>
+<body>
+
+<!-- Verrouillage -->
+<div id="lock">
+  <form class="box" id="lockForm" autocomplete="off">
+    <img id="lockIcon" src="icon.svg" alt="">
+    <h2 id="lockTitle">Déverrouiller</h2>
+    <p id="lockHint"></p>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="Code" aria-label="Code">
+    <input id="pin2" type="password" inputmode="numeric" autocomplete="off" placeholder="Confirmer le code" aria-label="Confirmer le code" class="hidden">
+    <div id="lockErr"></div>
+    <button class="btn" id="lockBtn" type="submit">Valider</button>
+    <button class="link hidden" id="forgot" type="button">Code oublié ? Tout effacer</button>
+  </form>
+</div>
+
+<!-- Application -->
+<div id="app" class="hidden">
+  <header>
+    <button class="ib" id="btnSettings" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h11M4 18h7"/></svg></button>
+    <h1 id="title">Renseignement</h1>
+    <button class="ib" id="btnSearch" aria-label="Rechercher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+    <button class="ib" id="btnLock" aria-label="Verrouiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
+  </header>
+  <div id="searchbar" class="hidden"><input id="q" type="search" placeholder="Nom, date, lieu, véhicule…" autocomplete="off"></div>
+  <main id="list"></main>
+  <button id="fab" aria-label="Nouvelle fiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <nav class="tabs">
+    <button data-tab="pending" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></svg><span id="tabPending">En cours</span></button>
+    <button data-tab="archived"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg><span id="tabArchived">Archives</span></button>
+  </nav>
+</div>
+
+<!-- Formulaire -->
+<div id="form" class="sheet hidden">
+  <div class="top">
+    <button class="ib" id="formBack" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2 id="formTitle">Nouvelle fiche</h2>
+    <button class="ib hidden" id="formDelete" aria-label="Supprimer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+  </div>
+  <div class="body">
+    <label class="f">Type de contrôle</label>
+    <div class="seg" id="typeSeg"><button type="button" data-v="CI">CI</button><button type="button" data-v="CIF">CIF</button></div>
+
+    <label class="f" for="f_dateHeure">Date &amp; heure</label>
+    <input id="f_dateHeure" type="datetime-local">
+
+    <div class="sect">Identité</div>
+    <label class="f" for="f_nom">Nom</label>
+    <input id="f_nom" autocapitalize="characters" autocomplete="off" spellcheck="false">
+    <label class="f" for="f_prenom">Prénom</label>
+    <input id="f_prenom" autocapitalize="words" autocomplete="off" spellcheck="false">
+    <label class="f" for="f_dateNaissance">Date de naissance</label>
+    <input id="f_dateNaissance" inputmode="numeric" placeholder="JJ/MM/AAAA" autocomplete="off">
+    <label class="f" for="f_lieuNaissance">Lieu de naissance</label>
+    <input id="f_lieuNaissance" autocapitalize="words" autocomplete="off">
+    <label class="f" for="f_nationalite">Nationalité</label>
+    <input id="f_nationalite" list="nats" autocomplete="off">
+    <datalist id="nats"><option>Française</option><option>Monégasque</option><option>Italienne</option><option>Portugaise</option><option>Espagnole</option><option>Belge</option><option>Suisse</option><option>Britannique</option><option>Allemande</option><option>Tunisienne</option><option>Marocaine</option><option>Algérienne</option><option>Roumaine</option><option>Russe</option><option>Ukrainienne</option><option>Américaine</option></datalist>
+    <label class="f" for="f_profession">Profession</label>
+    <input id="f_profession" autocomplete="off">
+    <label class="f" for="f_adresse">Adresse</label>
+    <input id="f_adresse" autocomplete="off">
+
+    <div id="cifBlock">
+      <div class="sect">Compléments CIF</div>
+      <label class="f" for="f_telephone">Téléphone</label>
+      <input id="f_telephone" type="tel" inputmode="tel" autocomplete="off">
+      <label class="f" for="f_filiation">Filiation</label>
+      <input id="f_filiation" autocomplete="off" placeholder="Fils/fille de … et de …">
+      <label class="f">Identité établie</label>
+      <div class="seg" id="docSeg"><button type="button" data-v="Sur dires">Sur dires</button><button type="button" data-v="Officiel">Pièce officielle</button></div>
+      <div id="docBlock">
+        <label class="f" for="f_docType">Type de document</label>
+        <input id="f_docType" list="docTypes" autocomplete="off">
+        <datalist id="docTypes"><option>Carte nationale d'identité</option><option>Passeport</option><option>Titre de séjour</option><option>Carte de résident</option><option>Permis de conduire</option><option>Carte d'identité monégasque</option><option>Autre</option></datalist>
+        <label class="f" for="f_docNumero">Numéro</label>
+        <input id="f_docNumero" autocapitalize="characters" autocomplete="off" spellcheck="false">
+        <div class="row">
+          <div style="flex:1"><label class="f" for="f_docDate">Délivré le</label><input id="f_docDate" inputmode="numeric" placeholder="JJ/MM/AAAA" autocomplete="off"></div>
+          <div style="flex:1"><label class="f" for="f_docLieu">Délivré à / par</label><input id="f_docLieu" autocomplete="off"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect">Véhicules</div>
+    <div id="vehicles"></div>
+    <button type="button" class="addveh" id="addVeh">＋ Ajouter un véhicule</button>
+
+    <div class="sect">Contexte</div>
+    <label class="f" for="f_resultat">Résultat</label>
+    <input id="f_resultat" autocomplete="off" placeholder="Résultat des vérifications">
+    <label class="f">Qualité</label>
+    <div class="chips" id="qualites"></div>
+    <label class="f" for="f_lieuControle">Lieu</label>
+    <input id="f_lieuControle" autocomplete="off" placeholder="Lieu du contrôle / de l'observation">
+    <label class="f" for="f_motif">Motif</label>
+    <input id="f_motif" autocomplete="off">
+    <label class="f" for="f_observations">Observations</label>
+    <textarea id="f_observations"></textarea>
+
+    <div class="sect">Photos</div>
+    <div class="photos" id="photos"></div>
+    <input id="phInput" type="file" accept="image/*" multiple class="hidden">
+    <div class="err" id="formErr"></div>
+  </div>
+  <footer>
+    <button id="formCancel">Annuler</button>
+    <button id="formSave" class="primary">Enregistrer</button>
+  </footer>
+</div>
+
+<!-- Fiche en lecture -->
+<div id="detail" class="sheet hidden">
+  <div class="top">
+    <button class="ib" id="detBack" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2 id="detTitle"></h2>
+    <button class="ib" id="detDelete" aria-label="Supprimer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+  </div>
+  <div class="body" id="detBody"></div>
+  <div class="fabs">
+    <button id="detArchive" aria-label="Archiver"></button>
+    <button id="detSend" aria-label="Envoyer"></button>
+    <button id="detEdit" aria-label="Modifier"></button>
+  </div>
+</div>
+
+<!-- Réglages -->
+<div id="settings" class="sheet hidden">
+  <div class="top">
+    <button class="ib" id="setBack" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <h2>Réglages</h2>
+  </div>
+  <div class="body set">
+    <h3>Archives</h3>
+    <label class="f" for="s_purge">Suppression automatique des archives</label>
+    <select id="s_purge"><option value="7">Après 7 jours</option><option value="30">Après 30 jours</option><option value="90">Après 90 jours</option><option value="0">Jamais</option></select>
+
+    <h3>Sécurité</h3>
+    <label class="f" for="s_lock">Verrouillage automatique en arrière-plan</label>
+    <select id="s_lock"><option value="0">Immédiat</option><option value="1">Après 1 minute</option><option value="5">Après 5 minutes</option><option value="15">Après 15 minutes</option></select>
+    <label class="f">Changer le code</label>
+    <input id="c_old" type="password" inputmode="numeric" placeholder="Code actuel" autocomplete="off">
+    <div style="height:8px"></div>
+    <input id="c_new" type="password" inputmode="numeric" placeholder="Nouveau code" autocomplete="off">
+    <div style="height:8px"></div>
+    <input id="c_new2" type="password" inputmode="numeric" placeholder="Confirmer le nouveau code" autocomplete="off">
+    <button class="btn sec" id="c_btn">Changer le code</button>
+
+    <h3>Transfert vers le PC</h3>
+    <button class="btn sec" id="exportOutlook">Envoyer toutes les fiches en cours par Outlook</button>
+    <button class="btn sec" id="exportText">Partager toutes les fiches en cours (texte)</button>
+    <p class="hint">Ouvre le menu Partager (AirDrop, Mail, Notes…). Les données quittent alors l'appli.</p>
+
+    <h3>Sauvegarde</h3>
+    <button class="btn sec" id="backupOut">Exporter une sauvegarde chiffrée</button>
+    <button class="btn sec" id="backupIn">Restaurer une sauvegarde</button>
+    <input id="backupFile" type="file" accept=".json,application/json" class="hidden">
+    <p class="hint">Le fichier reste chiffré : il faudra le code en vigueur au moment de l'export pour le relire.</p>
+
+    <h3>Zone sensible</h3>
+    <button class="btn danger" id="wipe">Tout effacer</button>
+    <p class="hint" id="storageInfo"></p>
+  </div>
+</div>
+
+<div id="viewer" class="hidden"><img alt=""><button class="ib" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+<div id="modal" class="hidden"><div class="box"><p id="mMsg"></p><div class="row"><button class="btn sec" id="mNo">Annuler</button><button class="btn" id="mYes">OK</button></div></div></div>
+<div id="shareSheet" class="hidden"><div class="box">
+  <button data-sh="outlook"><b>Envoyer par Outlook</b><small id="shOutlookHint"></small></button>
+  <button data-sh="share"><b>Partager avec les photos</b><small id="shShareHint"></small></button>
+  <button data-sh="cancel" class="cancel">Annuler</button>
+</div></div>
+<div id="toast"></div>
+<div id="cover" class="hidden"></div>
+
+<script>
+'use strict';
+/* ---------- Utilitaires ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const te = new TextEncoder(), td = new TextDecoder();
+const uid = () => Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
+const DAY = 864e5;
+const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
+const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docNumero','docDate','docLieu','lieuControle','motif','observations'];
+const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
+const VEH_TYPES = ['VL','2RM','Camion','Vélo','Autre'];
+const VEH_FIELDS = [['marque','Marque'],['modele','Type / modèle'],['couleur','Couleur'],['plaque','Plaque'],['proprio','Propriétaire']];
+const ICON = {
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>',
+  archive:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M12 12v5M9.5 14.5 12 17l2.5-2.5"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  restore:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5M4 4v4.5h4.5"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.7 2.3 2.9 9.6c-.8.3-.8 1.4 0 1.7l6.4 2.6 2.6 6.4c.3.8 1.4.8 1.7 0l7.3-18.8c.2-.6-.4-1.2-1.2-1.2zM10.4 12.6l6.8-5.8-5.8 6.8-.3 3.6-.7-4.6z"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>'
+};
+const fmtDT = iso => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return iso;
+  return d.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}) + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); };
+const fmtD = ts => new Date(ts).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+const nowLocal = () => { const d = new Date(); d.setSeconds(0,0); return new Date(d - d.getTimezoneOffset()*6e4).toISOString().slice(0,16); };
+
+let toastT;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2200); }
+function ask(msg, yes='Confirmer', danger=true){
+  return new Promise(res=>{
+    $('#mMsg').textContent=msg; const y=$('#mYes'); y.textContent=yes; y.className='btn'+(danger?' danger':'');
+    $('#modal').classList.remove('hidden');
+    const done=v=>{ $('#modal').classList.add('hidden'); y.onclick=$('#mNo').onclick=null; res(v); };
+    y.onclick=()=>done(true); $('#mNo').onclick=()=>done(false);
+  });
+}
+
+/* ---------- Base locale (IndexedDB) ---------- */
+let db;
+const req = r => new Promise((res,rej)=>{ r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('renseignement',1);
+  r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore('meta'); d.createObjectStore('fiches',{keyPath:'id'}); d.createObjectStore('photos',{keyPath:'id'}); };
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+const os = (s,m='readonly') => db.transaction(s,m).objectStore(s);
+const dbGet = (s,k) => req(os(s).get(k));
+const dbPut = (s,v,k) => req(k===undefined ? os(s,'readwrite').put(v) : os(s,'readwrite').put(v,k));
+const dbDel = (s,k) => req(os(s,'readwrite').delete(k));
+const dbAll = s => req(os(s).getAll());
+function writeAll(ops){ // une seule transaction : tout ou rien
+  return new Promise((res,rej)=>{ const tx=db.transaction(['meta','fiches','photos'],'readwrite');
+    for (const [s,fn] of ops) fn(tx.objectStore(s));
+    tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); });
+}
+
+/* ---------- Chiffrement (AES-GCM 256, clé dérivée du code par PBKDF2) ---------- */
+let KEY = null;
+async function deriveKey(pin, salt){
+  const base = await crypto.subtle.importKey('raw', te.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:310000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function encBytes(key, buf){ const iv=crypto.getRandomValues(new Uint8Array(12)); return { iv, data: await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, buf) }; }
+const decBytes = (key, r) => crypto.subtle.decrypt({name:'AES-GCM', iv:r.iv}, key, r.data);
+const encJSON = (key, o) => encBytes(key, te.encode(JSON.stringify(o)));
+const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
+
+/* ---------- État ---------- */
+let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1}, TAB='pending', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
+const urlCache = new Map();
+
+async function saveFiche(f){
+  f.updatedAt = Date.now();
+  const r = await encJSON(KEY, f);
+  await dbPut('fiches', {id:f.id, iv:r.iv, data:r.data});
+  const i = FICHES.findIndex(x=>x.id===f.id); if (i<0) FICHES.push(f); else FICHES[i]=f;
+}
+async function removeFiche(id){
+  const f = FICHES.find(x=>x.id===id);
+  for (const p of (f?.photos||[])) await removePhoto(p);
+  await dbDel('fiches', id); FICHES = FICHES.filter(x=>x.id!==id);
+}
+async function savePhoto(blob){ const id=uid(); const r=await encBytes(KEY, await blob.arrayBuffer()); await dbPut('photos',{id, iv:r.iv, data:r.data}); return id; }
+async function removePhoto(id){ await dbDel('photos', id); const u=urlCache.get(id); if(u){ URL.revokeObjectURL(u); urlCache.delete(id); } }
+async function photoBuf(id){ const r=await dbGet('photos',id); return r ? decBytes(KEY, r) : null; }
+async function photoURL(id){
+  if (urlCache.has(id)) return urlCache.get(id);
+  const b = await photoBuf(id); if (!b) return '';
+  const u = URL.createObjectURL(new Blob([b],{type:'image/jpeg'})); urlCache.set(id,u); return u;
+}
+async function purge(){
+  if (!+SETTINGS.purgeDays) return;
+  const lim = Date.now() - SETTINGS.purgeDays*DAY;
+  for (const f of FICHES.filter(f=>f.status==='archived' && f.archivedAt < lim)) await removeFiche(f.id);
+}
+
+/* ---------- Verrouillage ---------- */
+function showLock(setup){
+  lockMode = setup ? 'setup' : 'unlock';
+  $('#lock').classList.remove('hidden'); $('#app').classList.add('hidden');
+  $('#lockTitle').textContent = setup ? 'Créer ton code' : 'Déverrouiller';
+  $('#lockHint').textContent = setup ? "Ce code chiffre toutes les fiches et photos. Sans lui, elles sont irrécupérables." : '';
+  $('#pin2').classList.toggle('hidden', !setup); $('#forgot').classList.toggle('hidden', setup);
+  $('#pin').value = $('#pin2').value = ''; $('#lockErr').textContent = '';
+  setTimeout(()=>$('#pin').focus(), 150);
+}
+function lock(){
+  KEY = null; FICHES = []; EDIT = null;
+  for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear();
+  DETAIL = null;
+  ['#form','#detail','#settings','#viewer','#modal','#shareSheet'].forEach(s=>$(s).classList.add('hidden'));
+  $('#list').innerHTML = ''; $('#q').value=''; QUERY='';
+  showLock(false);
+}
+$('#lockForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const pin = $('#pin').value, err = m => { $('#lockErr').textContent = m; $('#pin').select(); };
+  const btn = $('#lockBtn'); btn.disabled = true; btn.textContent = '…';
+  try {
+    if (lockMode === 'setup') {
+      if (pin.length < 4) return err('4 caractères minimum');
+      if (pin !== $('#pin2').value) return err('Les deux codes ne correspondent pas');
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      KEY = await deriveKey(pin, salt);
+      const v = await encJSON(KEY, {ok:true});
+      await dbPut('meta', {salt, verifier:{iv:v.iv, data:v.data}}, 'auth');
+    } else {
+      const auth = await dbGet('meta','auth');
+      const k = await deriveKey(pin, auth.salt);
+      try { await decJSON(k, auth.verifier); } catch { return err('Code incorrect'); }
+      KEY = k;
+    }
+    FICHES = await Promise.all((await dbAll('fiches')).map(r=>decJSON(KEY, r)));
+    await purge();
+    $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+    render();
+  } catch (ex) { err('Erreur : ' + ex.message); }
+  finally { btn.disabled = false; btn.textContent = 'Valider'; }
+});
+$('#forgot').onclick = async ()=>{
+  if (!await ask("Effacer TOUTES les fiches et photos de cet appareil ?\nCette action est définitive.", 'Tout effacer')) return;
+  await wipeAll();
+};
+async function wipeAll(){
+  await writeAll([['meta',s=>s.clear()],['fiches',s=>s.clear()],['photos',s=>s.clear()]]);
+  await dbPut('meta', SETTINGS, 'settings');
+  lock(); showLock(true); toast('Données effacées');
+}
+$('#btnLock').onclick = lock;
+document.addEventListener('visibilitychange', ()=>{
+  if (document.hidden) { hiddenAt = Date.now(); if (KEY) $('#cover').classList.remove('hidden'); }
+  else {
+    if (KEY && Date.now() - hiddenAt >= SETTINGS.lockMinutes*6e4) lock();
+    $('#cover').classList.add('hidden');
+  }
+});
+
+/* ---------- Liste ---------- */
+function render(){
+  const q = QUERY.trim().toLowerCase();
+  const nP = FICHES.filter(f=>f.status==='pending').length, nA = FICHES.length - nP;
+  $('#tabPending').textContent = `En cours${nP?` (${nP})`:''}`;
+  $('#tabArchived').textContent = `Archives${nA?` (${nA})`:''}`;
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===TAB));
+  $('#fab').classList.toggle('hidden', TAB!=='pending');
+  let items = FICHES.filter(f=>f.status===TAB);
+  if (q) items = items.filter(f => [...FIELDS.map(k=>f[k]||''), f.qualite, f.type, ...(f.vehicules||[]).flatMap(v=>Object.values(v))].join(' ').toLowerCase().includes(q));
+  items.sort((a,b)=> TAB==='archived' ? b.archivedAt - a.archivedAt : (b.dateHeure||'').localeCompare(a.dateHeure||''));
+  if (!items.length) {
+    $('#list').innerHTML = `<div class="empty">${q ? 'Aucun résultat.' : TAB==='pending' ? 'Aucune fiche en cours.<br>Touche + pour en créer une.' : 'Aucune archive.'}</div>`;
+    return;
+  }
+  $('#list').innerHTML = items.map(f=>{
+    const name = [ (f.nom||'').toUpperCase(), f.prenom ].filter(Boolean).join(' | ') || '<span style="color:var(--muted)">Sans identité</span>';
+    const sub = [f.dateNaissance, f.qualite].filter(Boolean).join(' | ');
+    const n = (f.photos||[]).length;
+    const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
+    return `<article class="card" data-id="${f.id}">
+      ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
+      <div class="main">
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.nom||f.prenom ? esc(name) : name}</div><div class="date">${esc(fmtDT(f.dateHeure))}</div></div>
+        ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
+        ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
+        ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
+        ${purgeInfo ? `<div class="note">${purgeInfo}</div>` : ''}
+        <div class="r2">
+          <div class="meta">${n ? ICON.cam + n : ''}</div>
+          <div class="acts">
+            <button class="ib" data-act="del" aria-label="Supprimer">${ICON.trash}</button>
+            <button class="ib" data-act="edit" aria-label="Modifier">${ICON.edit}</button>
+            ${f.status==='pending'
+              ? `<button class="ib" data-act="archive" aria-label="Archiver (intégrée au PC)">${ICON.archive}</button>`
+              : `<button class="ib" data-act="restore" aria-label="Remettre en cours">${ICON.restore}</button>`}
+            <button class="ib" data-act="share" aria-label="Partager">${ICON.send}</button>
+          </div>
+        </div>
+      </div></article>`;
+  }).join('');
+  document.querySelectorAll('img[data-ph]').forEach(async img=>{ img.src = await photoURL(img.dataset.ph); });
+}
+$('#list').addEventListener('click', async e=>{
+  const card = e.target.closest('.card'); if (!card) return;
+  const f = FICHES.find(x=>x.id===card.dataset.id); if (!f) return;
+  const act = e.target.closest('[data-act]')?.dataset.act;
+  if (!act) return openDetail(f);
+  if (act==='edit') return openForm(f);
+  if (act==='del') { if (await ask(`Supprimer la fiche ${f.nom||''} ${f.prenom||''} et ses photos ?`, 'Supprimer')) { await removeFiche(f.id); render(); toast('Fiche supprimée'); } }
+  if (act==='archive') { f.status='archived'; f.archivedAt=Date.now(); await saveFiche(f); render(); toast('Fiche archivée'); }
+  if (act==='restore') { f.status='pending'; f.archivedAt=null; await saveFiche(f); render(); toast('Remise en cours'); }
+  if (act==='share') shareFiche(f);
+});
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{ TAB=b.dataset.tab; render(); window.scrollTo(0,0); });
+$('#btnSearch').onclick = ()=>{ const s=$('#searchbar'); s.classList.toggle('hidden'); if(!s.classList.contains('hidden')) $('#q').focus(); else { $('#q').value=''; QUERY=''; render(); } };
+$('#q').oninput = e=>{ QUERY=e.target.value; render(); };
+$('#fab').onclick = ()=>openForm(null);
+
+/* ---------- Fiche (lecture) ---------- */
+let DETAIL = null;
+async function openDetail(f){
+  DETAIL = f.id;
+  $('#detTitle').innerHTML = `<span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.status==='archived'?'Archivée':'En cours'}`;
+  const n = (f.photos||[]).length;
+  $('#detBody').innerHTML = ficheSections(f).map(([t,rows],i)=>
+      (t ? `<div class="sect">${esc(t)}</div>` : '') +
+      rows.map(([l,v])=>`<div class="dl"><div class="dk">${esc(l)}</div><div class="dv${i===0&&l==='Date & heure'?' acc':''}">${esc(v)}</div></div>`).join('')).join('')
+    + (n ? `<div class="sect">Photos</div><div class="photos">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div>` : '')
+    + (f.status==='archived' ? `<p class="hint" style="margin-top:20px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '');
+  $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore : ICON.archive;
+  $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
+  $('#detail').classList.remove('hidden'); $('#detail .body').scrollTop = 0;
+  for (const el of $('#detBody').querySelectorAll('.ph')) el.querySelector('img').src = await photoURL(el.dataset.id);
+}
+const detFiche = () => FICHES.find(x=>x.id===DETAIL);
+const closeDetail = () => { DETAIL = null; $('#detail').classList.add('hidden'); };
+$('#detBack').onclick = closeDetail;
+$('#detBody').addEventListener('click', async e=>{ const ph=e.target.closest('.ph'); if (!ph) return; $('#viewer img').src = await photoURL(ph.dataset.id); $('#viewer').classList.remove('hidden'); });
+$('#detEdit').onclick = ()=>{ const f=detFiche(); closeDetail(); openForm(f); };
+$('#detSend').onclick = ()=>shareFiche(detFiche());
+$('#detArchive').onclick = async ()=>{
+  const f = detFiche();
+  if (f.status==='pending') { f.status='archived'; f.archivedAt=Date.now(); toast('Fiche archivée'); }
+  else { f.status='pending'; f.archivedAt=null; toast('Remise en cours'); }
+  await saveFiche(f); closeDetail(); render();
+};
+$('#detDelete').onclick = async ()=>{
+  const f = detFiche();
+  if (!await ask('Supprimer cette fiche et ses photos ?', 'Supprimer')) return;
+  await removeFiche(f.id); closeDetail(); render(); toast('Fiche supprimée');
+};
+
+/* ---------- Formulaire ---------- */
+$('#qualites').innerHTML = QUALITES.map(q=>`<label><input type="radio" name="qualite" value="${q}"><span>${q}</span></label>`).join('');
+function openForm(f){
+  const isNew = !f;
+  EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:'CI', docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
+  if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
+  for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
+  document.querySelectorAll('input[name=qualite]').forEach(r=>r.checked = r.value===EDIT.f.qualite);
+  setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
+  renderVehicles();
+  $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
+  $('#formDelete').classList.toggle('hidden', isNew);
+  $('#formErr').textContent = '';
+  renderPhotos();
+  $('#form').classList.remove('hidden'); $('#form .body').scrollTop = 0;
+}
+async function closeForm(save){
+  if (!EDIT) return;
+  const E = EDIT;
+  if (save) {
+    for (const k of FIELDS) E.f[k] = $('#f_'+k).value.trim();
+    E.f.qualite = document.querySelector('input[name=qualite]:checked')?.value || '';
+    E.f.type = segVal('typeSeg'); E.f.docMode = segVal('docSeg');
+    readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
+    if (E.f.type === 'CI') for (const k of CIF_FIELDS) E.f[k] = '';
+    if (E.f.type === 'CIF' && E.f.docMode === 'Sur dires') for (const k of ['docType','docNumero','docDate','docLieu']) E.f[k] = '';
+    if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
+    for (const id of E.removed) await removePhoto(id);
+    await saveFiche(E.f); toast('Fiche enregistrée');
+  } else {
+    for (const id of E.added) await removePhoto(id);
+  }
+  EDIT = null; $('#form').classList.add('hidden'); render();
+  if (save && !E.isNew) openDetail(E.f);
+}
+$('#formSave').onclick = ()=>closeForm(true);
+$('#formCancel').onclick = $('#formBack').onclick = ()=>closeForm(false);
+$('#formDelete').onclick = async ()=>{
+  if (!await ask('Supprimer cette fiche et ses photos ?', 'Supprimer')) return;
+  for (const id of EDIT.added) await removePhoto(id);
+  await removeFiche(EDIT.f.id); EDIT=null; $('#form').classList.add('hidden'); render(); toast('Fiche supprimée');
+};
+const dateMask = e=>{
+  const d = e.target.value.replace(/\D/g,'').slice(0,8);
+  e.target.value = d.length>4 ? `${d.slice(0,2)}/${d.slice(2,4)}/${d.slice(4)}` : d.length>2 ? `${d.slice(0,2)}/${d.slice(2)}` : d;
+};
+$('#f_dateNaissance').addEventListener('input', dateMask);
+$('#f_docDate').addEventListener('input', dateMask);
+
+/* Sélecteurs CI/CIF et Sur dires/Officiel */
+function setSeg(id, v){ document.querySelectorAll(`#${id} button`).forEach(b=>b.classList.toggle('on', b.dataset.v===v)); syncBlocks(); }
+const segVal = id => document.querySelector(`#${id} button.on`)?.dataset.v;
+function syncBlocks(){
+  $('#cifBlock').classList.toggle('hidden', segVal('typeSeg') !== 'CIF');
+  $('#docBlock').classList.toggle('hidden', segVal('docSeg') !== 'Officiel');
+}
+['typeSeg','docSeg'].forEach(id=>$('#'+id).addEventListener('click', e=>{ const b=e.target.closest('button'); if (b) setSeg(id, b.dataset.v); }));
+
+/* Véhicules */
+function readVehicles(){
+  document.querySelectorAll('#vehicles .veh').forEach((el,i)=>{
+    const v = EDIT.f.vehicules[i]; if (!v) return;
+    v.type = el.querySelector('input[type=radio]:checked')?.value || '';
+    for (const [k] of VEH_FIELDS) v[k] = el.querySelector(`[data-k=${k}]`).value.trim();
+  });
+}
+function renderVehicles(){
+  $('#vehicles').innerHTML = EDIT.f.vehicules.map((v,i)=>`<div class="veh">
+    <div class="vh"><b>Véhicule ${i+1}</b><button type="button" class="ib" data-rmveh="${i}" aria-label="Retirer le véhicule">${ICON.trash}</button></div>
+    <div class="chips">${VEH_TYPES.map(t=>`<label><input type="radio" name="vt${i}" value="${t}" ${v.type===t?'checked':''}><span>${t}</span></label>`).join('')}</div>
+    ${VEH_FIELDS.map(([k,l])=>`<label class="f">${l}</label><input data-k="${k}" value="${esc(v[k]||'')}" autocomplete="off" ${k==='plaque'?'autocapitalize="characters" spellcheck="false"':''}>`).join('')}
+  </div>`).join('');
+}
+$('#addVeh').onclick = ()=>{ readVehicles(); EDIT.f.vehicules.push({type:'VL'}); renderVehicles(); $('#vehicles .veh:last-child').scrollIntoView({behavior:'smooth', block:'start'}); };
+$('#vehicles').addEventListener('click', async e=>{
+  const b = e.target.closest('[data-rmveh]'); if (!b) return;
+  if (!await ask('Retirer ce véhicule ?', 'Retirer')) return;
+  readVehicles(); EDIT.f.vehicules.splice(+b.dataset.rmveh, 1); renderVehicles();
+});
+$('#vehicles').addEventListener('input', e=>{ if (e.target.dataset.k==='plaque') { const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); } });
+$('#f_nom').addEventListener('input', e=>{ const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); });
+
+async function renderPhotos(){
+  const ids = EDIT.f.photos;
+  const box = $('#photos');
+  box.innerHTML = ids.map(id=>`<div class="ph" data-id="${id}"><img alt=""><button class="x" aria-label="Retirer la photo">${ICON.x}</button></div>`).join('')
+    + `<button class="addph" id="addph">${ICON.cam}Ajouter</button>`;
+  $('#addph').onclick = ()=>$('#phInput').click();
+  for (const el of box.querySelectorAll('.ph')) el.querySelector('img').src = await photoURL(el.dataset.id);
+}
+$('#photos').addEventListener('click', async e=>{
+  const ph = e.target.closest('.ph'); if (!ph) return;
+  const id = ph.dataset.id;
+  if (e.target.closest('.x')) {
+    if (!await ask('Retirer cette photo ?', 'Retirer')) return;
+    EDIT.f.photos = EDIT.f.photos.filter(x=>x!==id);
+    if (EDIT.added.includes(id)) { EDIT.added = EDIT.added.filter(x=>x!==id); await removePhoto(id); } else EDIT.removed.push(id);
+    renderPhotos();
+  } else { $('#viewer img').src = await photoURL(id); $('#viewer').classList.remove('hidden'); }
+});
+$('#viewer').onclick = ()=>$('#viewer').classList.add('hidden');
+$('#phInput').onchange = async e=>{
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  toast(files.length>1 ? `Ajout de ${files.length} photos…` : 'Ajout de la photo…');
+  for (const file of files) {
+    try { const id = await savePhoto(await shrink(file)); EDIT.added.push(id); EDIT.f.photos.push(id); }
+    catch { toast('Une photo n’a pas pu être lue'); }
+  }
+  renderPhotos();
+};
+// Redimensionne (1600 px max) et réencode en JPEG : allège le stockage et retire les métadonnées (GPS…).
+async function shrink(file, max=1600, q=.82){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const s = Math.min(1, max/Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth*s); c.height = Math.round(img.naturalHeight*s);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('jpeg')), 'image/jpeg', q));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/* ---------- Partage ---------- */
+function ficheSections(f){
+  const cif = f.type === 'CIF', S = [];
+  const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
+  add('', [['Date & heure',fmtDT(f.dateHeure)],['Lieu du contrôle',f.lieuControle],['Résultat',f.resultat]]);
+  add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
+    ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation]] : [])]);
+  if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
+    : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
+  (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, v[k]])));
+  add('Contexte', [['Qualité',f.qualite],['Motif',f.motif],['Observations',f.observations]]);
+  return S;
+}
+function ficheText(f){
+  const n = (f.photos||[]).length;
+  return `FICHE DE RENSEIGNEMENT — ${f.type==='CIF'?'CIF':'CI'}\n`
+    + ficheSections(f).map(([t,rows])=>(t?t.toUpperCase()+'\n':'') + rows.map(r=>`${r[0]} : ${r[1]}`).join('\n')).join('\n\n')
+    + (n ? `\n\nPhotos jointes : ${n}` : '');
+}
+const ficheSubject = f => `Fiche ${f.type||'CI'} — ${[(f.nom||'').toUpperCase(), f.prenom].filter(Boolean).join(' ') || 'sans identité'} — ${fmtDT(f.dateHeure)}`;
+async function shareOut(data, fallbackText){
+  try {
+    if (data.files?.length && !(navigator.canShare && navigator.canShare({files:data.files}))) delete data.files;
+    if (navigator.share) { await navigator.share(data); return; }
+    throw new Error('noshare');
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    try { await navigator.clipboard.writeText(fallbackText); toast('Texte copié dans le presse-papiers'); }
+    catch { toast('Partage impossible sur cet appareil'); }
+  }
+}
+function openOutlook(subject, body){
+  const url = `ms-outlook://compose?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  location.href = url;
+}
+async function shareFiche(f){
+  const n = (f.photos||[]).length;
+  const choice = await new Promise(res=>{
+    const m = $('#shareSheet'); m.classList.remove('hidden');
+    $('#shOutlookHint').textContent = 'Texte seul, tu saisis le destinataire' + (n ? ' (sans les photos)' : '');
+    $('#shShareHint').textContent = n ? `Texte + ${n} photo(s), choisis Outlook dans la liste` : 'Outlook, Mail, AirDrop…';
+    m.onclick = e=>{ const b=e.target.closest('[data-sh]'); if (!b && e.target!==m) return; m.classList.add('hidden'); m.onclick=null; res(b?.dataset.sh); };
+  });
+  if (choice === 'outlook') return openOutlook(ficheSubject(f), ficheText(f));
+  if (choice !== 'share') return;
+  const text = ficheText(f), base = ((f.nom||'fiche')+'_'+(f.prenom||'')).replace(/[^\w-]+/g,'_');
+  const files = [];
+  for (const [i,id] of (f.photos||[]).entries()) { const b = await photoBuf(id); if (b) files.push(new File([b], `${base}_${i+1}.jpg`, {type:'image/jpeg'})); }
+  shareOut({title:ficheSubject(f), text, files}, text);
+}
+
+/* ---------- Réglages ---------- */
+$('#btnSettings').onclick = async ()=>{
+  $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_lock').value = String(SETTINGS.lockMinutes);
+  ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
+  $('#storageInfo').textContent = '';
+  try { const est = await navigator.storage.estimate(); const persisted = await navigator.storage.persisted?.();
+    $('#storageInfo').textContent = `Espace utilisé : ${(est.usage/1048576).toFixed(1)} Mo · ${FICHES.length} fiche(s)` + (persisted ? ' · stockage persistant' : ''); } catch {}
+  $('#settings').classList.remove('hidden');
+};
+$('#setBack').onclick = ()=>$('#settings').classList.add('hidden');
+$('#s_purge').onchange = async e=>{ SETTINGS.purgeDays = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); await purge(); render(); };
+$('#s_lock').onchange = async e=>{ SETTINGS.lockMinutes = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); };
+
+$('#c_btn').onclick = async ()=>{
+  const o=$('#c_old').value, n=$('#c_new').value, n2=$('#c_new2').value;
+  const auth = await dbGet('meta','auth');
+  try { await decJSON(await deriveKey(o, auth.salt), auth.verifier); } catch { return toast('Code actuel incorrect'); }
+  if (n.length < 4) return toast('Nouveau code : 4 caractères minimum');
+  if (n !== n2) return toast('Les nouveaux codes ne correspondent pas');
+  toast('Rechiffrement en cours…');
+  const salt = crypto.getRandomValues(new Uint8Array(16)), nk = await deriveKey(n, salt);
+  const v = await encJSON(nk, {ok:true});
+  const fiches = [], photos = [];
+  for (const f of FICHES) { const r = await encJSON(nk, f); fiches.push({id:f.id, iv:r.iv, data:r.data}); }
+  for (const p of await dbAll('photos')) { const r = await encBytes(nk, await decBytes(KEY, p)); photos.push({id:p.id, iv:r.iv, data:r.data}); }
+  await writeAll([
+    ['meta', s=>s.put({salt, verifier:{iv:v.iv, data:v.data}}, 'auth')],
+    ['fiches', s=>fiches.forEach(x=>s.put(x))],
+    ['photos', s=>photos.forEach(x=>s.put(x))]
+  ]);
+  KEY = nk; ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value=''); toast('Code modifié');
+};
+
+$('#exportOutlook').onclick = ()=>{
+  const list = FICHES.filter(f=>f.status==='pending').sort((a,b)=>(a.dateHeure||'').localeCompare(b.dateHeure||''));
+  if (!list.length) return toast('Aucune fiche en cours');
+  openOutlook(`Fiches de renseignement (${list.length}) — ${fmtD(Date.now())}`, list.map(ficheText).join('\n\n— — — — —\n\n'));
+};
+$('#exportText').onclick = ()=>{
+  const list = FICHES.filter(f=>f.status==='pending').sort((a,b)=>(a.dateHeure||'').localeCompare(b.dateHeure||''));
+  if (!list.length) return toast('Aucune fiche en cours');
+  const text = list.map(ficheText).join('\n\n— — —\n\n');
+  shareOut({title:'Fiches de renseignement', text}, text);
+};
+
+const b64 = u => { const a = u instanceof Uint8Array ? u : new Uint8Array(u); let s=''; for (let i=0;i<a.length;i+=0x8000) s += String.fromCharCode.apply(null, a.subarray(i,i+0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
+$('#backupOut').onclick = async ()=>{
+  const auth = await dbGet('meta','auth');
+  const pack = r => ({id:r.id, iv:b64(r.iv), data:b64(r.data)});
+  const obj = {app:'renseignement', v:1, date:new Date().toISOString(), salt:b64(auth.salt),
+    verifier:{iv:b64(auth.verifier.iv), data:b64(auth.verifier.data)},
+    fiches:(await dbAll('fiches')).map(pack), photos:(await dbAll('photos')).map(pack)};
+  const name = `sauvegarde-renseignement-${new Date().toISOString().slice(0,10)}.json`;
+  const file = new File([JSON.stringify(obj)], name, {type:'application/json'});
+  if (navigator.canShare && navigator.canShare({files:[file]})) {
+    try { await navigator.share({files:[file]}); } catch (e) { if (e.name!=='AbortError') toast('Export impossible'); }
+  } else {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  }
+};
+$('#backupIn').onclick = ()=>$('#backupFile').click();
+$('#backupFile').onchange = async e=>{
+  const file = e.target.files[0]; e.target.value=''; if (!file) return;
+  let obj; try { obj = JSON.parse(await file.text()); if (obj.app!=='renseignement') throw 0; } catch { return toast('Fichier de sauvegarde invalide'); }
+  if (!await ask(`Restaurer la sauvegarde du ${fmtD(obj.date)} (${obj.fiches.length} fiche(s)) ?\nToutes les données actuelles seront remplacées. Il faudra ensuite saisir le code de la sauvegarde.`, 'Restaurer')) return;
+  const unpack = r => ({id:r.id, iv:unb64(r.iv), data:unb64(r.data)});
+  await writeAll([
+    ['meta', s=>{ s.delete('auth'); s.put({salt:unb64(obj.salt), verifier:{iv:unb64(obj.verifier.iv), data:unb64(obj.verifier.data)}}, 'auth'); }],
+    ['fiches', s=>{ s.clear(); obj.fiches.forEach(r=>s.put(unpack(r))); }],
+    ['photos', s=>{ s.clear(); obj.photos.forEach(r=>s.put(unpack(r))); }]
+  ]);
+  lock(); toast('Sauvegarde restaurée');
+};
+$('#wipe').onclick = async ()=>{
+  if (!await ask('Effacer TOUTES les fiches, archives et photos ?\nCette action est définitive.', 'Tout effacer')) return;
+  await wipeAll();
+};
+
+$('#detSend').innerHTML = ICON.send; $('#detEdit').innerHTML = ICON.edit;
+
+/* Icône PNG générée à la volée (iOS exige du PNG pour l'écran d'accueil) */
+(()=>{ try {
+  const S=180, c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d'), u=S/512;
+  g.fillStyle='#16202e'; g.fillRect(0,0,S,S);
+  const rr=(x,y,w,h,r,col)=>{ g.fillStyle=col; g.beginPath(); g.roundRect(x*u,y*u,w*u,h*u,r*u); g.fill(); };
+  rr(130,90,220,310,24,'#f2f2f2');
+  [[150,150],[195,105],[240,150],[285,105]].forEach(([y,w])=>rr(165,y,w,18,9,'#8a96a8'));
+  g.fillStyle='#16202e'; g.beginPath(); g.arc(330*u,330*u,78*u,0,7); g.fill();
+  g.strokeStyle='#3ccf4e'; g.lineWidth=22*u; g.beginPath(); g.arc(330*u,330*u,53*u,0,7); g.stroke();
+  g.lineWidth=34*u; g.lineCap='round'; g.beginPath(); g.moveTo(378*u,378*u); g.lineTo(450*u,450*u); g.stroke();
+  const url=c.toDataURL('image/png'); $('#touchIcon').href=url; $('#lockIcon').src=url;
+} catch {} })();
+
+/* ---------- Démarrage ---------- */
+(async ()=>{
+  try {
+    db = await openDB();
+    const s = await dbGet('meta','settings'); if (s) SETTINGS = {...SETTINGS, ...s};
+    showLock(!(await dbGet('meta','auth')));
+    navigator.storage?.persist?.().catch(()=>{});
+  } catch (e) {
+    $('#lockErr').textContent = 'Stockage indisponible : ' + e.message;
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
