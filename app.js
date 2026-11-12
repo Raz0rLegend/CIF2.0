@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -798,18 +798,8 @@ async function doBackup(){
   toast('Sauvegarde effectuée'); render(); syncBackupInfo();
 }
 $('#backupOut').onclick = doBackup;
-/* Outil : recherche de plaque en ligne, hors appli (rien n'est envoyé depuis les fiches) */
-(()=>{ const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Application'); h.insertAdjacentHTML('beforebegin', `<h3>Outils</h3>
-    <label class="f" for="t_plate">Recherche de plaque (appli Immatriculation Scanner)</label>
-    <input id="t_plate" placeholder="AB-123-CD" autocapitalize="characters" autocomplete="off" spellcheck="false" style="font-family:ui-monospace,Menlo,monospace;font-weight:700;letter-spacing:.08em">
-    <button class="btn sec" id="t_plateGo">Copier et ouvrir Immatriculation Scanner</button>
-    <p class="hint">La plaque est copiée puis le raccourci iOS « Immat » ouvre l'appli : colle la plaque dedans. Aucune fiche ni donnée de CIF 2.0 n'est transmise. À créer une fois dans l'app Raccourcis : nouveau raccourci nommé « Immat » avec l'action « Ouvrir l'app » → Immatriculation Scanner.</p>`); })();
-$('#t_plate').addEventListener('input', e=>{ e.target.value = e.target.value.toUpperCase(); });
-$('#t_plateGo').onclick = async ()=>{
-  const p = normPlate($('#t_plate').value); if (!p) return toast('Saisis une plaque');
-  try { await navigator.clipboard.writeText(p); toast('Plaque copiée — colle-la dans l\'appli'); } catch {}
-  setTimeout(()=>{ location.href = 'shortcuts://run-shortcut?name=' + encodeURIComponent('Immat'); }, 300);
-};
+/* Section « Outils » des réglages (l'outil ADR s'y ajoute) */
+(()=>{ const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Application'); h.insertAdjacentHTML('beforebegin', `<h3>Outils</h3>`); })();
 /* Rappel de sauvegarde périodique */
 const backupDue = () => +SETTINGS.backupDays > 0 && FICHES.length > 0 && Date.now() - (+SETTINGS.lastBackup||0) > SETTINGS.backupDays*DAY;
 function backupBanner(){
