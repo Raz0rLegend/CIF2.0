@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.0';
+const APP_VERSION = '2.1';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,6 +16,8 @@ const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nati
 const ACC_FIELDS = ['sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const resTest = r => r ? `<span style="color:${r==='Positif'?'#ff5a52':'#3ccf4e'};font-weight:600">${r}</span>` : '';
 const taux = t => t ? `${String(t).replace('.',',')} mg/L` : '';
+/* Taux alcool : < 0,25 vert · ≥ 0,25 orange · ≥ 0,40 rouge */
+const tauxColor = t => { const v = parseFloat(String(t||'').replace(',','.')); return isNaN(v) ? '' : v >= 0.40 ? '#ff5a52' : v >= 0.25 ? '#f39c34' : '#3ccf4e'; };
 const MEMO = [['memoCG','Carte grise','carte grise'],['memoAss','Assurance','assurance'],['memoPR','Permis (recto)','permis recto'],['memoPV','Permis (verso)','permis verso']];
 const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
 const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
@@ -326,7 +328,7 @@ async function openDetail(f){
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
   const acc = !f.accident ? '' : panel('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email?`<a href="mailto:${esc(f.email)}">${esc(f.email)}</a>`:'',true],
       ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, ok(f[k]), true])]);
-  const dep = !f.accident ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux',taux(f.alcTaux)],
+  const dep = !f.accident ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux', f.alcTaux ? `<span style="color:${tauxColor(f.alcTaux)||'inherit'};font-weight:700">${esc(taux(f.alcTaux))}</span>` : '', true],
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
@@ -362,7 +364,7 @@ function openForm(f){
   EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
-  $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc();
+  $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
   setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
   renderVehicles();
   $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
@@ -413,6 +415,8 @@ $('#f_docDate').addEventListener('input', dateMask);
 function syncAcc(){ $('#accBlock').classList.toggle('hidden', !$('#f_accident').checked); }
 $('#f_accident').addEventListener('change', syncAcc);
 $('#memoPhoto').onclick = ()=>$('#phInput').click();
+function syncTaux(){ const el = $('#f_alcTaux'), c = tauxColor(el.value); el.style.color = c; el.style.borderColor = c; el.style.fontWeight = c ? '700' : ''; }
+$('#f_alcTaux').addEventListener('input', syncTaux);
 
 /* Sélecteurs CI/CIF et Sur dires/Officiel */
 function setSeg(id, v){ document.querySelectorAll(`#${id} button`).forEach(b=>b.classList.toggle('on', b.dataset.v===v)); syncBlocks(); }
