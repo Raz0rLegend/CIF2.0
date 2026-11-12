@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -78,7 +78,7 @@ const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
 
 /* ---------- État ---------- */
 let SEL = null, PIN = null;
-let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1, groupMin:10}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
+let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1, groupMin:10, backupDays:5, lastBackup:0}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
 const urlCache = new Map();
 
 async function saveFiche(f){
@@ -224,10 +224,10 @@ function render(){
   items.sort((a,b)=> TAB==='archived' ? b.archivedAt - a.archivedAt : (b.dateHeure||'').localeCompare(a.dateHeure||''));
   window.visibleIds = items.map(f=>f.id);
   if (!items.length) {
-    $('#list').innerHTML = `<div class="empty">${q ? 'Aucun résultat.' : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
+    $('#list').innerHTML = backupBanner() + `<div class="empty">${q ? 'Aucun résultat.' : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
     return;
   }
-  $('#list').innerHTML = items.map((f,i)=>{
+  $('#list').innerHTML = backupBanner() + items.map((f,i)=>{
     const name = [ (f.nom||'').toUpperCase(), f.prenom ].filter(Boolean).join(' | ') || '<span style="color:var(--muted)">Sans identité</span>';
     const sub = [f.dateNaissance, f.nationalite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
@@ -685,7 +685,7 @@ $('#bioToggle').onclick = async ()=>{
     <label class="f" for="s_group">Relier les contrôles effectués à moins de</label>
     <select id="s_group"><option value="5">5 minutes d'écart</option><option value="10">10 minutes d'écart</option><option value="15">15 minutes d'écart</option><option value="20">20 minutes d'écart</option><option value="0">Ne pas relier</option></select>`); })();
 $('#btnSettings').onclick = async ()=>{
-  $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_group').value = String(SETTINGS.groupMin); $('#s_lock').value = String(SETTINGS.lockMinutes);
+  $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_group').value = String(SETTINGS.groupMin); $('#s_backup').value = String(SETTINGS.backupDays); syncBackupInfo(); $('#s_lock').value = String(SETTINGS.lockMinutes);
   ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
   $('#storageInfo').textContent = ''; $('#verTag').textContent = `v${APP_VERSION}`; syncBioUI();
   $('#versionInfo').textContent = `Version installée : ${APP_VERSION}. Tes fiches sont conservées lors des mises à jour.` + ` (écran ${screen.height} · fenêtre ${window.innerHeight})`;
@@ -756,7 +756,7 @@ $('#exportText').onclick = ()=>{
 
 const b64 = u => { const a = u instanceof Uint8Array ? u : new Uint8Array(u); let s=''; for (let i=0;i<a.length;i+=0x8000) s += String.fromCharCode.apply(null, a.subarray(i,i+0x8000)); return btoa(s); };
 const unb64 = s => Uint8Array.from(atob(s), c=>c.charCodeAt(0));
-$('#backupOut').onclick = async ()=>{
+async function doBackup(){
   const auth = await dbGet('meta','auth');
   const pack = r => ({id:r.id, iv:b64(r.iv), data:b64(r.data)});
   const obj = {app:'renseignement', v:1, date:new Date().toISOString(), salt:b64(auth.salt),
@@ -766,11 +766,31 @@ $('#backupOut').onclick = async ()=>{
   const name = `sauvegarde-CIF2.0-${new Date().toISOString().slice(0,10)}.json`;
   const file = new File([JSON.stringify(obj)], name, {type:'application/json'});
   if (navigator.canShare && navigator.canShare({files:[file]})) {
-    try { await navigator.share({files:[file]}); } catch (e) { if (e.name!=='AbortError') toast('Export impossible'); }
+    try { await navigator.share({files:[file]}); } catch (e) { if (e.name!=='AbortError') toast('Export impossible'); return; }
   } else {
     const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
   }
-};
+  SETTINGS.lastBackup = Date.now(); await dbPut('meta', SETTINGS, 'settings');
+  toast('Sauvegarde effectuée'); render(); syncBackupInfo();
+}
+$('#backupOut').onclick = doBackup;
+/* Rappel de sauvegarde périodique */
+const backupDue = () => +SETTINGS.backupDays > 0 && FICHES.length > 0 && Date.now() - (+SETTINGS.lastBackup||0) > SETTINGS.backupDays*DAY;
+function backupBanner(){
+  if (!backupDue()) return '';
+  const last = +SETTINGS.lastBackup ? `dernière il y a ${Math.floor((Date.now()-SETTINGS.lastBackup)/DAY)} j` : 'aucune pour l\'instant';
+  return `<button type="button" id="bkDue" style="display:flex;align-items:center;gap:10px;width:calc(100% - 24px);margin:10px 12px 4px;padding:11px 14px;border:1px solid #2d4a7a;border-radius:12px;background:#1b2a42;color:#dce8ff;font-size:15px;text-align:left;position:relative;z-index:2"><span style="font-size:20px">💾</span><span style="flex:1"><b>Sauvegarde à faire</b><br><small style="color:#9db4d8">${last} · toucher pour l'enregistrer dans Fichiers</small></span></button>`;
+}
+$('#list').addEventListener('click', e=>{ if (e.target.closest('#bkDue')) doBackup(); });
+function syncBackupInfo(){
+  const el = $('#bkInfo'); if (!el) return;
+  el.textContent = +SETTINGS.lastBackup ? `Dernière sauvegarde : ${fmtDT(new Date(SETTINGS.lastBackup).toISOString())}` : 'Aucune sauvegarde effectuée pour l\'instant.';
+}
+(()=>{ const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Zone sensible'); h.insertAdjacentHTML('beforebegin', `<label class="f" for="s_backup">Rappel de sauvegarde</label>
+    <select id="s_backup"><option value="3">Tous les 3 jours</option><option value="5">Tous les 5 jours</option><option value="7">Tous les 7 jours</option><option value="14">Tous les 14 jours</option><option value="0">Pas de rappel</option></select>
+    <p class="hint" id="bkInfo"></p>
+    <p class="hint">À l'échéance, un bandeau apparaît en haut de la liste : un tap prépare la sauvegarde chiffrée, puis choisis « Enregistrer dans Fichiers ».</p>`); })();
+$('#s_backup').onchange = async e=>{ SETTINGS.backupDays = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); render(); };
 $('#backupIn').onclick = ()=>$('#backupFile').click();
 $('#backupFile').onchange = async e=>{
   const file = e.target.files[0]; e.target.value=''; if (!file) return;
