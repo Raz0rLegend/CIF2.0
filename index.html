@@ -28,6 +28,7 @@
     <input id="pin2" type="password" inputmode="numeric" autocomplete="off" placeholder="Confirmer le code" aria-label="Confirmer le code" class="hidden">
     <div id="lockErr"></div>
     <button class="btn" id="lockBtn" type="submit">Valider</button>
+    <button class="btn bio hidden" id="bioBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1M9.5 15.5c1.5 1.2 3.5 1.2 5 0"/></svg><span id="bioLbl">Face ID</span></button>
     <button class="link hidden" id="forgot" type="button">Code oublié ? Tout effacer</button>
   </form>
 </div>
@@ -177,6 +178,10 @@
     <button class="btn" id="btnUpdate">Rechercher une mise à jour</button>
     <p class="hint" id="versionInfo"></p>
 
+    <h3>Déverrouillage biométrique</h3>
+    <button class="btn sec" id="bioToggle">Activer Face ID</button>
+    <p class="hint" id="bioInfo"></p>
+
     <h3>Archives</h3>
     <label class="f" for="s_purge">Suppression automatique des archives</label>
     <select id="s_purge"><option value="7">Après 7 jours</option><option value="30">Après 30 jours</option><option value="90">Après 90 jours</option><option value="0">Jamais</option></select>
@@ -220,7 +225,7 @@
 <div id="toast"></div>
 <div id="cover" class="hidden"></div>
 
-<!-- APP_VERSION = '0.9' (la version de référence est dans app.js) -->
+<!-- APP_VERSION = '1.0' (la version de référence est dans app.js) -->
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>

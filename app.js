@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '0.9';
+const APP_VERSION = '1.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -74,7 +74,7 @@ const encJSON = (key, o) => encBytes(key, te.encode(JSON.stringify(o)));
 const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
 
 /* ---------- État ---------- */
-let SEL = null;
+let SEL = null, PIN = null;
 let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
 const urlCache = new Map();
 
@@ -111,10 +111,12 @@ function showLock(setup){
   $('#lockHint').textContent = setup ? "Ce code chiffre toutes les fiches et photos. Sans lui, elles sont irrécupérables." : '';
   $('#pin2').classList.toggle('hidden', !setup); $('#forgot').classList.toggle('hidden', setup);
   $('#pin').value = $('#pin2').value = ''; $('#lockErr').textContent = '';
-  setTimeout(()=>$('#pin').focus(), 150);
+  $('#bioBtn').classList.add('hidden');
+  if (!setup) dbGet('meta','bio').then(b=>{ if (b && lockMode==='unlock') { $('#bioLbl').textContent = IS_IOS ? 'Face ID' : 'Biométrie'; $('#bioBtn').classList.remove('hidden'); bioUnlock(true); } else setTimeout(()=>$('#pin').focus(), 150); }).catch(()=>{});
+  else setTimeout(()=>$('#pin').focus(), 150);
 }
 function lock(){
-  KEY = null; FICHES = []; EDIT = null; SEL = null; LEARN = {}; sgHide();
+  KEY = null; PIN = null; FICHES = []; EDIT = null; SEL = null; LEARN = {}; sgHide();
   for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear();
   DETAIL = null;
   ['#form','#detail','#settings','#viewer','#modal','#shareSheet'].forEach(s=>$(s).classList.add('hidden'));
@@ -133,20 +135,27 @@ $('#lockForm').addEventListener('submit', async e=>{
       KEY = await deriveKey(pin, salt);
       const v = await encJSON(KEY, {ok:true});
       await dbPut('meta', {salt, verifier:{iv:v.iv, data:v.data}}, 'auth');
+      PIN = pin; await openApp();
+      if (await bioAvailable()) setTimeout(async ()=>{ if (KEY && await ask(`Activer ${bioName()} pour ouvrir l'appli sans taper le code ?`, 'Activer', false)) enableBio(); }, 600);
     } else {
-      const auth = await dbGet('meta','auth');
-      const k = await deriveKey(pin, auth.salt);
-      try { await decJSON(k, auth.verifier); } catch { return err('Code incorrect'); }
-      KEY = k;
+      if (!await unlockWith(pin)) return err('Code incorrect');
     }
-    FICHES = await Promise.all((await dbAll('fiches')).map(r=>decJSON(KEY, r)));
-    await loadLearn();
-    await purge();
-    $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
-    render(); checkUpdate(false);
   } catch (ex) { err('Erreur : ' + ex.message); }
   finally { btn.disabled = false; btn.textContent = 'Valider'; }
 });
+async function unlockWith(pin){
+  const auth = await dbGet('meta','auth');
+  const k = await deriveKey(pin, auth.salt);
+  try { await decJSON(k, auth.verifier); } catch { return false; }
+  KEY = k; PIN = pin; await openApp(); return true;
+}
+async function openApp(){
+  FICHES = await Promise.all((await dbAll('fiches')).map(r=>decJSON(KEY, r)));
+  await loadLearn();
+  await purge();
+  $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
+  render(); checkUpdate(false);
+}
 $('#forgot').onclick = async ()=>{
   if (!await ask("Effacer TOUTES les fiches et photos de cet appareil ?\nCette action est définitive.", 'Tout effacer')) return;
   await wipeAll();
@@ -559,11 +568,83 @@ sgBox.addEventListener('click', e=>{
 });
 document.querySelectorAll('.sheet .body').forEach(b=>b.addEventListener('scroll', ()=>{ if (sgInput) sgShow(sgInput); }, {passive:true}));
 
+/* ---------- Déverrouillage biométrique (WebAuthn + PRF) ----------
+   Le téléphone crée une clé d'accès (passkey) liée à Face ID / l'empreinte.
+   Son extension PRF fournit un secret qui n'est délivré qu'après validation biométrique :
+   il sert à chiffrer le code de l'appli, lui-même nécessaire pour déchiffrer les fiches. */
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+const bioName = () => IS_IOS ? 'Face ID' : 'la biométrie';
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+async function bioAvailable(){
+  try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch { return false; }
+}
+async function prfKey(out){ return crypto.subtle.importKey('raw', out, {name:'AES-GCM'}, false, ['encrypt','decrypt']); }
+async function prfGet(credId, prfSalt){
+  const cred = await navigator.credentials.get({publicKey:{
+    challenge: rnd(32), rpId: location.hostname, userVerification:'required', timeout: 60000,
+    allowCredentials:[{type:'public-key', id: credId}],
+    extensions:{prf:{eval:{first: prfSalt}}}
+  }});
+  const out = cred.getClientExtensionResults()?.prf?.results?.first;
+  if (!out) throw new Error('noprf');
+  return out;
+}
+async function enableBio(){
+  if (!KEY || !PIN) return toast('Déverrouille d\'abord avec ton code');
+  if (!await bioAvailable()) return toast('Biométrie non disponible sur cet appareil');
+  try {
+    const prfSalt = rnd(32);
+    const cred = await navigator.credentials.create({publicKey:{
+      rp:{name:'CIF 2.0', id: location.hostname},
+      user:{id: rnd(16), name:'CIF 2.0', displayName:'CIF 2.0'},
+      challenge: rnd(32), timeout: 60000,
+      pubKeyCredParams:[{type:'public-key', alg:-7},{type:'public-key', alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform', residentKey:'required', userVerification:'required'},
+      extensions:{prf:{eval:{first: prfSalt}}}
+    }});
+    const ext = cred.getClientExtensionResults()?.prf;
+    if (ext && ext.enabled === false) throw new Error('noprf');
+    const credId = new Uint8Array(cred.rawId);
+    const out = ext?.results?.first || await prfGet(credId, prfSalt);
+    const r = await encBytes(await prfKey(out), te.encode(PIN));
+    await dbPut('meta', {credId, prfSalt, iv:r.iv, data:r.data}, 'bio');
+    toast('Déverrouillage biométrique activé'); syncBioUI();
+  } catch (e) {
+    if (e.name === 'NotAllowedError' || e.name === 'AbortError') return toast('Activation annulée');
+    toast(e.message==='noprf' ? 'Appareil non compatible (iOS 18 ou Android récent requis)' : 'Activation impossible : ' + (e.message||e.name));
+  }
+}
+let bioBusy = false;
+async function bioUnlock(auto){
+  if (bioBusy || KEY) return; bioBusy = true;
+  try {
+    const b = await dbGet('meta','bio'); if (!b) return;
+    const out = await prfGet(b.credId, b.prfSalt);
+    const pin = td.decode(await decBytes(await prfKey(out), b));
+    if (!await unlockWith(pin)) { await dbDel('meta','bio'); $('#bioBtn').classList.add('hidden'); $('#lockErr').textContent = 'Déverrouillage biométrique désactivé : saisis ton code.'; }
+  } catch (e) {
+    if (!auto && e.name !== 'NotAllowedError' && e.name !== 'AbortError') $('#lockErr').textContent = 'Biométrie indisponible : saisis ton code.';
+    if (auto) setTimeout(()=>$('#pin').focus(), 150);
+  } finally { bioBusy = false; }
+}
+$('#bioBtn').onclick = ()=>bioUnlock(false);
+async function syncBioUI(){
+  const on = !!(await dbGet('meta','bio')), avail = await bioAvailable();
+  const t = $('#bioToggle'); t.textContent = on ? `Désactiver ${bioName()}` : `Activer ${bioName()}`; t.disabled = !avail && !on;
+  $('#bioInfo').textContent = !avail && !on ? 'Biométrie non disponible sur cet appareil.'
+    : on ? `L'appli s'ouvre avec ${bioName()}. Ton code reste utilisable en secours.`
+    : `Ouvre l'appli avec ${bioName()} au lieu de taper le code (iOS 18 ou Android récent).`;
+}
+$('#bioToggle').onclick = async ()=>{
+  if (await dbGet('meta','bio')) { if (await ask(`Désactiver ${bioName()} ?`, 'Désactiver')) { await dbDel('meta','bio'); toast('Déverrouillage biométrique désactivé'); syncBioUI(); } }
+  else enableBio();
+};
+
 /* ---------- Réglages ---------- */
 $('#btnSettings').onclick = async ()=>{
   $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_lock').value = String(SETTINGS.lockMinutes);
   ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
-  $('#storageInfo').textContent = ''; $('#verTag').textContent = `v${APP_VERSION}`;
+  $('#storageInfo').textContent = ''; $('#verTag').textContent = `v${APP_VERSION}`; syncBioUI();
   $('#versionInfo').textContent = `Version installée : ${APP_VERSION}. Tes fiches sont conservées lors des mises à jour.`;
   try { const est = await navigator.storage.estimate(); const persisted = await navigator.storage.persisted?.();
     $('#storageInfo').textContent = `Espace utilisé : ${(est.usage/1048576).toFixed(1)} Mo · ${FICHES.length} fiche(s)` + (persisted ? ' · stockage persistant' : ''); } catch {}
@@ -613,7 +694,8 @@ $('#c_btn').onclick = async ()=>{
     ['fiches', s=>fiches.forEach(x=>s.put(x))],
     ['photos', s=>photos.forEach(x=>s.put(x))]
   ]);
-  KEY = nk; ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value=''); toast('Code modifié');
+  KEY = nk; PIN = n; ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
+  if (await dbGet('meta','bio')) { await dbDel('meta','bio'); toast('Code modifié — réactive le déverrouillage biométrique'); syncBioUI(); } else toast('Code modifié');
 };
 
 $('#exportOutlook').onclick = ()=>{
@@ -652,7 +734,7 @@ $('#backupFile').onchange = async e=>{
   if (!await ask(`Restaurer la sauvegarde du ${fmtD(obj.date)} (${obj.fiches.length} fiche(s)) ?\nToutes les données actuelles seront remplacées. Il faudra ensuite saisir le code de la sauvegarde.`, 'Restaurer')) return;
   const unpack = r => ({id:r.id, iv:unb64(r.iv), data:unb64(r.data)});
   await writeAll([
-    ['meta', s=>{ s.delete('auth'); s.delete('learn'); s.put({salt:unb64(obj.salt), verifier:{iv:unb64(obj.verifier.iv), data:unb64(obj.verifier.data)}}, 'auth'); if (obj.learn) s.put({iv:unb64(obj.learn.iv), data:unb64(obj.learn.data)}, 'learn'); }],
+    ['meta', s=>{ s.delete('auth'); s.delete('learn'); s.delete('bio'); s.put({salt:unb64(obj.salt), verifier:{iv:unb64(obj.verifier.iv), data:unb64(obj.verifier.data)}}, 'auth'); if (obj.learn) s.put({iv:unb64(obj.learn.iv), data:unb64(obj.learn.data)}, 'learn'); }],
     ['fiches', s=>{ s.clear(); obj.fiches.forEach(r=>s.put(unpack(r))); }],
     ['photos', s=>{ s.clear(); obj.photos.forEach(r=>s.put(unpack(r))); }]
   ]);
