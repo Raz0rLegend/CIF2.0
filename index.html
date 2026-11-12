@@ -7,12 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rens.">
+<meta name="apple-mobile-web-app-title" content="CIF 2.0">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" id="touchIcon" href="icon.svg">
-<link rel="icon" href="icon.svg" type="image/svg+xml">
-<title>Renseignement</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<title>CIF 2.0</title>
 <style>
 :root{--bg:#121212;--panel:#1e1e1e;--card:#1c1c1c;--line:#323232;--text:#ececec;--muted:#9a9a9a;--accent:#3ccf4e;--danger:#ff5a52;--field:#1a1a1a;--border:#565656}
 *{box-sizing:border-box}
@@ -24,10 +24,12 @@ svg{display:block}
 /* Écran de verrouillage */
 #lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;padding-top:calc(24px + env(safe-area-inset-top));background:var(--bg);z-index:50}
 #lock .box{width:100%;max-width:340px;text-align:center}
-#lock img{width:84px;height:84px;border-radius:20px;margin-bottom:16px}
+#lock img{height:170px;width:auto;margin:0 auto 22px;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
 #lock h2{margin:0 0 6px;font-size:22px}
 #lock p{color:var(--muted);font-size:14px;margin:0 0 18px}
 #lock input{text-align:center;font-size:22px;letter-spacing:.3em;margin-bottom:10px}
+#lock input::placeholder{letter-spacing:normal;font-size:17px}
+#lock .app{font-size:13px;letter-spacing:.25em;color:#c9a227;margin:-8px 0 14px;font-weight:600}
 #lockErr{color:var(--danger);min-height:20px;font-size:14px;margin:4px 0 8px}
 .btn{width:100%;height:50px;border:0;border-radius:12px;background:#fff;color:#111;font-weight:600;font-size:17px}
 .btn:disabled{opacity:.5}
@@ -37,14 +39,16 @@ svg{display:block}
 
 /* En-tête et liste */
 header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:4px;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;background:var(--panel);border-bottom:1px solid var(--line)}
-header h1{flex:1;margin:0 0 0 6px;font-size:19px;font-weight:600}
+header h1{flex:1;margin:0 0 0 8px;font-size:19px;font-weight:600}
+.hlogo{height:34px;width:auto;margin-left:2px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
 .ib{background:none;border:0;width:44px;height:44px;display:grid;place-items:center;border-radius:10px}
 .ib:active{background:#2c2c2c}
 .ib.on{background:#fff;color:#111}
 .ib svg{width:24px;height:24px}
 #searchbar{padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
-#list{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
-.card{display:flex;gap:12px;padding:14px 12px 8px 16px;border-bottom:1px solid var(--line);background:var(--card)}
+#list{position:relative;z-index:1;padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+#wm{position:fixed;left:50%;top:54%;width:78vw;max-width:380px;aspect-ratio:313/638;transform:translate(-50%,-50%);background:url(logo.png) center/contain no-repeat;opacity:.07;pointer-events:none;z-index:0}
+.card{display:flex;gap:12px;padding:14px 12px 8px 16px;border-bottom:1px solid var(--line);background:rgba(28,28,28,.88);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
 .card .thumb{width:58px;height:58px;border-radius:8px;object-fit:cover;background:#000;flex:none}
 .card .main{flex:1;min-width:0}
 .card .r1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -145,6 +149,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 #shareSheet button.cancel{text-align:center;font-weight:600;font-size:17px;background:#fff;color:#111}
 #toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translateX(-50%);background:#f2f2f2;color:#111;padding:10px 16px;border-radius:22px;font-size:15px;z-index:70;opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center}
 #toast.on{opacity:1}
+#updBanner{position:fixed;left:12px;right:12px;top:calc(64px + env(safe-area-inset-top));z-index:65;border:0;border-radius:12px;background:#2d4a7a;color:#fff;font-weight:600;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
 #cover{position:fixed;inset:0;background:var(--bg);z-index:80}
 </style>
 </head>
@@ -153,7 +158,8 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 <!-- Verrouillage -->
 <div id="lock">
   <form class="box" id="lockForm" autocomplete="off">
-    <img id="lockIcon" src="icon.svg" alt="">
+    <img id="lockIcon" src="logo.png" alt="">
+    <div class="app">CIF 2.0</div>
     <h2 id="lockTitle">Déverrouiller</h2>
     <p id="lockHint"></p>
     <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="Code" aria-label="Code">
@@ -168,13 +174,14 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 <div id="app" class="hidden">
   <header>
     <button class="ib" id="btnSettings" aria-label="Réglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h11M4 18h7"/></svg></button>
-    <h1 id="title">Renseignement</h1>
+    <img class="hlogo" src="logo.png" alt=""><h1 id="title">CIF 2.0</h1>
     <button class="ib" id="btnSelect" aria-label="Sélectionner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></button>
     <button class="ib" id="btnArchives" aria-label="Archives"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></svg></button>
     <button class="ib" id="btnSearch" aria-label="Rechercher"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
     <button class="ib" id="btnLock" aria-label="Verrouiller"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></button>
   </header>
   <div id="searchbar" class="hidden"><input id="q" type="search" placeholder="Nom, date, lieu, véhicule…" autocomplete="off"></div>
+  <div id="wm" aria-hidden="true"></div>
   <main id="list"></main>
   <button id="fab" aria-label="Nouvelle fiche"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
   <div id="selBar" class="hidden">
@@ -286,9 +293,13 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 <div id="settings" class="sheet hidden">
   <div class="top">
     <button class="ib" id="setBack" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
-    <h2>Réglages</h2>
+    <h2>Réglages <span id="verTag" style="color:var(--muted);font-weight:400;font-size:14px"></span></h2>
   </div>
   <div class="body set">
+    <h3>Application</h3>
+    <button class="btn" id="btnUpdate">Rechercher une mise à jour</button>
+    <p class="hint" id="versionInfo"></p>
+
     <h3>Archives</h3>
     <label class="f" for="s_purge">Suppression automatique des archives</label>
     <select id="s_purge"><option value="7">Après 7 jours</option><option value="30">Après 30 jours</option><option value="90">Après 90 jours</option><option value="0">Jamais</option></select>
@@ -328,11 +339,13 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
   <button data-sh="share"><b>Partager avec les photos</b><small id="shShareHint"></small></button>
   <button data-sh="cancel" class="cancel">Annuler</button>
 </div></div>
+<button id="updBanner" class="hidden">Nouvelle version disponible — toucher pour mettre à jour</button>
 <div id="toast"></div>
 <div id="cover" class="hidden"></div>
 
 <script>
 'use strict';
+const APP_VERSION = '0.3';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -469,7 +482,7 @@ $('#lockForm').addEventListener('submit', async e=>{
     FICHES = await Promise.all((await dbAll('fiches')).map(r=>decJSON(KEY, r)));
     await purge();
     $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
-    render();
+    render(); checkUpdate(false);
   } catch (ex) { err('Erreur : ' + ex.message); }
   finally { btn.disabled = false; btn.textContent = 'Valider'; }
 });
@@ -500,7 +513,7 @@ function render(){
   $('#tabCI').textContent = `CI${nCI?` (${nCI})`:''}`;
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===TAB));
   $('#btnArchives').classList.toggle('on', TAB==='archived');
-  $('#title').textContent = TAB==='archived' ? `Archives${nA?` (${nA})`:''}` : 'Renseignement';
+  $('#title').textContent = TAB==='archived' ? `Archives${nA?` (${nA})`:''}` : 'CIF 2.0';
   $('#fab').classList.toggle('hidden', TAB==='archived' || !!SEL);
   $('#btnSelect').classList.toggle('on', !!SEL);
   $('#selBar').classList.toggle('hidden', !SEL);
@@ -794,11 +807,35 @@ async function shareFiches(list){
 $('#btnSettings').onclick = async ()=>{
   $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_lock').value = String(SETTINGS.lockMinutes);
   ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
-  $('#storageInfo').textContent = '';
+  $('#storageInfo').textContent = ''; $('#verTag').textContent = `v${APP_VERSION}`;
+  $('#versionInfo').textContent = `Version installée : ${APP_VERSION}. Tes fiches sont conservées lors des mises à jour.`;
   try { const est = await navigator.storage.estimate(); const persisted = await navigator.storage.persisted?.();
     $('#storageInfo').textContent = `Espace utilisé : ${(est.usage/1048576).toFixed(1)} Mo · ${FICHES.length} fiche(s)` + (persisted ? ' · stockage persistant' : ''); } catch {}
   $('#settings').classList.remove('hidden');
 };
+async function remoteVersion(){
+  const r = await fetch('./index.html?v=' + Date.now(), {cache:'reload'});
+  if (!r.ok) throw new Error(r.status);
+  return ((await r.text()).match(/APP_VERSION = '([^']+)'/) || [])[1] || null;
+}
+async function applyUpdate(){
+  toast('Mise à jour…');
+  try {
+    await fetch('./index.html', {cache:'reload'}); await fetch('./sw.js', {cache:'reload'});
+    const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update();
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch {}
+  setTimeout(()=>location.reload(), 500);
+}
+async function checkUpdate(manual){
+  try {
+    const v = await remoteVersion();
+    if (v && v !== APP_VERSION) { if (manual) applyUpdate(); else { $('#updBanner').textContent = `Version ${v} disponible (installée : ${APP_VERSION}) — toucher pour mettre à jour`; $('#updBanner').classList.remove('hidden'); } }
+    else if (manual) toast(`Déjà à jour (v${APP_VERSION})`);
+  } catch { if (manual) toast('Pas de réseau : vérification impossible'); }
+}
+$('#btnUpdate').onclick = ()=>checkUpdate(true);
+$('#updBanner').onclick = applyUpdate;
 $('#setBack').onclick = ()=>$('#settings').classList.add('hidden');
 $('#s_purge').onchange = async e=>{ SETTINGS.purgeDays = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); await purge(); render(); };
 $('#s_lock').onchange = async e=>{ SETTINGS.lockMinutes = +e.target.value; await dbPut('meta', SETTINGS, 'settings'); };
@@ -826,13 +863,13 @@ $('#c_btn').onclick = async ()=>{
 $('#exportOutlook').onclick = ()=>{
   const list = FICHES.filter(f=>f.status==='pending').sort((a,b)=>(a.dateHeure||'').localeCompare(b.dateHeure||''));
   if (!list.length) return toast('Aucune fiche en cours');
-  openOutlook(`Fiches de renseignement (${list.length}) — ${fmtD(Date.now())}`, list.map(ficheText).join('\n\n— — — — —\n\n'));
+  openOutlook(`CIF 2.0 — ${list.length} fiches — ${fmtD(Date.now())}`, list.map(ficheText).join('\n\n— — — — —\n\n'));
 };
 $('#exportText').onclick = ()=>{
   const list = FICHES.filter(f=>f.status==='pending').sort((a,b)=>(a.dateHeure||'').localeCompare(b.dateHeure||''));
   if (!list.length) return toast('Aucune fiche en cours');
   const text = list.map(ficheText).join('\n\n— — —\n\n');
-  shareOut({title:'Fiches de renseignement', text}, text);
+  shareOut({title:'CIF 2.0', text}, text);
 };
 
 const b64 = u => { const a = u instanceof Uint8Array ? u : new Uint8Array(u); let s=''; for (let i=0;i<a.length;i+=0x8000) s += String.fromCharCode.apply(null, a.subarray(i,i+0x8000)); return btoa(s); };
@@ -843,7 +880,7 @@ $('#backupOut').onclick = async ()=>{
   const obj = {app:'renseignement', v:1, date:new Date().toISOString(), salt:b64(auth.salt),
     verifier:{iv:b64(auth.verifier.iv), data:b64(auth.verifier.data)},
     fiches:(await dbAll('fiches')).map(pack), photos:(await dbAll('photos')).map(pack)};
-  const name = `sauvegarde-renseignement-${new Date().toISOString().slice(0,10)}.json`;
+  const name = `sauvegarde-CIF2.0-${new Date().toISOString().slice(0,10)}.json`;
   const file = new File([JSON.stringify(obj)], name, {type:'application/json'});
   if (navigator.canShare && navigator.canShare({files:[file]})) {
     try { await navigator.share({files:[file]}); } catch (e) { if (e.name!=='AbortError') toast('Export impossible'); }
@@ -870,19 +907,6 @@ $('#wipe').onclick = async ()=>{
 };
 
 $('#detSend').innerHTML = ICON.send; $('#detEdit').innerHTML = ICON.edit;
-
-/* Icône PNG générée à la volée (iOS exige du PNG pour l'écran d'accueil) */
-(()=>{ try {
-  const S=180, c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d'), u=S/512;
-  g.fillStyle='#16202e'; g.fillRect(0,0,S,S);
-  const rr=(x,y,w,h,r,col)=>{ g.fillStyle=col; g.beginPath(); g.roundRect(x*u,y*u,w*u,h*u,r*u); g.fill(); };
-  rr(130,90,220,310,24,'#f2f2f2');
-  [[150,150],[195,105],[240,150],[285,105]].forEach(([y,w])=>rr(165,y,w,18,9,'#8a96a8'));
-  g.fillStyle='#16202e'; g.beginPath(); g.arc(330*u,330*u,78*u,0,7); g.fill();
-  g.strokeStyle='#3ccf4e'; g.lineWidth=22*u; g.beginPath(); g.arc(330*u,330*u,53*u,0,7); g.stroke();
-  g.lineWidth=34*u; g.lineCap='round'; g.beginPath(); g.moveTo(378*u,378*u); g.lineTo(450*u,450*u); g.stroke();
-  const url=c.toDataURL('image/png'); $('#touchIcon').href=url; $('#lockIcon').src=url;
-} catch {} })();
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
