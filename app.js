@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,7 +8,7 @@ const te = new TextEncoder(), td = new TextDecoder();
 const uid = () => Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
 const DAY = 864e5;
 const RES_COLORS = {'NDN':'#3ccf4e','Oméga':'#b77cff','CDPA':'#ff5a52','CDPU':'#ff5a52','CDPJ':'#ff5a52'};
-const resColor = f => RES_COLORS[f.resultat] || '#cfcfcf';
+const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
@@ -193,6 +193,14 @@ function computeGroups(){
   flush();
 }
 const groupMates = f => { const g = GROUPS.get(f.id); return g ? g.ids.filter(id=>id!==f.id).map(id=>FICHES.find(x=>x.id===id)).filter(Boolean) : []; };
+/* Résultat : saisi sur les CIF ; un CI hérite du résultat du dernier CIF de la même personne */
+const idKey = f => [norm(f.nom), norm(f.prenom)].join('|');
+function cifSource(f){
+  if ((f.type||'CI') !== 'CI' || !norm(f.nom)) return null;
+  return FICHES.filter(x => x.type==='CIF' && x.resultat && idKey(x)===idKey(f) && (!x.dateNaissance || !f.dateNaissance || x.dateNaissance===f.dateNaissance))
+    .sort((a,b)=>(b.dateHeure||'').localeCompare(a.dateHeure||''))[0] || null;
+}
+const effRes = f => (f.type||'CI') === 'CI' ? (cifSource(f)?.resultat || '') : (f.resultat || '');
 const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>';
 
 /* ---------- Liste ---------- */
@@ -230,7 +238,7 @@ function render(){
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
-        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${f.resultat?`<b>${esc(f.resultat)}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
@@ -297,14 +305,14 @@ function panel(title, rows, right=''){
 }
 async function openDetail(f){
   DETAIL = f.id;
-  const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length;
+  const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length, src = cifSource(f);
   computeGroups(); const mates = groupMates(f);
   $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
       <div class="chips2">
-        <label class="chip" style="position:relative;${f.resultat ? `background:${col}22;color:${col};border:1px solid ${col}66` : 'border:1px dashed #666;color:#bdbdbd'}">${f.resultat ? esc(f.resultat) : 'Résultat'} ▾<select id="detRes" aria-label="Changer le résultat" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;border:0">${['','NDN','Oméga','CDPA','CDPU','CDPJ'].map(r=>`<option value="${r}" ${r===(f.resultat||'')?'selected':''}>${r||'—'}</option>`).join('')}</select></label>
+        ${!cif ? (src ? `<button type="button" class="chip" data-mate="${src.id}" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(src.resultat)} · hérité du CIF ›</button>` : '') : `<label class="chip" style="position:relative;${f.resultat ? `background:${col}22;color:${col};border:1px solid ${col}66` : 'border:1px dashed #666;color:#bdbdbd'}">${f.resultat ? esc(f.resultat) : 'Résultat'} ▾<select id="detRes" aria-label="Changer le résultat" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;border:0">${['','NDN','Oméga','CDPA','CDPU','CDPJ'].map(r=>`<option value="${r}" ${r===(f.resultat||'')?'selected':''}>${r||'—'}</option>`).join('')}</select></label>`}
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
         ${f.lieuControle ? `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>` : ''}
       </div>${mates.length ? `<div class="mates">${ICON_LINK}<span>Avec ${mates.map(m=>`<button type="button" data-mate="${m.id}">${esc(ficheName(m))}</button>`).join(', ')}</span></div>` : ''}</div><div class="vics">${vehIcons(f)}</div></div>`;
@@ -326,7 +334,7 @@ async function openDetail(f){
   $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + doc + veh : veh + ident + acc + dep) + ctx + photos + arch;
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore + '<span>Remettre</span>' : ICON.archive + '<span>Archiver</span>';
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
-  $('#detRes').onchange = async e=>{ const sc = $('#detail .body').scrollTop; f.resultat = e.target.value; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.resultat ? `Résultat : ${f.resultat}` : 'Résultat effacé'); };
+  if ($('#detRes')) $('#detRes').onchange = async e=>{ const sc = $('#detail .body').scrollTop; f.resultat = e.target.value; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.resultat ? `Résultat : ${f.resultat}` : 'Résultat effacé'); };
   $('#detail').classList.remove('hidden'); $('#detail .body').scrollTop = 0;
   for (const el of $('#detBody').querySelectorAll('.ph')) el.querySelector('img').src = await photoURL(el.dataset.id);
 }
@@ -372,7 +380,7 @@ async function closeForm(save){
     E.f.accident = $('#f_accident').checked; for (const [k] of MEMO) E.f[k] = E.f.accident && $('#f_'+k).checked;
     if (!E.f.accident) for (const k of ACC_FIELDS) E.f[k] = '';
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
-    if (E.f.type === 'CI') for (const k of CIF_FIELDS) E.f[k] = '';
+    if (E.f.type === 'CI') { for (const k of CIF_FIELDS) E.f[k] = ''; E.f.resultat = ''; }
     if (E.f.type === 'CIF' && E.f.docMode === 'Sur dires') for (const k of ['docType','docNumero','docDate','docLieu']) E.f[k] = '';
     if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
     const miss = E.f.accident ? MEMO.filter(([k])=>!E.f[k]).map(m=>m[2]) : [];
@@ -410,6 +418,8 @@ $('#memoPhoto').onclick = ()=>$('#phInput').click();
 function setSeg(id, v){ document.querySelectorAll(`#${id} button`).forEach(b=>b.classList.toggle('on', b.dataset.v===v)); syncBlocks(); }
 const segVal = id => document.querySelector(`#${id} button.on`)?.dataset.v;
 function syncBlocks(){
+  const isCI = segVal('typeSeg') === 'CI';
+  $('#f_resultat').classList.toggle('hidden', isCI); document.querySelector('label[for=f_resultat]').classList.toggle('hidden', isCI);
   $('#cifBlock').classList.toggle('hidden', segVal('typeSeg') !== 'CIF');
   $('#docBlock').classList.toggle('hidden', segVal('docSeg') !== 'Officiel');
 }
@@ -488,7 +498,8 @@ async function shrink(file, max=1600, q=.82){
 function ficheSections(f){
   const cif = f.type === 'CIF', S = [];
   const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
-  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat',f.resultat],['Lieu du contrôle',f.lieuControle],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
+  const src = cifSource(f);
+  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat', src ? `${src.resultat} (hérité du CIF du ${fmtDT(src.dateHeure)})` : (f.type==='CIF' ? f.resultat : '')],['Lieu du contrôle',f.lieuControle],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
   const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, k==='plaque' && v.plaque ? `${v.plaque} (${v.pays||'F'} — ${PAYS_NAME[v.pays||'F']||''})` : v[k]])));
   if (!cif) addVeh(); // CI : le véhicule passe en premier
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
