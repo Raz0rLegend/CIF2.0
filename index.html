@@ -120,8 +120,8 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 .dv{font-size:19px;margin-top:2px;white-space:pre-wrap;word-break:break-word}
 .dv.acc{color:var(--accent)}
 #detBody{padding-bottom:calc(240px + env(safe-area-inset-bottom))}
-.fabs{position:absolute;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
-.fabs button{width:60px;height:60px;border-radius:50%;border:0;background:#fff;color:#111;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+.fabs{position:absolute;right:14px;bottom:calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px}
+.fabs button{width:54px;height:54px;border-radius:50%;border:0;background:#fff;color:#111;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}
 .fabs button svg{width:26px;height:26px}
 .badge{display:inline-block;font-size:12px;font-weight:700;padding:1px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;background:#333;color:#ddd}
 .badge.cif{background:#2d4a7a;color:#e6eeff}
@@ -151,6 +151,27 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 #toast.on{opacity:1}
 #updBanner{position:fixed;left:12px;right:12px;top:calc(64px + env(safe-area-inset-top));z-index:65;border:0;border-radius:12px;background:#2d4a7a;color:#fff;font-weight:600;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
 #cover{position:fixed;inset:0;background:var(--bg);z-index:80}
+#sg{position:fixed;z-index:90;background:#2a2a2a;border:1px solid #444;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.6);max-height:300px;overflow-y:auto}
+#sg button{display:block;width:100%;text-align:left;border:0;background:none;padding:12px 14px;font-size:16px;border-bottom:1px solid #383838}
+#sg button:last-child{border-bottom:0}
+#sg button:active{background:#3a3a3a}
+#sg b{color:#fff;font-weight:700}
+/* Détail */
+.hero{padding:14px 2px 4px}
+.hero .nm{font-size:27px;font-weight:700;line-height:1.15;letter-spacing:.01em;word-break:break-word}
+.hero .nm span{font-weight:400}
+.hero .sub2{color:#c4c4c4;margin-top:6px;font-size:15px}
+.chips2{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600;background:#2a2a2a;color:#ddd}
+.chip svg{width:15px;height:15px}
+.panel{background:#191919;border:1px solid #2e2e2e;border-radius:14px;margin-top:14px;overflow:hidden}
+.panel h4{margin:0;padding:10px 14px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#a8a8a8;background:#212121;border-bottom:1px solid #2e2e2e;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kv{display:flex;gap:12px;padding:11px 14px;border-bottom:1px solid #262626}
+.kv:last-child{border-bottom:0}
+.kv .k{flex:0 0 36%;color:var(--muted);font-size:14px;padding-top:2px}
+.kv .v{flex:1;font-size:17px;word-break:break-word;white-space:pre-wrap}
+.kv .v a{color:#7fb3ff;text-decoration:none}
+.plate{display:inline-block;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:15px;letter-spacing:.06em;background:#f4f4f4;color:#111;border-radius:5px;padding:2px 8px 2px 6px;border-left:7px solid #1f4fbf;text-transform:none}
 </style>
 </head>
 <body>
@@ -219,12 +240,11 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
     <label class="f" for="f_dateNaissance">Date de naissance</label>
     <input id="f_dateNaissance" inputmode="numeric" placeholder="JJ/MM/AAAA" autocomplete="off">
     <label class="f" for="f_lieuNaissance">Lieu de naissance</label>
-    <input id="f_lieuNaissance" autocapitalize="words" autocomplete="off">
+    <input id="f_lieuNaissance" data-sg="villes" autocapitalize="words" autocomplete="off">
     <label class="f" for="f_nationalite">Nationalité</label>
-    <input id="f_nationalite" list="nats" autocomplete="off">
-    <datalist id="nats"><option>Française</option><option>Monégasque</option><option>Italienne</option><option>Portugaise</option><option>Espagnole</option><option>Belge</option><option>Suisse</option><option>Britannique</option><option>Allemande</option><option>Tunisienne</option><option>Marocaine</option><option>Algérienne</option><option>Roumaine</option><option>Russe</option><option>Ukrainienne</option><option>Américaine</option></datalist>
+    <input id="f_nationalite" data-sg="nats" autocomplete="off" autocapitalize="words">
     <label class="f" for="f_profession">Profession</label>
-    <input id="f_profession" autocomplete="off">
+    <input id="f_profession" data-sg="prof" autocomplete="off">
     <label class="f" for="f_adresse">Adresse</label>
     <input id="f_adresse" autocomplete="off">
 
@@ -238,13 +258,12 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
       <div class="seg" id="docSeg"><button type="button" data-v="Sur dires">Sur dires</button><button type="button" data-v="Officiel">Pièce officielle</button></div>
       <div id="docBlock">
         <label class="f" for="f_docType">Type de document</label>
-        <input id="f_docType" list="docTypes" autocomplete="off">
-        <datalist id="docTypes"><option>Carte nationale d'identité</option><option>Passeport</option><option>Titre de séjour</option><option>Carte de résident</option><option>Permis de conduire</option><option>Carte d'identité monégasque</option><option>Autre</option></datalist>
+        <input id="f_docType" data-sg="docTypes" autocomplete="off">
         <label class="f" for="f_docNumero">Numéro</label>
         <input id="f_docNumero" autocapitalize="characters" autocomplete="off" spellcheck="false">
         <div class="row">
           <div style="flex:1"><label class="f" for="f_docDate">Délivré le</label><input id="f_docDate" inputmode="numeric" placeholder="JJ/MM/AAAA" autocomplete="off"></div>
-          <div style="flex:1"><label class="f" for="f_docLieu">Délivré à / par</label><input id="f_docLieu" autocomplete="off"></div>
+          <div style="flex:1"><label class="f" for="f_docLieu">Délivré à / par</label><input id="f_docLieu" data-sg="docLieu" autocomplete="off"></div>
         </div>
       </div>
     </div>
@@ -257,7 +276,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
     <label class="f">Qualité</label>
     <div class="chips" id="qualites"></div>
     <label class="f" for="f_lieuControle">Lieu</label>
-    <input id="f_lieuControle" autocomplete="off" placeholder="Lieu du contrôle / de l'observation">
+    <input id="f_lieuControle" data-sg="lieux" autocomplete="off" placeholder="Lieu du contrôle / de l'observation">
     <label class="f" for="f_motif">Motif</label>
     <input id="f_motif" autocomplete="off">
     <label class="f" for="f_observations">Observations</label>
@@ -345,7 +364,7 @@ select{background-image:linear-gradient(45deg,transparent 50%,#aaa 50%),linear-g
 
 <script>
 'use strict';
-const APP_VERSION = '0.3';
+const APP_VERSION = '0.5';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -454,7 +473,7 @@ function showLock(setup){
   setTimeout(()=>$('#pin').focus(), 150);
 }
 function lock(){
-  KEY = null; FICHES = []; EDIT = null; SEL = null;
+  KEY = null; FICHES = []; EDIT = null; SEL = null; LEARN = {}; sgHide();
   for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear();
   DETAIL = null;
   ['#form','#detail','#settings','#viewer','#modal','#shareSheet'].forEach(s=>$(s).classList.add('hidden'));
@@ -480,6 +499,7 @@ $('#lockForm').addEventListener('submit', async e=>{
       KEY = k;
     }
     FICHES = await Promise.all((await dbAll('fiches')).map(r=>decJSON(KEY, r)));
+    await loadLearn();
     await purge();
     $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
     render(); checkUpdate(false);
@@ -587,15 +607,37 @@ $('#btnArchives').onclick = ()=>{ SEL=null; TAB = TAB==='archived' ? (window.las
 
 /* ---------- Fiche (lecture) ---------- */
 let DETAIL = null;
+const ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+const ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+function panel(title, rows, right=''){
+  rows = rows.filter(r=>r[1]); if (!rows.length) return '';
+  return `<section class="panel"><h4><span>${esc(title)}</span>${right}</h4>${rows.map(([k,v,raw])=>`<div class="kv"><div class="k">${esc(k)}</div><div class="v">${raw ? v : esc(v)}</div></div>`).join('')}</section>`;
+}
 async function openDetail(f){
   DETAIL = f.id;
-  $('#detTitle').innerHTML = `<span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.status==='archived'?'Archivée':'En cours'}`;
-  const n = (f.photos||[]).length;
-  $('#detBody').innerHTML = ficheSections(f).map(([t,rows],i)=>
-      (t ? `<div class="sect">${esc(t)}</div>` : '') +
-      rows.map(([l,v])=>`<div class="dl"><div class="dk">${esc(l)}</div><div class="dv"${i===0&&(l==='Date & heure'||l==='Résultat')?` style="color:${resColor(f)}"`:''}>${esc(v)}</div></div>`).join('')).join('')
-    + (n ? `<div class="sect">Photos</div><div class="photos">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div>` : '')
-    + (f.status==='archived' ? `<p class="hint" style="margin-top:20px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '');
+  const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length;
+  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.status==='archived'?'Archivée':'En cours'}`;
+  const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
+  const hero = `<div class="hero">
+      <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
+      ${born || f.nationalite ? `<div class="sub2">${esc([born, f.nationalite].filter(Boolean).join(' · '))}</div>` : ''}
+      <div class="chips2">
+        ${f.resultat ? `<span class="chip" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(f.resultat)}</span>` : ''}
+        <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
+        ${f.lieuControle ? `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>` : ''}
+      </div></div>`;
+  const veh = (f.vehicules||[]).map((v,i)=>panel(`Véhicule ${i+1}${v.type?` · ${v.type}`:''}`,
+      [['Marque',v.marque],['Type / modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio], ...(v.plaque?[]:[])],
+      v.plaque ? `<span class="plate">${esc(v.plaque)}</span>` : '') || (v.plaque ? `<section class="panel"><h4><span>Véhicule ${i+1}${v.type?` · ${v.type}`:''}</span><span class="plate">${esc(v.plaque)}</span></h4></section>` : '')).join('');
+  const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
+  const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse],
+      ...(cif ? [['Téléphone',tel,true],['Filiation',f.filiation]] : [])]);
+  const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
+      : panel('Pièce d\'identité', [['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
+  const ctx = panel('Contexte', [['Qualité',f.qualite],['Motif',f.motif],['Observations',f.observations]]);
+  const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
+  const arch = f.status==='archived' ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '';
+  $('#detBody').innerHTML = hero + (cif ? ident + doc + veh : veh + ident) + ctx + photos + arch;
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore : ICON.archive;
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
   $('#detail').classList.remove('hidden'); $('#detail .body').scrollTop = 0;
@@ -648,11 +690,12 @@ async function closeForm(save){
     if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
     for (const id of E.removed) await removePhoto(id);
     await saveFiche(E.f); toast('Fiche enregistrée');
+    if (learnFrom(E.f)) saveLearn().catch(()=>{});
     if (E.f.status==='pending') { TAB = E.f.type; window.lastTab = TAB; }
   } else {
     for (const id of E.added) await removePhoto(id);
   }
-  EDIT = null; $('#form').classList.add('hidden'); render();
+  EDIT = null; sgHide(); $('#form').classList.add('hidden'); render();
   if (save && !E.isNew) openDetail(E.f);
 }
 $('#formSave').onclick = ()=>closeForm(true);
@@ -690,7 +733,7 @@ function renderVehicles(){
   $('#vehicles').innerHTML = EDIT.f.vehicules.map((v,i)=>`<div class="veh">
     <div class="vh"><b>Véhicule ${i+1}</b><button type="button" class="ib" data-rmveh="${i}" aria-label="Retirer le véhicule">${ICON.trash}</button></div>
     <div class="chips">${VEH_TYPES.map(t=>`<label><input type="radio" name="vt${i}" value="${t}" ${v.type===t?'checked':''}><span>${t}</span></label>`).join('')}</div>
-    ${VEH_FIELDS.map(([k,l])=>`<label class="f">${l}</label><input data-k="${k}" value="${esc(v[k]||'')}" autocomplete="off" ${k==='plaque'?'autocapitalize="characters" spellcheck="false"':''}>`).join('')}
+    ${VEH_FIELDS.map(([k,l])=>`<label class="f">${l}</label><input data-k="${k}" value="${esc(v[k]||'')}" autocomplete="off" spellcheck="false" ${k==='plaque'?'autocapitalize="characters"':''}${k==='marque'?' data-sg="brands"':''}${k==='couleur'?' data-sg="colors"':''}>`).join('')}
   </div>`).join('');
 }
 $('#addVeh').onclick = ()=>{ readVehicles(); EDIT.f.vehicules.push({type:'VL'}); renderVehicles(); $('#vehicles .veh:last-child').scrollIntoView({behavior:'smooth', block:'start'}); };
@@ -748,11 +791,13 @@ function ficheSections(f){
   const cif = f.type === 'CIF', S = [];
   const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
   add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat',f.resultat],['Lieu du contrôle',f.lieuControle]]);
+  const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, v[k]])));
+  if (!cif) addVeh(); // CI : le véhicule passe en premier
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation]] : [])]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
     : !(f.docType||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
-  (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, v[k]])));
+  if (cif) addVeh();
   add('Contexte', [['Qualité',f.qualite],['Motif',f.motif],['Observations',f.observations]]);
   return S;
 }
@@ -803,6 +848,63 @@ async function shareFiches(list){
   if (SEL) { SEL = null; render(); }
 }
 
+/* ---------- Suggestions (saisie rapide) ---------- */
+const SG_BASE = {
+  brands: ['Abarth','Aixam','Alfa Romeo','Alpine','Aprilia','Aston Martin','Audi','Benelli','Bentley','Beta','BMW','Brixton','Bugatti','BYD','Cadillac','Can-Am','CFMoto','Chatenet','Chevrolet','Chrysler','Citroën','Cupra','Dacia','DAF','Daihatsu','Ducati','Dodge','DS','Fantic','Ferrari','Fiat','Ford','Genesis','Gilera','Harley-Davidson','Honda','Husqvarna','Hyundai','Indian','Infiniti','Isuzu','Iveco','Jaguar','Jeep','Kawasaki','Kia','KTM','Kymco','Lamborghini','Lancia','Land Rover','Lexus','Ligier','Lotus','Lynk & Co','MAN','Maserati','Maybach','Mazda','McLaren','Mercedes-Benz','MG','Microcar','Mini','Mitsubishi','Moto Guzzi','MV Agusta','Nissan','NIU','Opel','Peugeot','Piaggio','Polestar','Porsche','Renault','Renault Trucks','Rolls-Royce','Royal Enfield','Scania','Seat','Sherco','Silence','Skoda','Smart','SsangYong','Subaru','Super Soco','Suzuki','SYM','Tesla','Toyota','Triumph','Vespa','Volkswagen','Volvo','Voge','Yamaha','Zero',
+    'B\'Twin','Brompton','Cannondale','Canyon','Cube','Decathlon','Giant','Gitane','Lapierre','Moustache','Orbea','Rockrider','Scott','Specialized','Trek','VanMoof','Xiaomi','Segway-Ninebot'],
+  colors: ['Anthracite','Argent','Beige','Blanc','Blanc nacré','Bleu','Bleu clair','Bleu marine','Bordeaux','Bronze','Champagne','Crème','Doré','Gris','Gris clair','Gris foncé','Jaune','Kaki','Marron','Multicolore','Noir','Noir mat','Orange','Rose','Rouge','Turquoise','Vert','Vert foncé','Violet'],
+  nats: ['Afghane','Albanaise','Algérienne','Allemande','Américaine','Andorrane','Angolaise','Argentine','Arménienne','Australienne','Autrichienne','Azerbaïdjanaise','Bangladaise','Belge','Biélorusse','Bolivienne','Bosnienne','Brésilienne','Britannique','Bulgare','Burkinabée','Camerounaise','Canadienne','Cap-verdienne','Chilienne','Chinoise','Chypriote','Colombienne','Comorienne','Congolaise','Coréenne','Croate','Cubaine','Danoise','Égyptienne','Émirienne','Équatorienne','Érythréenne','Espagnole','Estonienne','Éthiopienne','Finlandaise','Française','Gabonaise','Géorgienne','Ghanéenne','Grecque','Guinéenne','Haïtienne','Hongroise','Indienne','Indonésienne','Irakienne','Iranienne','Irlandaise','Islandaise','Israélienne','Italienne','Ivoirienne','Japonaise','Jordanienne','Kazakhe','Kenyane','Kosovare','Koweïtienne','Lettone','Libanaise','Libyenne','Liechtensteinoise','Lituanienne','Luxembourgeoise','Macédonienne','Malgache','Malienne','Maltaise','Marocaine','Mauricienne','Mauritanienne','Mexicaine','Moldave','Monégasque','Mongole','Monténégrine','Néerlandaise','Néo-zélandaise','Nigériane','Nigérienne','Norvégienne','Pakistanaise','Palestinienne','Péruvienne','Philippine','Polonaise','Portugaise','Qatarienne','Roumaine','Russe','Saoudienne','Sénégalaise','Serbe','Singapourienne','Slovaque','Slovène','Somalienne','Soudanaise','Sri-lankaise','Sud-africaine','Suédoise','Suisse','Syrienne','Tchadienne','Tchèque','Thaïlandaise','Togolaise','Tunisienne','Turque','Ukrainienne','Uruguayenne','Vénézuélienne','Vietnamienne','Yéménite'],
+  villes: ['Monaco','Nice','Menton','Beausoleil','Cap-d\'Ail','Roquebrune-Cap-Martin','La Turbie','Èze','Villefranche-sur-Mer','Cannes','Antibes','Grasse','Cagnes-sur-Mer','Saint-Laurent-du-Var','Toulon','Marseille','Aix-en-Provence','Avignon','Montpellier','Lyon','Paris','Bordeaux','Toulouse','Lille','Strasbourg','Nantes','Sanremo','Vintimille','Bordighera','Imperia','Gênes','Savone','Cuneo','Turin','Milan','Rome','Naples','Palerme'],
+  lieux: ['Monte-Carlo','La Condamine','Fontvieille','Monaco-Ville','Larvotto','Moneghetti','Saint-Roman','Jardin Exotique','Les Révoires','Port Hercule','Gare de Monaco','Place du Casino','Boulevard Princesse Charlotte','Boulevard du Larvotto','Avenue Princesse Grace','Boulevard Albert Ier','Boulevard des Moulins','Avenue de Grande-Bretagne','Rue Grimaldi','Boulevard Rainier III','Tunnel Louis II'],
+  docTypes: ['Carte nationale d\'identité','Passeport','Titre de séjour','Carte de résident','Permis de conduire','Carte d\'identité monégasque','Carte de séjour monégasque','Autre'],
+  docLieu: ['Préfecture des Alpes-Maritimes','Sous-préfecture de Grasse','Mairie de Nice','Mairie de Menton','Direction de la Sûreté Publique','Gouvernement Princier'],
+  prof: ['Sans profession','Retraité(e)','Étudiant(e)','Salarié(e)','Commerçant(e)','Chauffeur','Serveur / serveuse','Cuisinier / cuisinière','Agent de sécurité','Employé(e) de maison','Ouvrier / ouvrière','Artisan','Chef d\'entreprise','Livreur','Croupier','Infirmier / infirmière']
+};
+const SG_LEARN_MAP = [['nationalite','nats'],['lieuNaissance','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docTypes'],['docLieu','docLieu']];
+let LEARN = {};
+const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+function sgList(key){ const seen=new Set(), out=[]; for (const v of [...(LEARN[key]||[]), ...(SG_BASE[key]||[])]) { const n=norm(v); if (n && !seen.has(n)) { seen.add(n); out.push(v); } } return out; }
+function learnFrom(f){
+  let changed = false;
+  const add = (key, val) => { val=(val||'').trim(); if (!val || val.length<2) return; if (sgList(key).some(x=>norm(x)===norm(val))) return; (LEARN[key] ||= []).unshift(val); LEARN[key]=LEARN[key].slice(0,300); changed = true; };
+  for (const [field,key] of SG_LEARN_MAP) add(key, f[field]);
+  for (const v of (f.vehicules||[])) { add('brands', v.marque); add('colors', v.couleur); }
+  return changed;
+}
+async function saveLearn(){ const r = await encJSON(KEY, LEARN); await dbPut('meta', {iv:r.iv, data:r.data}, 'learn'); }
+async function loadLearn(){ const r = await dbGet('meta','learn'); LEARN = {}; if (r) try { LEARN = await decJSON(KEY, r); } catch {} }
+
+const sgBox = document.createElement('div'); sgBox.id = 'sg'; sgBox.className = 'hidden'; document.body.appendChild(sgBox);
+let sgInput = null;
+function sgHide(){ sgBox.classList.add('hidden'); sgInput = null; }
+function sgShow(inp){
+  const q = norm(inp.value); if (!q) return sgHide();
+  const list = sgList(inp.dataset.sg);
+  const starts = [], words = [], inc = [];
+  for (const v of list) { const n = norm(v); if (n === q) continue; if (n.startsWith(q)) starts.push(v); else if (n.split(/[\s\-'/]+/).some(w=>w.startsWith(q))) words.push(v); else if (q.length>1 && n.includes(q)) inc.push(v); }
+  const res = [...starts.sort((a,b)=>a.localeCompare(b,'fr')), ...words, ...inc].slice(0,8);
+  if (!res.length) return sgHide();
+  sgInput = inp;
+  const r = inp.getBoundingClientRect();
+  sgBox.style.left = r.left+'px'; sgBox.style.width = r.width+'px';
+  const below = window.innerHeight - r.bottom;
+  if (below < 220 && r.top > below) { sgBox.style.top=''; sgBox.style.bottom = (window.innerHeight - r.top + 4)+'px'; }
+  else { sgBox.style.bottom=''; sgBox.style.top = (r.bottom + 4)+'px'; }
+  sgBox.innerHTML = res.map(v=>{ const n=norm(v), i=n.indexOf(q); return `<button type="button" data-v="${esc(v)}">${i>=0 ? esc(v.slice(0,i))+'<b>'+esc(v.slice(i,i+q.length))+'</b>'+esc(v.slice(i+q.length)) : esc(v)}</button>`; }).join('');
+  sgBox.classList.remove('hidden');
+}
+document.addEventListener('input', e=>{ if (e.target.dataset?.sg) sgShow(e.target); });
+document.addEventListener('focusin', e=>{ if (e.target.dataset?.sg) sgShow(e.target); else if (!sgBox.contains(e.target)) sgHide(); });
+document.addEventListener('focusout', e=>{ if (e.target===sgInput) setTimeout(()=>{ if (document.activeElement!==sgInput) sgHide(); }, 200); });
+sgBox.addEventListener('pointerdown', e=>e.preventDefault());
+sgBox.addEventListener('click', e=>{
+  const b = e.target.closest('button'); if (!b || !sgInput) return;
+  const inp = sgInput; inp.value = b.dataset.v; inp.dispatchEvent(new Event('change',{bubbles:true})); sgHide();
+  const all = [...inp.closest('.body').querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=file]),textarea')].filter(x=>x.offsetParent);
+  const nx = all[all.indexOf(inp)+1]; if (nx) nx.focus(); else inp.blur();
+});
+document.querySelectorAll('.sheet .body').forEach(b=>b.addEventListener('scroll', ()=>{ if (sgInput) sgShow(sgInput); }, {passive:true}));
+
 /* ---------- Réglages ---------- */
 $('#btnSettings').onclick = async ()=>{
   $('#s_purge').value = String(SETTINGS.purgeDays); $('#s_lock').value = String(SETTINGS.lockMinutes);
@@ -849,11 +951,11 @@ $('#c_btn').onclick = async ()=>{
   toast('Rechiffrement en cours…');
   const salt = crypto.getRandomValues(new Uint8Array(16)), nk = await deriveKey(n, salt);
   const v = await encJSON(nk, {ok:true});
-  const fiches = [], photos = [];
+  const fiches = [], photos = [], lr = await encJSON(nk, LEARN);
   for (const f of FICHES) { const r = await encJSON(nk, f); fiches.push({id:f.id, iv:r.iv, data:r.data}); }
   for (const p of await dbAll('photos')) { const r = await encBytes(nk, await decBytes(KEY, p)); photos.push({id:p.id, iv:r.iv, data:r.data}); }
   await writeAll([
-    ['meta', s=>s.put({salt, verifier:{iv:v.iv, data:v.data}}, 'auth')],
+    ['meta', s=>{ s.put({salt, verifier:{iv:v.iv, data:v.data}}, 'auth'); s.put({iv:lr.iv, data:lr.data}, 'learn'); }],
     ['fiches', s=>fiches.forEach(x=>s.put(x))],
     ['photos', s=>photos.forEach(x=>s.put(x))]
   ]);
@@ -880,6 +982,7 @@ $('#backupOut').onclick = async ()=>{
   const obj = {app:'renseignement', v:1, date:new Date().toISOString(), salt:b64(auth.salt),
     verifier:{iv:b64(auth.verifier.iv), data:b64(auth.verifier.data)},
     fiches:(await dbAll('fiches')).map(pack), photos:(await dbAll('photos')).map(pack)};
+  const lrec = await dbGet('meta','learn'); if (lrec) obj.learn = {iv:b64(lrec.iv), data:b64(lrec.data)};
   const name = `sauvegarde-CIF2.0-${new Date().toISOString().slice(0,10)}.json`;
   const file = new File([JSON.stringify(obj)], name, {type:'application/json'});
   if (navigator.canShare && navigator.canShare({files:[file]})) {
@@ -895,7 +998,7 @@ $('#backupFile').onchange = async e=>{
   if (!await ask(`Restaurer la sauvegarde du ${fmtD(obj.date)} (${obj.fiches.length} fiche(s)) ?\nToutes les données actuelles seront remplacées. Il faudra ensuite saisir le code de la sauvegarde.`, 'Restaurer')) return;
   const unpack = r => ({id:r.id, iv:unb64(r.iv), data:unb64(r.data)});
   await writeAll([
-    ['meta', s=>{ s.delete('auth'); s.put({salt:unb64(obj.salt), verifier:{iv:unb64(obj.verifier.iv), data:unb64(obj.verifier.data)}}, 'auth'); }],
+    ['meta', s=>{ s.delete('auth'); s.delete('learn'); s.put({salt:unb64(obj.salt), verifier:{iv:unb64(obj.verifier.iv), data:unb64(obj.verifier.data)}}, 'auth'); if (obj.learn) s.put({iv:unb64(obj.learn.iv), data:unb64(obj.learn.data)}, 'learn'); }],
     ['fiches', s=>{ s.clear(); obj.fiches.forEach(r=>s.put(unpack(r))); }],
     ['photos', s=>{ s.clear(); obj.photos.forEach(r=>s.put(unpack(r))); }]
   ]);
