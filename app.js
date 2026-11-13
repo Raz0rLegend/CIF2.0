@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1056,6 +1056,16 @@ const fullYear = y => y.length === 4 ? y : String((+y > new Date().getFullYear()
 const dateLettres = d => { const m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/.exec(String(d||'').trim()); if (!m || +m[2] < 1 || +m[2] > 12) return d; return `${+m[1] === 1 ? '1er' : +m[1]} ${MOIS[+m[2]-1]} ${fullYear(m[3])}`; };
 /* Date de naissance saisie avec une année sur 2 chiffres (12/06/80) : complétée en 12/06/1980 */
 $('#f_dateNaissance').addEventListener('blur', e=>{ const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(e.target.value.trim()); if (m) e.target.value = `${m[1]}/${m[2]}/${fullYear(m[3])}`; });
+/* Pièce d'identité en toutes lettres : « sa carte nationale d'identité française » */
+const DOC_FULL = {CNI:['carte nationale d\'identité','f'], PS:['passeport','m'], PC:['permis de conduire','m'], CS:['carte de séjour','f'], TS:['titre de séjour','m']};
+const PAYS_ADJ = {FR:'français',MC:'monégasque',IT:'italien',DE:'allemand',CH:'suisse',BE:'belge',NL:'néerlandais',LU:'luxembourgeois',GB:'britannique',ES:'espagnol',PT:'portugais',ZA:'sud-africain',AL:'albanais',DZ:'algérien',AD:'andorran',SA:'saoudien',AR:'argentin',AM:'arménien',AU:'australien',AT:'autrichien',AZ:'azerbaïdjanais',BY:'biélorusse',BA:'bosnien',BR:'brésilien',BG:'bulgare',CM:'camerounais',CA:'canadien',CN:'chinois',CY:'chypriote',CO:'colombien',CI:'ivoirien',HR:'croate',DK:'danois',EG:'égyptien',AE:'émirien',EE:'estonien',US:'américain',FI:'finlandais',GE:'géorgien',GR:'grec',HU:'hongrois',IN:'indien',IE:'irlandais',IS:'islandais',IL:'israélien',JP:'japonais',XK:'kosovar',LV:'letton',LB:'libanais',LI:'liechtensteinois',LT:'lituanien',MK:'macédonien',ML:'malien',MT:'maltais',MA:'marocain',MX:'mexicain',MD:'moldave',ME:'monténégrin',NO:'norvégien',PL:'polonais',QA:'qatarien',RO:'roumain',RU:'russe',SM:'saint-marinais',SN:'sénégalais',RS:'serbe',SK:'slovaque',SI:'slovène',SE:'suédois',CZ:'tchèque',TN:'tunisien',TR:'turc',UA:'ukrainien',VA:'du Vatican'};
+const adjFem = a => a==='grec' ? 'grecque' : a==='turc' ? 'turque' : /e$|^du /.test(a) ? a : /(ien|en)$/.test(a) ? a+'ne' : a+'e';
+function docPhrase(f){
+  const d = DOC_FULL[(f.docType||'').toUpperCase()];
+  if (!d) return { txt: docLabel(f) || 'pièce d\'identité', fem: true, art: '' };
+  const fem = d[1] === 'f', adj = PAYS_ADJ[f.docPays];
+  return { txt: d[0] + (adj ? ' ' + (fem ? adjFem(adj) : adj) : f.docPays && f.docPays !== '??' ? ` (${f.docPays})` : ''), fem, art: fem ? 'sa ' : 'son ' };
+}
 const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|larvotto|moneghetti|saint[\s-]roman|jardin[\s-]exotique|port[\s-]hercule/i.test(a||'');
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
@@ -1067,7 +1077,7 @@ function mcText(f){
   if (f.adresse) parts.push(`${isMonacoAddr(f.adresse) ? 'résidant' : 'demeurant'} ${f.adresse}`);
   let txt = parts.join(', ') + '.';
   if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
-  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) txt += `\n\nIdentité relevée sur ${docLabel(f) || 'pièce d\'identité'}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? ' délivré(e)' : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${/^(par|à|a)\s/i.test(f.docLieu) ? f.docLieu : 'par ' + f.docLieu}` : '') + '.';
+  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${/^(par|à|a)\s/i.test(f.docLieu) ? f.docLieu : 'par ' + f.docLieu}` : '') + '.'; }
   const r = effRes(f); if (MC_RES[r]) txt += `\n\n${MC_RES[r][0].toUpperCase()}${MC_RES[r].slice(1)}.`;
   return txt;
 }
