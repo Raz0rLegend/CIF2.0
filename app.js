@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.0';
+const APP_VERSION = '3.2';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -485,8 +485,47 @@ $('#vehicles').addEventListener('click', async e=>{
   if (!await ask('Retirer ce véhicule ?', 'Retirer')) return;
   readVehicles(); EDIT.f.vehicules.splice(+b.dataset.rmveh, 1); renderVehicles();
 });
-$('#vehicles').addEventListener('change', e=>{ if (e.target.dataset.k==='pays') e.target.closest('.pays').querySelector('span').textContent = e.target.value; });
-$('#vehicles').addEventListener('input', e=>{ if (e.target.dataset.k==='plaque') { const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); plateInherit(e.target); } });
+$('#vehicles').addEventListener('change', e=>{
+  if (e.target.dataset.k==='pays') { e.target.closest('.pays').querySelector('span').textContent = e.target.value; plateTidy(e.target.closest('.veh').querySelector('[data-k=plaque]')); }
+  if (e.target.dataset.k==='plaque') plateTidy(e.target);
+});
+$('#vehicles').addEventListener('input', e=>{
+  if (e.target.dataset.k!=='plaque') return;
+  // Texte inséré d'un coup (« Scanner le texte » d'iOS, coller) : mise au format immédiate
+  if (/^insert(FromPaste|ReplacementText|FromDrop)/.test(e.inputType||'') || (e.data && e.data.length > 1)) return plateTidy(e.target);
+  const p=e.target.selectionStart; e.target.value=e.target.value.toUpperCase(); e.target.setSelectionRange(p,p); plateInherit(e.target);
+});
+/* Mise au format d'une plaque selon le pays (utile après un scan iOS) */
+const TO_LETTER = {'0':'D','1':'I','2':'Z','5':'S','6':'G','8':'B'}, TO_DIGIT = {'O':'0','Q':'0','D':'0','I':'1','L':'1','Z':'2','S':'5','G':'6','B':'8','T':'7'};
+const fixAt = (s, mask) => [...s].map((c,i)=> mask[i]==='L' ? (TO_LETTER[c]||c) : mask[i]==='9' ? (TO_DIGIT[c]||c) : c).join('');
+function formatPlate(raw, pays){
+  const up = String(raw||'').toUpperCase().replace(/[\r\n\t]+/g,' ');
+  const c = up.replace(/[^A-Z0-9]/g,'');
+  if (!c) return '';
+  if (pays === 'MC') return (c.length > 4 && c.startsWith('MC') ? c.slice(2) : c).slice(0,4);
+  if (pays === 'F') {
+    let x = c;
+    if (x.length >= 8 && /^F[A-Z0-9]{2}[A-Z0-9]{3}[A-Z0-9]{2}/.test(x) && !/^[A-Z]{2}\d{3}[A-Z]{2}/.test(x)) x = x.slice(1);   // « F » de la bande bleue
+    else if (x.length === 8 && x[0]==='F' && /^[A-Z]{2}\d{3}[A-Z]{2}$/.test(x.slice(1))) x = x.slice(1);
+    const siv = x.slice(0,7);
+    if (x.length >= 7 && x.length <= 10) { const f = fixAt(siv, 'LL999LL'); if (/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(f)) return `${f.slice(0,2)}-${f.slice(2,5)}-${f.slice(5)}`; }
+    const fni = /^(\d{1,4})([A-Z]{1,3})(\d{2}|2A|2B|97\d)$/.exec(x);                                         // ancien format 123 ABC 06
+    if (fni) return `${fni[1]} ${fni[2]} ${fni[3]}`;
+    return x;
+  }
+  if (pays === 'I') {
+    let x = c; if (x.length === 8 && x[0]==='I') x = x.slice(1);
+    if (x.length === 7) { const f = fixAt(x, 'LL999LL'); if (/^[A-Z]{2}\d{3}[A-Z]{2}$/.test(f)) return `${f.slice(0,2)} ${f.slice(2,5)} ${f.slice(5)}`; }
+    return x;
+  }
+  return up.replace(/[^A-Z0-9 -]/g,'').replace(/\s+/g,' ').trim();
+}
+function plateTidy(inp){
+  if (!inp) return;
+  const pays = inp.closest('.veh').querySelector('[data-k=pays]').value, v = formatPlate(inp.value, pays);
+  if (v !== inp.value) inp.value = v;
+  plateInherit(inp);
+}
 /* Plaque déjà connue dans une ancienne fiche : on reprend le véhicule (champs vides uniquement) */
 const normPlate = s => String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 function plateLookup(plate){
@@ -605,6 +644,7 @@ async function shareFiches(list){
   });
   if (!choice || choice === 'cancel') return;
   if (choice === 'qr') { if (SEL) { SEL = null; render(); } return window.QRS?.show(list); }
+  if (choice === 'mc') { const t = list.map(mcText).join('\n\n'); await shareOut({title:list.map(ficheSubject).join(' / '), text:t}, t); if (SEL) { SEL = null; render(); } return; }
   const subject = list.map(ficheSubject).join(' / ');
   const text = list.map(ficheText).join('\n\n— — — — —\n\n');
   if (choice === 'outlook') openOutlook(subject, text);
@@ -1002,6 +1042,33 @@ async function geoFill(auto){
   } finally { geoBusy = false; }
 }
 $('#geoBtn').onclick = ()=>geoFill(false);
+
+/* ---------- Envoi au format « main courante » ---------- */
+const MC_RES = {
+  'NDN':'non défavorablement noté à notre fichier central et inconnu au fichier Interpol 24/7',
+  'Oméga':'inconnu à notre fichier central et inconnu au fichier Interpol 24/7',
+  'CDPA':'défavorablement noté à notre fichier central et inconnu au fichier Interpol 24/7',
+  'CDPU':'défavorablement noté à notre fichier central et inconnu au fichier Interpol 24/7',
+  'CDPJ':'défavorablement noté à notre fichier central et inconnu au fichier Interpol 24/7'
+};
+const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const dateLettres = d => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d||'').trim()); if (!m || +m[2] < 1 || +m[2] > 12) return d; return `${+m[1] === 1 ? '1er' : +m[1]} ${MOIS[+m[2]-1]} ${m[3]}`; };
+const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|larvotto|moneghetti|saint[\s-]roman|jardin[\s-]exotique|port[\s-]hercule/i.test(a||'');
+function mcText(f){
+  const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
+  const parts = [[nom, f.prenom].filter(Boolean).join(' ') || 'Individu non identifié'];
+  if (f.dateNaissance || f.lieuNaissance) parts.push('né(e)' + (f.dateNaissance ? ` le ${dateLettres(f.dateNaissance)}` : '') + (f.lieuNaissance ? ` à ${f.lieuNaissance}` : ''));
+  if (cif && f.filiation) parts.push(f.filiation);
+  if (f.nationalite) parts.push(`de nationalité ${f.nationalite.toLowerCase()}`);
+  if (f.profession) parts.push(/^[A-ZÀ-Ý][a-zà-ÿ]/.test(f.profession) ? f.profession[0].toLowerCase() + f.profession.slice(1) : f.profession);
+  if (f.adresse) parts.push(`${isMonacoAddr(f.adresse) ? 'résidant' : 'demeurant'} ${f.adresse}`);
+  let txt = parts.join(', ') + '.';
+  if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
+  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) txt += `\n\nIdentité relevée sur ${docLabel(f) || 'pièce d\'identité'}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? ' délivré(e)' : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${/^(par|à|a)\s/i.test(f.docLieu) ? f.docLieu : 'par ' + f.docLieu}` : '') + '.';
+  const r = effRes(f); if (MC_RES[r]) txt += `\n\n${MC_RES[r][0].toUpperCase()}${MC_RES[r].slice(1)}.`;
+  return txt;
+}
+(()=>{ const c = document.querySelector('#shareSheet [data-sh=cancel]'); if (c) c.insertAdjacentHTML('beforebegin', `<button data-sh="mc"><b>Format main courante</b><small>Texte rédigé, prêt à coller ou à envoyer</small></button>`); })();
 
 /* ---------- Motif : choix rapides (liste à compléter ici) ---------- */
 const MOTIFS = ['Trouvaille','Contrôle routier','Infraction','Accident du travail','AVP corporel','AVP matériel','AVP avec refus','Autre'];
