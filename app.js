@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.8';
+const APP_VERSION = '3.9';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -29,6 +29,16 @@ const DOC_PAYS_ALL = [['ZA','Afrique du Sud'],['AL','Albanie'],['DZ','Algérie']
 const NAT_ISO = [['franc','FR'],['moneg','MC'],['ital','IT'],['allem','DE'],['suisse','CH'],['belg','BE'],['neerland','NL'],['hollan','NL'],['luxemb','LU'],['britann','GB'],['anglais','GB'],['espagn','ES'],['portug','PT'],['maroc','MA'],['alger','DZ'],['tunis','TN'],['roum','RO'],['polon','PL'],['russe','RU'],['ukrain','UA'],['americ','US'],['senegal','SN'],['ivoir','CI'],['turc','TR'],['autrich','AT'],['grec','GR'],['suedois','SE'],['norveg','NO'],['danois','DK'],['chinois','CN'],['japon','JP'],['bresil','BR']];
 const docPaysOptions = sel => `<option value="" ${!sel?'selected':''}>Pays</option><optgroup label="Fréquents">${DOC_PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${DOC_PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
 const VERIF_BADGE = '<span class="badge" style="background:#b3261e;color:#fff;letter-spacing:.04em">VERIF</span>';
+/* Âge à la date du contrôle (date de naissance JJ/MM/AAAA ou JJ/MM/AA) */
+function ageOf(f){
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(String(f.dateNaissance||'').trim()); if (!m) return null;
+  const y = +fullYear(m[3]), mo = +m[2], d = +m[1]; if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const ref = f.dateHeure && !isNaN(new Date(f.dateHeure)) ? new Date(f.dateHeure) : new Date();
+  let a = ref.getFullYear() - y; if (ref.getMonth()+1 < mo || (ref.getMonth()+1 === mo && ref.getDate() < d)) a--;
+  return a >= 0 && a < 130 ? a : null;
+}
+const isMinor = f => { const a = ageOf(f); return a !== null && a < 18; };
+const MINOR_BADGE = '<span class="badge" style="background:#f39c34;color:#111;letter-spacing:.04em">MINEUR</span>';
 const signaLabel = f => f.signa ? 'SIGNA' + (f.signaAn ? ' ' + f.signaAn : '') : '';
 const docLabel = f => [f.docType, f.docPays].filter(Boolean).join(' ');
 const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
@@ -247,7 +257,7 @@ function render(){
   }
   $('#list').innerHTML = backupBanner() + draftBanner() + items.map((f,i)=>{
     const name = [ (f.nom||'').toUpperCase(), f.prenom ].filter(Boolean).join(' | ') || '<span style="color:var(--muted)">Sans identité</span>';
-    const sub = [f.dateNaissance, f.nationalite].filter(Boolean).join(' | ');
+    const sub = [f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans)` : f.dateNaissance), f.nationalite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
     const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
     const g = GROUPS.get(f.id), prev = items[i-1];
@@ -256,7 +266,7 @@ function render(){
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
-        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
@@ -331,7 +341,7 @@ async function openDetail(f){
   DETAIL = f.id;
   const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length, src = cifSource(f);
   computeGroups(); const mates = groupMates(f);
-  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
+  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
@@ -345,7 +355,7 @@ async function openDetail(f){
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
       v.plaque ? plateHTML(v) : '')).join('');
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
-  const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
+  const ident = panel('Identité', [['Date de naissance',f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans)` : f.dateNaissance)],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
@@ -443,6 +453,17 @@ const dateMask = e=>{
 $('#f_dateNaissance').addEventListener('input', dateMask);
 $('#f_docDate').addEventListener('input', dateMask);
 
+/* Âge sous la date de naissance, alerte si mineur */
+$('#f_dateNaissance').insertAdjacentHTML('afterend', `<div id="ageHint" style="margin-top:6px;font-size:14px"></div>`);
+function syncAge(){
+  const el = $('#ageHint'); if (!el) return;
+  const a = ageOf({dateNaissance:$('#f_dateNaissance').value, dateHeure:$('#f_dateHeure').value});
+  if (a === null) { el.innerHTML = ''; el.style.cssText = 'margin-top:6px;font-size:14px'; return; }
+  if (a < 18) { el.innerHTML = `⚠️ <b>MINEUR</b> — ${a} an${a>1?'s':''}`; el.style.cssText = 'margin-top:8px;font-size:15px;padding:9px 12px;border-radius:10px;background:#f39c34;color:#111'; }
+  else { el.textContent = `${a} ans`; el.style.cssText = 'margin-top:6px;font-size:14px;color:#9cc0ff'; }
+}
+['input','blur','change'].forEach(ev=>$('#f_dateNaissance').addEventListener(ev, ()=>setTimeout(syncAge)));
+$('#f_dateHeure').addEventListener('change', syncAge);
 /* Accident */
 $('#accBlock .memo').insertAdjacentHTML('afterend', `<label class="f" for="f_kilometrage" style="margin-top:16px">Kilométrage du véhicule</label><input id="f_kilometrage" inputmode="numeric" placeholder="ex. 85 000" autocomplete="off">`);
 $('#f_kilometrage').addEventListener('input', e=>{ const d = e.target.value.replace(/\D/g,'').slice(0,7); e.target.value = d ? (+d).toLocaleString('fr-FR').replace(/\s/g,' ') : ''; });
@@ -600,7 +621,7 @@ function ficheSections(f){
   add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat', src ? `${src.resultat} (hérité du CIF du ${fmtDT(src.dateHeure)})` : (f.type==='CIF' ? f.resultat : '')],['Vérification',f.verif?'VERIF':''],['Lieu du contrôle',f.lieuControle],['Coordonnées GPS',f.geo?`${f.geo.lat.toFixed(5)}, ${f.geo.lng.toFixed(5)}`:''],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
   const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, k==='plaque' && v.plaque ? `${v.plaque} (${v.pays||'F'} — ${PAYS_NAME[v.pays||'F']||''})` : v[k]])));
   if (!cif) addVeh(); // CI : le véhicule passe en premier
-  add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
+  add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans${isMinor(f)?' — MINEUR':''})` : f.dateNaissance)],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   if (f.accident) add('Accident', [['Kilométrage du véhicule',kmTxt(f.kilometrage)],['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
     ...MEMO.map(([k,l])=>[l, f[k]?'photographié(e)':'non photographié(e)'])]);
@@ -991,7 +1012,7 @@ function syncExtra(){
   const on = !!EDIT?.f.verif, b = $('#f_verif');
   b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   b.style.cssText = 'flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px;' + (on ? 'background:#b3261e;color:#fff;border:1px solid #b3261e' : 'background:transparent;color:#9a9a9a;border:1px dashed #666');
-  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna(); syncMotif();
+  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna(); syncMotif(); syncAge();
 }
 function syncSigna(){ const on = $('#f_signa').checked; $('#f_signaAn').disabled = !on; $('#f_signaAn').style.opacity = on ? '1' : '.4'; }
 $('#f_verif').onclick = ()=>{ if (!EDIT) return; EDIT.f.verif = !EDIT.f.verif; syncExtra(); };
