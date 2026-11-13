@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.7';
+const APP_VERSION = '3.8';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,9 +12,10 @@ const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
-const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
-const ACC_FIELDS = ['sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
+const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage'];
+const ACC_FIELDS = ['kilometrage','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const resTest = r => r ? `<span style="color:${r==='Positif'?'#ff5a52':'#3ccf4e'};font-weight:600">${r}</span>` : '';
+const kmTxt = k => { const d = String(k||'').replace(/\D/g,''); return d ? (+d).toLocaleString('fr-FR').replace(/\s/g,' ') + ' km' : ''; };
 const taux = t => t ? `${String(t).replace('.',',')} mg/L` : '';
 /* Taux alcool : < 0,25 vert · ≥ 0,25 orange · ≥ 0,40 rouge */
 const tauxColor = t => { const v = parseFloat(String(t||'').replace(',','.')); return isNaN(v) ? '' : v >= 0.40 ? '#ff5a52' : v >= 0.25 ? '#f39c34' : '#3ccf4e'; };
@@ -348,7 +349,7 @@ async function openDetail(f){
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
-  const acc = !f.accident ? '' : panel('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email?`<a href="mailto:${esc(f.email)}">${esc(f.email)}</a>`:'',true],
+  const acc = !f.accident ? '' : panel('Accident', [['Kilométrage',kmTxt(f.kilometrage)],['Situation familiale',f.sitFam],['E-mail',f.email?`<a href="mailto:${esc(f.email)}">${esc(f.email)}</a>`:'',true],
       ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, ok(f[k]), true])]);
   const dep = !f.accident ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux', f.alcTaux ? `<span style="color:${tauxColor(f.alcTaux)||'inherit'};font-weight:700">${esc(taux(f.alcTaux))}</span>` : '', true],
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
@@ -443,6 +444,8 @@ $('#f_dateNaissance').addEventListener('input', dateMask);
 $('#f_docDate').addEventListener('input', dateMask);
 
 /* Accident */
+$('#accBlock .memo').insertAdjacentHTML('afterend', `<label class="f" for="f_kilometrage" style="margin-top:16px">Kilométrage du véhicule</label><input id="f_kilometrage" inputmode="numeric" placeholder="ex. 85 000" autocomplete="off">`);
+$('#f_kilometrage').addEventListener('input', e=>{ const d = e.target.value.replace(/\D/g,'').slice(0,7); e.target.value = d ? (+d).toLocaleString('fr-FR').replace(/\s/g,' ') : ''; });
 function syncAcc(){ $('#accBlock').classList.toggle('hidden', !$('#f_accident').checked); }
 $('#f_accident').addEventListener('change', syncAcc);
 $('#memoPhoto').onclick = ()=>$('#phInput').click();
@@ -599,7 +602,7 @@ function ficheSections(f){
   if (!cif) addVeh(); // CI : le véhicule passe en premier
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
-  if (f.accident) add('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
+  if (f.accident) add('Accident', [['Kilométrage du véhicule',kmTxt(f.kilometrage)],['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
     ...MEMO.map(([k,l])=>[l, f[k]?'photographié(e)':'non photographié(e)'])]);
   if (f.accident) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
     ['Test stupéfiants',[f.stupHeure && `à ${f.stupHeure}`, f.stupRes].filter(Boolean).join(' — ')]]);
