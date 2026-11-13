@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -443,6 +443,7 @@ function syncBlocks(){
   const isCI = segVal('typeSeg') === 'CI';
   $('#f_resultat').classList.toggle('hidden', isCI); document.querySelector('label[for=f_resultat]').textContent = isCI ? 'Vérification' : 'Résultat';
   $('#cifBlock').classList.toggle('hidden', segVal('typeSeg') !== 'CIF');
+  $('#signaRow')?.classList.toggle('hidden', segVal('typeSeg') !== 'CIF');
   $('#docBlock').classList.toggle('hidden', segVal('docSeg') !== 'Officiel');
 }
 ['typeSeg','docSeg'].forEach(id=>$('#'+id).addEventListener('click', e=>{ const b=e.target.closest('button'); if (b) setSeg(id, b.dataset.v); }));
@@ -920,12 +921,12 @@ function normDocType(){
 $('#f_docType').addEventListener('change', normDocType);
 $('#f_docType').addEventListener('blur', ()=>setTimeout(normDocType, 250));
 
-/* ---------- VERIF (à côté du résultat) et SIGNA (bas du CIF) ---------- */
+/* ---------- VERIF (à côté du résultat) et SIGNA (tout en bas, après les observations, CIF seulement) ---------- */
 (()=>{
   const sel = $('#f_resultat'), row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:stretch';
   sel.replaceWith(row); row.appendChild(sel); sel.style.flex = '1'; sel.style.minWidth = '0';
   row.insertAdjacentHTML('beforeend', `<button type="button" id="f_verif" aria-pressed="false" style="flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px">VERIF</button>`);
-  $('#cifBlock').insertAdjacentHTML('beforeend', `<div style="display:flex;align-items:center;gap:12px;margin-top:18px">
+  $('#f_observations').insertAdjacentHTML('afterend', `<div id="signaRow" style="display:flex;align-items:center;gap:12px;margin-top:18px">
     <label class="switch" style="flex:1;margin:0"><input type="checkbox" id="f_signa"><span class="sw"></span><span class="swl">SIGNA</span></label>
     <select id="f_signaAn" aria-label="Année de signalisation" style="flex:0 0 120px">${'<option value="">Année</option>' + Array.from({length:new Date().getFullYear()-1969}, (_,i)=>new Date().getFullYear()-i).map(y=>`<option>${y}</option>`).join('')}</select></div>`);
 })();
