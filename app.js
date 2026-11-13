@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.8';
+const APP_VERSION = '2.9';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -51,9 +51,9 @@ const nowLocal = () => { const d = new Date(); d.setSeconds(0,0); return new Dat
 
 let toastT;
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2200); }
-function ask(msg, yes='Confirmer', danger=true){
+function ask(msg, yes='Confirmer', danger=true, no='Annuler'){
   return new Promise(res=>{
-    $('#mMsg').textContent=msg; const y=$('#mYes'); y.textContent=yes; y.className='btn'+(danger?' danger':'');
+    $('#mNo').textContent=no; $('#mMsg').textContent=msg; const y=$('#mYes'); y.textContent=yes; y.className='btn'+(danger?' danger':'');
     $('#modal').classList.remove('hidden');
     const done=v=>{ $('#modal').classList.add('hidden'); y.onclick=$('#mNo').onclick=null; res(v); };
     y.onclick=()=>done(true); $('#mNo').onclick=()=>done(false);
@@ -131,6 +131,8 @@ function showLock(setup){
   else setTimeout(()=>$('#pin').focus(), 150);
 }
 function lock(){
+  if (EDIT && KEY) saveDraft(KEY, snapshot());
+  DRAFT = null;
   KEY = null; PIN = null; FICHES = []; EDIT = null; SEL = null; LEARN = {}; sgHide();
   for (const u of urlCache.values()) URL.revokeObjectURL(u); urlCache.clear();
   DETAIL = null;
@@ -167,6 +169,7 @@ async function unlockWith(pin){
 async function openApp(){
   FICHES = await Promise.all((await dbAll('fiches')).map(r=>decJSON(KEY, r)));
   await loadLearn();
+  await loadDraft();
   await purge();
   $('#lock').classList.add('hidden'); $('#app').classList.remove('hidden');
   render(); checkUpdate(false);
@@ -238,10 +241,10 @@ function render(){
   items.sort((a,b)=> TAB==='archived' ? b.archivedAt - a.archivedAt : (b.dateHeure||'').localeCompare(a.dateHeure||''));
   window.visibleIds = items.map(f=>f.id);
   if (!items.length) {
-    $('#list').innerHTML = backupBanner() + `<div class="empty">${q ? 'Aucun résultat.' : VFILTER ? `Aucune fiche « ${esc(VFILTER)} » ici.<br><a href="#" id="vfReset" style="color:#7fb3ff">Tout afficher</a>` : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
+    $('#list').innerHTML = backupBanner() + draftBanner() + `<div class="empty">${q ? 'Aucun résultat.' : VFILTER ? `Aucune fiche « ${esc(VFILTER)} » ici.<br><a href="#" id="vfReset" style="color:#7fb3ff">Tout afficher</a>` : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
     return;
   }
-  $('#list').innerHTML = backupBanner() + items.map((f,i)=>{
+  $('#list').innerHTML = backupBanner() + draftBanner() + items.map((f,i)=>{
     const name = [ (f.nom||'').toUpperCase(), f.prenom ].filter(Boolean).join(' | ') || '<span style="color:var(--muted)">Sans identité</span>';
     const sub = [f.dateNaissance, f.nationalite].filter(Boolean).join(' | ');
     const n = (f.photos||[]).length;
@@ -287,7 +290,13 @@ $('#list').addEventListener('click', async e=>{
 document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{ SEL=null; TAB=b.dataset.tab; window.lastTab=TAB; render(); window.scrollTo(0,0); });
 $('#btnSearch').onclick = ()=>{ const s=$('#searchbar'); s.classList.toggle('hidden'); if(!s.classList.contains('hidden')) $('#q').focus(); else { $('#q').value=''; QUERY=''; render(); } };
 $('#q').oninput = e=>{ QUERY=e.target.value; render(); };
-$('#fab').onclick = ()=>openForm(null);
+$('#fab').onclick = async ()=>{
+  if (DRAFT) {
+    if (await ask(`Un contrôle non enregistré est en attente (${ficheName(DRAFT.f)}).\nLe reprendre ?`, 'Reprendre', false, 'Nouveau')) return resumeDraft();
+    await discardDraft();
+  }
+  openForm(null);
+};
 $('#btnSelect').onclick = ()=>{ SEL = SEL ? null : new Set(); render(); };
 $('#selAll').onclick = ()=>{ const ids = window.visibleIds||[]; if (ids.every(id=>SEL.has(id))) SEL.clear(); else ids.forEach(id=>SEL.add(id)); render(); };
 $('#selArchive').onclick = async ()=>{
@@ -374,9 +383,9 @@ $('#detDelete').onclick = async ()=>{
 };
 
 /* ---------- Formulaire ---------- */
-function openForm(f){
-  const isNew = !f;
-  EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
+function openForm(f, d){
+  const isNew = d ? d.isNew : !f;
+  EDIT = d ? { isNew, f: structuredClone(d.f), added:[...(d.added||[])], removed:[...(d.removed||[])] } : { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
   syncDocPays(); $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
@@ -388,7 +397,7 @@ function openForm(f){
   renderPhotos();
   syncExtra(); $('#geoHint').textContent = EDIT.f.geo ? '📍 Position GPS enregistrée' : '';
   $('#form').classList.remove('hidden'); $('#form .body').scrollTop = 0;
-  if (isNew && SETTINGS.geoMode !== 'off') geoFill(true);
+  if (isNew && !d && SETTINGS.geoMode !== 'off') geoFill(true);
 }
 async function closeForm(save){
   if (!EDIT) return;
@@ -406,11 +415,14 @@ async function closeForm(save){
     const miss = E.f.accident ? MEMO.filter(([k])=>!E.f[k]).map(m=>m[2]) : [];
     if (miss.length && !await ask(`Accident — photos non cochées :\n• ${miss.join('\n• ')}\n\nEnregistrer quand même ?`, 'Enregistrer', false)) return;
     for (const id of E.removed) await removePhoto(id);
-    await saveFiche(E.f); toast('Fiche enregistrée');
+    await saveFiche(E.f); toast('Fiche enregistrée'); clearTimeout(draftT); await clearDraft();
     if (learnFrom(E.f)) saveLearn().catch(()=>{});
     if (E.f.status==='pending') { TAB = E.f.type; window.lastTab = TAB; }
   } else {
-    for (const id of E.added) await removePhoto(id);
+    clearTimeout(draftT);
+    const snap = snapshot();
+    if (isDirty(snap)) { await saveDraft(KEY, snap); toast('Contrôle gardé en brouillon : tu peux le reprendre'); }
+    else { if (DRAFT && DRAFT.f.id === E.f.id) await clearDraft(); for (const id of E.added) await removePhoto(id); }
   }
   EDIT = null; sgHide(); $('#form').classList.add('hidden'); render();
   if (save && !E.isNew) openDetail(E.f);
@@ -420,6 +432,7 @@ $('#formCancel').onclick = $('#formBack').onclick = ()=>closeForm(false);
 $('#formDelete').onclick = async ()=>{
   if (!await ask('Supprimer cette fiche et ses photos ?', 'Supprimer')) return;
   for (const id of EDIT.added) await removePhoto(id);
+  clearTimeout(draftT); if (DRAFT && DRAFT.f.id === EDIT.f.id) await clearDraft();
   await removeFiche(EDIT.f.id); EDIT=null; $('#form').classList.add('hidden'); render(); toast('Fiche supprimée');
 };
 const dateMask = e=>{
@@ -523,7 +536,7 @@ $('#phInput').onchange = async e=>{
     try { const id = await savePhoto(await shrink(file)); EDIT.added.push(id); EDIT.f.photos.push(id); }
     catch { toast('Une photo n’a pas pu être lue'); }
   }
-  renderPhotos();
+  renderPhotos(); draftSoon();
 };
 // Redimensionne (1600 px max) et réencode en JPEG : allège le stockage et retire les métadonnées (GPS…).
 async function shrink(file, max=1600, q=.82){
@@ -783,6 +796,7 @@ $('#c_btn').onclick = async ()=>{
     ['photos', s=>photos.forEach(x=>s.put(x))]
   ]);
   KEY = nk; PIN = n; ['#c_old','#c_new','#c_new2'].forEach(s=>$(s).value='');
+  if (DRAFT) await saveDraft(KEY, DRAFT);
   if (await dbGet('meta','bio')) { await dbDel('meta','bio'); toast('Code modifié — réactive le déverrouillage biométrique'); syncBioUI(); } else toast('Code modifié');
 };
 
@@ -988,6 +1002,58 @@ async function geoFill(auto){
   } finally { geoBusy = false; }
 }
 $('#geoBtn').onclick = ()=>geoFill(false);
+
+/* ---------- Brouillon : reprendre un contrôle fermé sans enregistrer ----------
+   Le formulaire en cours est copié (chiffré) toutes les secondes de saisie, à la sortie de l'appli
+   et au verrouillage. Il disparaît dès que la fiche est enregistrée ou que tu l'ignores. */
+let DRAFT = null, draftT = null;
+function snapshot(){
+  const f = structuredClone(EDIT.f);
+  for (const k of FIELDS) f[k] = $('#f_'+k).value.trim();
+  f.type = segVal('typeSeg'); f.docMode = segVal('docSeg');
+  f.accident = $('#f_accident').checked; for (const [k] of MEMO) f[k] = $('#f_'+k).checked;
+  f.verif = $('#f_verif').classList.contains('on'); f.signa = $('#f_signa').checked; f.signaAn = f.signa ? $('#f_signaAn').value : '';
+  readVehicles(); f.vehicules = structuredClone(EDIT.f.vehicules);
+  return {f, isNew:EDIT.isNew, added:[...EDIT.added], removed:[...EDIT.removed], at:Date.now()};
+}
+const draftKey = f => JSON.stringify([FIELDS.filter(k=>k!=='dateHeure').map(k=>f[k]||''), f.type, f.accident||false, MEMO.map(([k])=>!!f[k]), !!f.verif, !!f.signa, f.signaAn||'', (f.vehicules||[]).map(v=>[v.type||'',v.pays||'',...VEH_FIELDS.map(([k])=>v[k]||'')]), f.photos||[]]);
+function isDirty(snap){
+  const f = snap.f;
+  if (snap.isNew) return FIELDS.some(k=>k!=='dateHeure' && k!=='lieuControle' && f[k]) || (f.photos||[]).length > 0 || (f.vehicules||[]).some(v=>VEH_FIELDS.some(([k])=>v[k])) || !!f.accident || !!f.verif || !!f.signa;
+  const orig = FICHES.find(x=>x.id===f.id); return !orig || draftKey(orig) !== draftKey(f);
+}
+async function saveDraft(key, snap){
+  try { if (!isDirty(snap)) return; const r = await encJSON(key, snap); await dbPut('meta', {iv:r.iv, data:r.data}, 'draft'); if (key === KEY) DRAFT = snap; } catch {}
+}
+function draftSoon(){ clearTimeout(draftT); draftT = setTimeout(()=>{ if (EDIT && KEY) saveDraft(KEY, snapshot()); }, 800); }
+async function loadDraft(){ DRAFT = null; const r = await dbGet('meta','draft').catch(()=>null); if (r) try { DRAFT = await decJSON(KEY, r); } catch { await dbDel('meta','draft').catch(()=>{}); } }
+async function clearDraft(){ DRAFT = null; await dbDel('meta','draft').catch(()=>{}); }
+async function discardDraft(){
+  const d = DRAFT; if (!d) return;
+  const used = new Set(FICHES.flatMap(f=>f.photos||[]));
+  for (const id of (d.added||[])) if (!used.has(id)) await removePhoto(id);
+  await clearDraft();
+}
+function resumeDraft(){
+  const d = DRAFT; if (!d) return;
+  if (!d.isNew && !FICHES.some(x=>x.id===d.f.id)) d.isNew = true;
+  closeDetail(); openForm(null, d);
+}
+function draftBanner(){
+  if (!DRAFT || EDIT) return '';
+  const mins = Math.max(0, Math.round((Date.now() - DRAFT.at)/6e4));
+  const ago = mins < 1 ? 'à l\'instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.round(mins/60)} h` : `le ${fmtD(DRAFT.at)}`;
+  return `<div id="drDue" style="display:flex;align-items:center;gap:10px;margin:10px 12px 4px;padding:11px 14px;border:1px solid #7a5a1c;border-radius:12px;background:#33270f;color:#ffe2a8;font-size:15px;position:relative;z-index:2">
+    <span style="font-size:20px">↺</span>
+    <button type="button" id="drResume" style="flex:1;border:0;background:none;color:inherit;text-align:left;padding:0;font-size:15px"><b>Reprendre le contrôle précédent</b><br><small style="color:#d9bf86">${esc(ficheName(DRAFT.f))} · ${esc(DRAFT.f.type||'CI')} · non enregistré · ${ago}</small></button>
+    <button type="button" id="drDrop" style="border:0;background:none;color:#d9bf86;font-size:14px;padding:6px">Ignorer</button></div>`;
+}
+$('#list').addEventListener('click', async e=>{
+  if (e.target.closest('#drResume')) return resumeDraft();
+  if (e.target.closest('#drDrop')) { if (await ask('Supprimer ce contrôle non enregistré ?', 'Supprimer', true)) { await discardDraft(); render(); toast('Brouillon supprimé'); } }
+});
+['input','change','click'].forEach(ev=>$('#form').addEventListener(ev, ()=>{ if (EDIT) draftSoon(); }));
+document.addEventListener('visibilitychange', ()=>{ if (document.hidden && EDIT && KEY) { clearTimeout(draftT); saveDraft(KEY, snapshot()); } });
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
