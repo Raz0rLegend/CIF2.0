@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1162,3 +1162,5 @@ document.addEventListener('visibilitychange', ()=>{ if (document.hidden && EDIT 
 (()=>{ const sc = document.createElement('script'); sc.src = 'adr.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
 /* Partage de fiches par QR code : module séparé */
 (()=>{ const sc = document.createElement('script'); sc.src = 'share.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
+/* Lecture de plaque sur photo (OCR dans le téléphone) : module séparé */
+(()=>{ const sc = document.createElement('script'); sc.src = 'plate-ocr.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
