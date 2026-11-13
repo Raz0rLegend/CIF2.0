@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.9';
+const APP_VERSION = '3.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -620,7 +620,7 @@ async function shareFiches(list){
 }
 
 /* ---------- Suggestions (saisie rapide) ---------- */
-const SG_LEARN_MAP = [['nationalite','nats'],['lieuNaissance','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docAbbr'],['docLieu','docLieu']];
+const SG_LEARN_MAP = [['nationalite','nats'],['lieuNaissance','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docAbbr'],['docLieu','docLieu'],['motif','motifs']];
 let LEARN = {};
 const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 function sgList(key){ const seen=new Set(), out=[]; for (const v of [...(LEARN[key]||[]), ...(SG_BASE[key]||[])]) { const n=norm(v); if (n && !seen.has(n)) { seen.add(n); out.push(v); } } return out; }
@@ -948,7 +948,7 @@ function syncExtra(){
   const on = !!EDIT?.f.verif, b = $('#f_verif');
   b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   b.style.cssText = 'flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px;' + (on ? 'background:#b3261e;color:#fff;border:1px solid #b3261e' : 'background:transparent;color:#9a9a9a;border:1px dashed #666');
-  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna();
+  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna(); syncMotif();
 }
 function syncSigna(){ const on = $('#f_signa').checked; $('#f_signaAn').disabled = !on; $('#f_signaAn').style.opacity = on ? '1' : '.4'; }
 $('#f_verif').onclick = ()=>{ if (!EDIT) return; EDIT.f.verif = !EDIT.f.verif; syncExtra(); };
@@ -1002,6 +1002,27 @@ async function geoFill(auto){
   } finally { geoBusy = false; }
 }
 $('#geoBtn').onclick = ()=>geoFill(false);
+
+/* ---------- Motif : choix rapides (liste à compléter ici) ---------- */
+const MOTIFS = ['Trouvaille','Contrôle routier','Infraction','Accident du travail','AVP corporel','AVP matériel','AVP avec refus','Autre'];
+SG_BASE.motifs = MOTIFS.filter(m=>m!=='Autre');
+(()=>{
+  const inp = $('#f_motif'); inp.dataset.sg = 'motifs'; inp.placeholder = 'Choisis ci-dessous ou écris';
+  inp.insertAdjacentHTML('afterend', `<div id="motifChips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${MOTIFS.map(m=>`<button type="button" data-motif="${esc(m)}" style="border:1px solid var(--line);background:var(--panel);color:inherit;border-radius:16px;padding:7px 12px;font-size:14px">${esc(m)}</button>`).join('')}</div>`);
+})();
+function syncMotif(){
+  const v = norm($('#f_motif').value);
+  document.querySelectorAll('#motifChips [data-motif]').forEach(b=>{ const on = v && norm(b.dataset.motif) === v; b.style.background = on ? '#fff' : 'var(--panel)'; b.style.color = on ? '#111' : 'inherit'; b.style.fontWeight = on ? '700' : ''; });
+}
+$('#motifChips').addEventListener('click', e=>{
+  const b = e.target.closest('[data-motif]'); if (!b) return;
+  const inp = $('#f_motif');
+  if (b.dataset.motif === 'Autre') { inp.value = ''; inp.placeholder = 'Préciser le motif…'; inp.focus(); }
+  else { inp.value = norm(inp.value) === norm(b.dataset.motif) ? '' : b.dataset.motif; inp.placeholder = 'Choisis ci-dessous ou écris'; }
+  syncMotif();
+});
+$('#f_motif').addEventListener('input', syncMotif);
+$('#f_motif').addEventListener('change', syncMotif);
 
 /* ---------- Brouillon : reprendre un contrôle fermé sans enregistrer ----------
    Le formulaire en cours est copié (chiffré) toutes les secondes de saisie, à la sortie de l'appli
