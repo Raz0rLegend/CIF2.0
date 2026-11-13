@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1052,7 +1052,10 @@ const MC_RES = {
   'CDPJ':'défavorablement noté à notre fichier central et inconnu au fichier Interpol 24/7'
 };
 const MOIS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-const dateLettres = d => { const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(d||'').trim()); if (!m || +m[2] < 1 || +m[2] > 12) return d; return `${+m[1] === 1 ? '1er' : +m[1]} ${MOIS[+m[2]-1]} ${m[3]}`; };
+const fullYear = y => y.length === 4 ? y : String((+y > new Date().getFullYear() % 100 ? 1900 : 2000) + +y);
+const dateLettres = d => { const m = /^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})$/.exec(String(d||'').trim()); if (!m || +m[2] < 1 || +m[2] > 12) return d; return `${+m[1] === 1 ? '1er' : +m[1]} ${MOIS[+m[2]-1]} ${fullYear(m[3])}`; };
+/* Date de naissance saisie avec une année sur 2 chiffres (12/06/80) : complétée en 12/06/1980 */
+$('#f_dateNaissance').addEventListener('blur', e=>{ const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(e.target.value.trim()); if (m) e.target.value = `${m[1]}/${m[2]}/${fullYear(m[3])}`; });
 const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|larvotto|moneghetti|saint[\s-]roman|jardin[\s-]exotique|port[\s-]hercule/i.test(a||'');
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
