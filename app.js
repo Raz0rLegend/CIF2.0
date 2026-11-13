@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.6';
+const APP_VERSION = '2.7';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -27,6 +27,8 @@ const DOC_PAYS_TOP = [['FR','France'],['MC','Monaco'],['IT','Italie'],['DE','All
 const DOC_PAYS_ALL = [['ZA','Afrique du Sud'],['AL','Albanie'],['DZ','Algérie'],['AD','Andorre'],['SA','Arabie saoudite'],['AR','Argentine'],['AM','Arménie'],['AU','Australie'],['AT','Autriche'],['AZ','Azerbaïdjan'],['BY','Biélorussie'],['BA','Bosnie-Herzégovine'],['BR','Brésil'],['BG','Bulgarie'],['CM','Cameroun'],['CA','Canada'],['CN','Chine'],['CY','Chypre'],['CO','Colombie'],['CI','Côte d\'Ivoire'],['HR','Croatie'],['DK','Danemark'],['EG','Égypte'],['AE','Émirats arabes unis'],['EE','Estonie'],['US','États-Unis'],['FI','Finlande'],['GE','Géorgie'],['GR','Grèce'],['HU','Hongrie'],['IN','Inde'],['IE','Irlande'],['IS','Islande'],['IL','Israël'],['JP','Japon'],['XK','Kosovo'],['LV','Lettonie'],['LB','Liban'],['LI','Liechtenstein'],['LT','Lituanie'],['MK','Macédoine du Nord'],['ML','Mali'],['MT','Malte'],['MA','Maroc'],['MX','Mexique'],['MD','Moldavie'],['ME','Monténégro'],['NO','Norvège'],['PL','Pologne'],['QA','Qatar'],['RO','Roumanie'],['RU','Russie'],['SM','Saint-Marin'],['SN','Sénégal'],['RS','Serbie'],['SK','Slovaquie'],['SI','Slovénie'],['SE','Suède'],['CZ','Tchéquie'],['TN','Tunisie'],['TR','Turquie'],['UA','Ukraine'],['VA','Vatican'],['??','Autre / inconnu']];
 const NAT_ISO = [['franc','FR'],['moneg','MC'],['ital','IT'],['allem','DE'],['suisse','CH'],['belg','BE'],['neerland','NL'],['hollan','NL'],['luxemb','LU'],['britann','GB'],['anglais','GB'],['espagn','ES'],['portug','PT'],['maroc','MA'],['alger','DZ'],['tunis','TN'],['roum','RO'],['polon','PL'],['russe','RU'],['ukrain','UA'],['americ','US'],['senegal','SN'],['ivoir','CI'],['turc','TR'],['autrich','AT'],['grec','GR'],['suedois','SE'],['norveg','NO'],['danois','DK'],['chinois','CN'],['japon','JP'],['bresil','BR']];
 const docPaysOptions = sel => `<option value="" ${!sel?'selected':''}>Pays</option><optgroup label="Fréquents">${DOC_PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${DOC_PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
+const VERIF_BADGE = '<span class="badge" style="background:#b3261e;color:#fff;letter-spacing:.04em">VERIF</span>';
+const signaLabel = f => f.signa ? 'SIGNA' + (f.signaAn ? ' ' + f.signaAn : '') : '';
 const docLabel = f => [f.docType, f.docPays].filter(Boolean).join(' ');
 const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
 const plateHTML = v => `<span class="plate"><i>${esc(v.pays||'F')}</i>${esc(v.plaque)}</span>`;
@@ -88,7 +90,7 @@ const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
 
 /* ---------- État ---------- */
 let SEL = null, PIN = null, VFILTER = '';
-let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1, groupMin:10, backupDays:5, lastBackup:0}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
+let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1, groupMin:10, backupDays:5, lastBackup:0, geoMode:'addr'}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
 const urlCache = new Map();
 
 async function saveFiche(f){
@@ -232,7 +234,7 @@ function render(){
   let items = TAB==='archived' ? FICHES.filter(f=>f.status==='archived') : pend.filter(f=>(f.type||'CI')===TAB);
   syncVFilter(items);
   if (VFILTER) items = items.filter(f => vehTypes(f).includes(VFILTER));
-  if (q) items = items.filter(f => [...FIELDS.map(k=>f[k]||''), f.qualite, f.type, ...(f.vehicules||[]).flatMap(v=>Object.values(v))].join(' ').toLowerCase().includes(q));
+  if (q) items = items.filter(f => [...FIELDS.map(k=>f[k]||''), f.qualite, f.type, f.verif?'VERIF':'', signaLabel(f), ...(f.vehicules||[]).flatMap(v=>Object.values(v))].join(' ').toLowerCase().includes(q));
   items.sort((a,b)=> TAB==='archived' ? b.archivedAt - a.archivedAt : (b.dateHeure||'').localeCompare(a.dateHeure||''));
   window.visibleIds = items.map(f=>f.id);
   if (!items.length) {
@@ -250,7 +252,7 @@ function render(){
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
-        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
@@ -319,20 +321,21 @@ async function openDetail(f){
   DETAIL = f.id;
   const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length, src = cifSource(f);
   computeGroups(); const mates = groupMates(f);
-  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.status==='archived'?'Archivée':'En cours'}`;
+  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
       <div class="chips2">
         ${!cif ? (src ? `<button type="button" class="chip" data-mate="${src.id}" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(src.resultat)} · hérité du CIF ›</button>` : '') : `<label class="chip" style="position:relative;${f.resultat ? `background:${col}22;color:${col};border:1px solid ${col}66` : 'border:1px dashed #666;color:#bdbdbd'}">${f.resultat ? esc(f.resultat) : 'Résultat'} ▾<select id="detRes" aria-label="Changer le résultat" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;border:0">${['','NDN','Oméga','CDPA','CDPU','CDPJ'].map(r=>`<option value="${r}" ${r===(f.resultat||'')?'selected':''}>${r||'—'}</option>`).join('')}</select></label>`}
+        <button type="button" class="chip" id="detVerif" style="${f.verif ? 'background:#b3261e;color:#fff;border:1px solid #b3261e;font-weight:700' : 'border:1px dashed #666;color:#bdbdbd'}">VERIF</button>
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
-        ${f.lieuControle ? `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>` : ''}
+        ${f.lieuControle ? (f.geo ? `<a class="chip" href="https://maps.apple.com/?ll=${f.geo.lat},${f.geo.lng}&q=${encodeURIComponent(f.lieuControle)}" style="text-decoration:none;color:inherit">${ICON_PIN}${esc(f.lieuControle)} ›</a>` : `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>`) : ''}
       </div>${mates.length ? `<div class="mates">${ICON_LINK}<span>Avec ${mates.map(m=>`<button type="button" data-mate="${m.id}">${esc(ficheName(m))}</button>`).join(', ')}</span></div>` : ''}</div><div class="vics">${vehIcons(f)}</div></div>`;
   const veh = (f.vehicules||[]).map((v,i)=>panel(`Véhicule ${i+1}${v.type?` · ${v.type}`:''}`,
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
       v.plaque ? plateHTML(v) : '')).join('');
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
-  const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
+  const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
@@ -347,6 +350,7 @@ async function openDetail(f){
   $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + doc + veh : veh + ident + acc + dep) + ctx + photos + recu + arch;
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore + '<span>Remettre</span>' : ICON.archive + '<span>Archiver</span>';
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
+  $('#detVerif').onclick = async ()=>{ const sc = $('#detail .body').scrollTop; f.verif = !f.verif; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.verif ? 'Marquée VERIF' : 'VERIF retiré'); };
   if ($('#detRes')) $('#detRes').onchange = async e=>{ const sc = $('#detail .body').scrollTop; f.resultat = e.target.value; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.resultat ? `Résultat : ${f.resultat}` : 'Résultat effacé'); };
   $('#detail').classList.remove('hidden'); $('#detail .body').scrollTop = 0;
   for (const el of $('#detBody').querySelectorAll('.ph')) el.querySelector('img').src = await photoURL(el.dataset.id);
@@ -382,7 +386,9 @@ function openForm(f){
   $('#formDelete').classList.toggle('hidden', isNew);
   $('#formErr').textContent = '';
   renderPhotos();
+  syncExtra(); $('#geoHint').textContent = EDIT.f.geo ? '📍 Position GPS enregistrée' : '';
   $('#form').classList.remove('hidden'); $('#form .body').scrollTop = 0;
+  if (isNew && SETTINGS.geoMode !== 'off') geoFill(true);
 }
 async function closeForm(save){
   if (!EDIT) return;
@@ -392,8 +398,9 @@ async function closeForm(save){
     E.f.type = segVal('typeSeg'); E.f.docMode = segVal('docSeg');
     E.f.accident = $('#f_accident').checked; for (const [k] of MEMO) E.f[k] = E.f.accident && $('#f_'+k).checked;
     if (!E.f.accident) for (const k of ACC_FIELDS) E.f[k] = '';
+    E.f.verif = $('#f_verif').classList.contains('on'); E.f.signa = $('#f_signa').checked; E.f.signaAn = E.f.signa ? $('#f_signaAn').value : '';
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
-    if (E.f.type === 'CI') { for (const k of CIF_FIELDS) E.f[k] = ''; E.f.resultat = ''; }
+    if (E.f.type === 'CI') { for (const k of CIF_FIELDS) E.f[k] = ''; E.f.resultat = ''; E.f.signa = false; E.f.signaAn = ''; }
     if (E.f.type === 'CIF' && E.f.docMode === 'Sur dires') for (const k of ['docType','docPays','docNumero','docDate','docLieu']) E.f[k] = '';
     if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
     const miss = E.f.accident ? MEMO.filter(([k])=>!E.f[k]).map(m=>m[2]) : [];
@@ -434,7 +441,7 @@ function setSeg(id, v){ document.querySelectorAll(`#${id} button`).forEach(b=>b.
 const segVal = id => document.querySelector(`#${id} button.on`)?.dataset.v;
 function syncBlocks(){
   const isCI = segVal('typeSeg') === 'CI';
-  $('#f_resultat').classList.toggle('hidden', isCI); document.querySelector('label[for=f_resultat]').classList.toggle('hidden', isCI);
+  $('#f_resultat').classList.toggle('hidden', isCI); document.querySelector('label[for=f_resultat]').textContent = isCI ? 'Vérification' : 'Résultat';
   $('#cifBlock').classList.toggle('hidden', segVal('typeSeg') !== 'CIF');
   $('#docBlock').classList.toggle('hidden', segVal('docSeg') !== 'Officiel');
 }
@@ -534,11 +541,11 @@ function ficheSections(f){
   const cif = f.type === 'CIF', S = [];
   const add = (title, rows) => { rows = rows.filter(r=>r[1]); if (rows.length) S.push([title, rows]); };
   const src = cifSource(f);
-  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat', src ? `${src.resultat} (hérité du CIF du ${fmtDT(src.dateHeure)})` : (f.type==='CIF' ? f.resultat : '')],['Lieu du contrôle',f.lieuControle],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
+  add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat', src ? `${src.resultat} (hérité du CIF du ${fmtDT(src.dateHeure)})` : (f.type==='CIF' ? f.resultat : '')],['Vérification',f.verif?'VERIF':''],['Lieu du contrôle',f.lieuControle],['Coordonnées GPS',f.geo?`${f.geo.lat.toFixed(5)}, ${f.geo.lng.toFixed(5)}`:''],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
   const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, k==='plaque' && v.plaque ? `${v.plaque} (${v.pays||'F'} — ${PAYS_NAME[v.pays||'F']||''})` : v[k]])));
   if (!cif) addVeh(); // CI : le véhicule passe en premier
   add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],
-    ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation]] : [])]);
+    ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   if (f.accident) add('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
     ...MEMO.map(([k,l])=>[l, f[k]?'photographié(e)':'non photographié(e)'])]);
   if (f.accident) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
@@ -912,6 +919,74 @@ function normDocType(){
 }
 $('#f_docType').addEventListener('change', normDocType);
 $('#f_docType').addEventListener('blur', ()=>setTimeout(normDocType, 250));
+
+/* ---------- VERIF (à côté du résultat) et SIGNA (bas du CIF) ---------- */
+(()=>{
+  const sel = $('#f_resultat'), row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:stretch';
+  sel.replaceWith(row); row.appendChild(sel); sel.style.flex = '1'; sel.style.minWidth = '0';
+  row.insertAdjacentHTML('beforeend', `<button type="button" id="f_verif" aria-pressed="false" style="flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px">VERIF</button>`);
+  $('#cifBlock').insertAdjacentHTML('beforeend', `<div style="display:flex;align-items:center;gap:12px;margin-top:18px">
+    <label class="switch" style="flex:1;margin:0"><input type="checkbox" id="f_signa"><span class="sw"></span><span class="swl">SIGNA</span></label>
+    <select id="f_signaAn" aria-label="Année de signalisation" style="flex:0 0 120px">${'<option value="">Année</option>' + Array.from({length:new Date().getFullYear()-1969}, (_,i)=>new Date().getFullYear()-i).map(y=>`<option>${y}</option>`).join('')}</select></div>`);
+})();
+function syncExtra(){
+  const on = !!EDIT?.f.verif, b = $('#f_verif');
+  b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+  b.style.cssText = 'flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px;' + (on ? 'background:#b3261e;color:#fff;border:1px solid #b3261e' : 'background:transparent;color:#9a9a9a;border:1px dashed #666');
+  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna();
+}
+function syncSigna(){ const on = $('#f_signa').checked; $('#f_signaAn').disabled = !on; $('#f_signaAn').style.opacity = on ? '1' : '.4'; }
+$('#f_verif').onclick = ()=>{ if (!EDIT) return; EDIT.f.verif = !EDIT.f.verif; syncExtra(); };
+$('#f_signa').addEventListener('change', ()=>{ syncSigna(); if ($('#f_signa').checked && !$('#f_signaAn').value) $('#f_signaAn').value = String(new Date().getFullYear()); });
+
+/* ---------- Lieu du contrôle : géolocalisation ----------
+   Le GPS reste sur le téléphone. En mode « adresse », seules les coordonnées sont envoyées
+   à OpenStreetMap (Nominatim) pour obtenir le nom de la rue : aucune donnée de fiche. */
+(()=>{
+  const inp = $('#f_lieuControle'), row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:stretch';
+  inp.replaceWith(row); row.appendChild(inp); inp.style.flex = '1'; inp.style.minWidth = '0';
+  row.insertAdjacentHTML('beforeend', `<button type="button" id="geoBtn" aria-label="Me localiser" style="flex:0 0 52px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:#7fb3ff;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg></button>`);
+  row.insertAdjacentHTML('afterend', `<div id="geoHint" style="font-size:13px;color:#9cc0ff;margin-top:6px"></div>`);
+  const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Sécurité');
+  h.insertAdjacentHTML('beforebegin', `<h3>Localisation</h3>
+    <label class="f" for="s_geo">À la création d'une fiche</label>
+    <select id="s_geo"><option value="addr">Remplir le lieu avec l'adresse</option><option value="gps">Coordonnées GPS seules (hors ligne)</option><option value="off">Ne pas localiser automatiquement</option></select>
+    <p class="hint">« Adresse » envoie uniquement la position (pas la fiche) à OpenStreetMap pour trouver le nom de la rue. Le bouton de localisation du formulaire reste toujours disponible.</p>`);
+})();
+$('#s_geo').onchange = async e=>{ SETTINGS.geoMode = e.target.value; await dbPut('meta', SETTINGS, 'settings'); };
+$('#btnSettings').addEventListener('click', ()=>{ $('#s_geo').value = SETTINGS.geoMode || 'addr'; });
+async function reverseGeo(lat, lng){
+  const ctl = new AbortController(), t = setTimeout(()=>ctl.abort(), 7000);
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fr`, {signal:ctl.signal});
+    if (!r.ok) return '';
+    const a = (await r.json()).address || {};
+    const street = [a.house_number, a.road || a.pedestrian || a.footway || a.square || a.place].filter(Boolean).join(' ');
+    const area = a.suburb || a.quarter || a.neighbourhood || a.city_district || '';
+    const city = a.city || a.town || a.village || a.municipality || '';
+    return [street, area, city].filter((x,i,arr)=>x && arr.indexOf(x)===i).join(', ');
+  } catch { return ''; } finally { clearTimeout(t); }
+}
+let geoBusy = false;
+async function geoFill(auto){
+  if (!EDIT || geoBusy) return;
+  if (!navigator.geolocation) { if (!auto) toast('Localisation indisponible sur cet appareil'); return; }
+  const id = EDIT.f.id, hint = $('#geoHint'); geoBusy = true; hint.textContent = '📍 Localisation en cours…';
+  try {
+    const pos = await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res, rej, {enableHighAccuracy:true, timeout:15000, maximumAge:60000}));
+    if (!EDIT || EDIT.f.id !== id) return;
+    const lat = +pos.coords.latitude.toFixed(6), lng = +pos.coords.longitude.toFixed(6);
+    EDIT.f.geo = {lat, lng, acc:Math.round(pos.coords.accuracy||0)};
+    let label = SETTINGS.geoMode === 'gps' ? '' : await reverseGeo(lat, lng);
+    if (!EDIT || EDIT.f.id !== id) return;
+    const inp = $('#f_lieuControle');
+    if (!inp.value.trim() || !auto) inp.value = label || `GPS ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    hint.textContent = `📍 Position enregistrée (précision ± ${EDIT.f.geo.acc} m)` + (label || SETTINGS.geoMode === 'gps' ? '' : ' — adresse introuvable, coordonnées notées');
+  } catch (e) {
+    hint.textContent = e && e.code === 1 ? '📍 Localisation refusée : autorise-la dans Réglages iPhone › Confidentialité › Service de localisation › Safari' : (auto ? '' : '📍 Position introuvable, réessaie');
+  } finally { geoBusy = false; }
+}
+$('#geoBtn').onclick = ()=>geoFill(false);
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
