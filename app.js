@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.6';
+const APP_VERSION = '3.7';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1066,6 +1066,13 @@ function docPhrase(f){
   const fem = d[1] === 'f', adj = PAYS_ADJ[f.docPays];
   return { txt: d[0] + (adj ? ' ' + (fem ? adjFem(adj) : adj) : f.docPays && f.docPays !== '??' ? ` (${f.docPays})` : ''), fem, art: fem ? 'sa ' : 'son ' };
 }
+/* « pref 06 », « préf. 84 » : nom complet de la préfecture d'après le n° de département */
+const DEPTS = {'01':"de l'Ain",'02':"de l'Aisne",'03':"de l'Allier",'04':"des Alpes-de-Haute-Provence",'05':"des Hautes-Alpes",'06':"des Alpes-Maritimes",'07':"de l'Ardèche",'08':"des Ardennes",'09':"de l'Ariège",'10':"de l'Aube",'11':"de l'Aude",'12':"de l'Aveyron",'13':"des Bouches-du-Rhône",'14':"du Calvados",'15':"du Cantal",'16':"de la Charente",'17':"de la Charente-Maritime",'18':"du Cher",'19':"de la Corrèze",'2A':"de la Corse-du-Sud",'2B':"de la Haute-Corse",'21':"de la Côte-d'Or",'22':"des Côtes-d'Armor",'23':"de la Creuse",'24':"de la Dordogne",'25':"du Doubs",'26':"de la Drôme",'27':"de l'Eure",'28':"d'Eure-et-Loir",'29':"du Finistère",'30':"du Gard",'31':"de la Haute-Garonne",'32':"du Gers",'33':"de la Gironde",'34':"de l'Hérault",'35':"d'Ille-et-Vilaine",'36':"de l'Indre",'37':"d'Indre-et-Loire",'38':"de l'Isère",'39':"du Jura",'40':"des Landes",'41':"de Loir-et-Cher",'42':"de la Loire",'43':"de la Haute-Loire",'44':"de la Loire-Atlantique",'45':"du Loiret",'46':"du Lot",'47':"de Lot-et-Garonne",'48':"de la Lozère",'49':"de Maine-et-Loire",'50':"de la Manche",'51':"de la Marne",'52':"de la Haute-Marne",'53':"de la Mayenne",'54':"de Meurthe-et-Moselle",'55':"de la Meuse",'56':"du Morbihan",'57':"de la Moselle",'58':"de la Nièvre",'59':"du Nord",'60':"de l'Oise",'61':"de l'Orne",'62':"du Pas-de-Calais",'63':"du Puy-de-Dôme",'64':"des Pyrénées-Atlantiques",'65':"des Hautes-Pyrénées",'66':"des Pyrénées-Orientales",'67':"du Bas-Rhin",'68':"du Haut-Rhin",'69':"du Rhône",'70':"de la Haute-Saône",'71':"de Saône-et-Loire",'72':"de la Sarthe",'73':"de la Savoie",'74':"de la Haute-Savoie",'75':"de police de Paris",'76':"de la Seine-Maritime",'77':"de Seine-et-Marne",'78':"des Yvelines",'79':"des Deux-Sèvres",'80':"de la Somme",'81':"du Tarn",'82':"de Tarn-et-Garonne",'83':"du Var",'84':"de Vaucluse",'85':"de la Vendée",'86':"de la Vienne",'87':"de la Haute-Vienne",'88':"des Vosges",'89':"de l'Yonne",'90':"du Territoire de Belfort",'91':"de l'Essonne",'92':"des Hauts-de-Seine",'93':"de la Seine-Saint-Denis",'94':"du Val-de-Marne",'95':"du Val-d'Oise",'971':"de la Guadeloupe",'972':"de la Martinique",'973':"de la Guyane",'974':"de La Réunion",'976':"de Mayotte"};
+function prefLieu(t){
+  const m = /^pr[ée]f(?:ecture|\.)?\s*(?:de\s*|du\s*)?(\d{1,3}|2[ab])$/i.exec(String(t||'').trim());
+  const d = m && DEPTS[m[1].toUpperCase().replace(/^(\d)$/, '0$1')];
+  return d ? `la préfecture ${d}` : null;
+}
 const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|larvotto|moneghetti|saint[\s-]roman|jardin[\s-]exotique|port[\s-]hercule/i.test(a||'');
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
@@ -1077,7 +1084,7 @@ function mcText(f){
   if (f.adresse) parts.push(`${isMonacoAddr(f.adresse) ? 'résidant' : 'demeurant'} ${f.adresse}`);
   let txt = parts.join(', ') + '.';
   if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
-  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${/^(par|à|a)\s/i.test(f.docLieu) ? f.docLieu : 'par ' + f.docLieu}` : '') + '.'; }
+  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${prefLieu(f.docLieu) ? 'par ' + prefLieu(f.docLieu) : /^(par|à|a)\s/i.test(f.docLieu) ? f.docLieu : 'par ' + f.docLieu}` : '') + '.'; }
   const r = effRes(f); if (MC_RES[r]) txt += `\n\n${MC_RES[r][0].toUpperCase()}${MC_RES[r].slice(1)}.`;
   return txt;
 }
