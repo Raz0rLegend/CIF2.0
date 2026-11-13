@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '2.5';
+const APP_VERSION = '2.6';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,14 +12,22 @@ const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
-const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
+const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const ACC_FIELDS = ['sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const resTest = r => r ? `<span style="color:${r==='Positif'?'#ff5a52':'#3ccf4e'};font-weight:600">${r}</span>` : '';
 const taux = t => t ? `${String(t).replace('.',',')} mg/L` : '';
 /* Taux alcool : < 0,25 vert · ≥ 0,25 orange · ≥ 0,40 rouge */
 const tauxColor = t => { const v = parseFloat(String(t||'').replace(',','.')); return isNaN(v) ? '' : v >= 0.40 ? '#ff5a52' : v >= 0.25 ? '#f39c34' : '#3ccf4e'; };
 const MEMO = [['memoCG','Carte grise','carte grise'],['memoAss','Assurance','assurance'],['memoPR','Permis (recto)','permis recto'],['memoPV','Permis (verso)','permis verso']];
-const CIF_FIELDS = ['telephone','filiation','docType','docNumero','docDate','docLieu'];
+const CIF_FIELDS = ['telephone','filiation','docType','docPays','docNumero','docDate','docLieu'];
+/* Pièce d'identité : abréviations et pays de délivrance (codes ISO) */
+const DOC_TYPES = [['CNI','Carte nationale d\'identité'],['PS','Passeport'],['PC','Permis de conduire'],['CS','Carte de séjour'],['TS','Titre de séjour']];
+const DOC_ABBR = Object.fromEntries(DOC_TYPES);
+const DOC_PAYS_TOP = [['FR','France'],['MC','Monaco'],['IT','Italie'],['DE','Allemagne'],['CH','Suisse'],['BE','Belgique'],['NL','Pays-Bas'],['LU','Luxembourg'],['GB','Royaume-Uni'],['ES','Espagne'],['PT','Portugal']];
+const DOC_PAYS_ALL = [['ZA','Afrique du Sud'],['AL','Albanie'],['DZ','Algérie'],['AD','Andorre'],['SA','Arabie saoudite'],['AR','Argentine'],['AM','Arménie'],['AU','Australie'],['AT','Autriche'],['AZ','Azerbaïdjan'],['BY','Biélorussie'],['BA','Bosnie-Herzégovine'],['BR','Brésil'],['BG','Bulgarie'],['CM','Cameroun'],['CA','Canada'],['CN','Chine'],['CY','Chypre'],['CO','Colombie'],['CI','Côte d\'Ivoire'],['HR','Croatie'],['DK','Danemark'],['EG','Égypte'],['AE','Émirats arabes unis'],['EE','Estonie'],['US','États-Unis'],['FI','Finlande'],['GE','Géorgie'],['GR','Grèce'],['HU','Hongrie'],['IN','Inde'],['IE','Irlande'],['IS','Islande'],['IL','Israël'],['JP','Japon'],['XK','Kosovo'],['LV','Lettonie'],['LB','Liban'],['LI','Liechtenstein'],['LT','Lituanie'],['MK','Macédoine du Nord'],['ML','Mali'],['MT','Malte'],['MA','Maroc'],['MX','Mexique'],['MD','Moldavie'],['ME','Monténégro'],['NO','Norvège'],['PL','Pologne'],['QA','Qatar'],['RO','Roumanie'],['RU','Russie'],['SM','Saint-Marin'],['SN','Sénégal'],['RS','Serbie'],['SK','Slovaquie'],['SI','Slovénie'],['SE','Suède'],['CZ','Tchéquie'],['TN','Tunisie'],['TR','Turquie'],['UA','Ukraine'],['VA','Vatican'],['??','Autre / inconnu']];
+const NAT_ISO = [['franc','FR'],['moneg','MC'],['ital','IT'],['allem','DE'],['suisse','CH'],['belg','BE'],['neerland','NL'],['hollan','NL'],['luxemb','LU'],['britann','GB'],['anglais','GB'],['espagn','ES'],['portug','PT'],['maroc','MA'],['alger','DZ'],['tunis','TN'],['roum','RO'],['polon','PL'],['russe','RU'],['ukrain','UA'],['americ','US'],['senegal','SN'],['ivoir','CI'],['turc','TR'],['autrich','AT'],['grec','GR'],['suedois','SE'],['norveg','NO'],['danois','DK'],['chinois','CN'],['japon','JP'],['bresil','BR']];
+const docPaysOptions = sel => `<option value="" ${!sel?'selected':''}>Pays</option><optgroup label="Fréquents">${DOC_PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${DOC_PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
+const docLabel = f => [f.docType, f.docPays].filter(Boolean).join(' ');
 const paysOptions = sel => `<optgroup label="Fréquents">${PAYS_TOP.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup><optgroup label="Tous les pays">${PAYS_ALL.map(([c,n])=>`<option value="${c}" ${c===sel?'selected':''}>${c} — ${n}</option>`).join('')}</optgroup>`;
 const plateHTML = v => `<span class="plate"><i>${esc(v.pays||'F')}</i>${esc(v.plaque)}</span>`;
 const VEH_TYPES = ['VL','2RM','Camion','Vélo','Autre'];
@@ -79,7 +87,7 @@ const encJSON = (key, o) => encBytes(key, te.encode(JSON.stringify(o)));
 const decJSON = async (key, r) => JSON.parse(td.decode(await decBytes(key, r)));
 
 /* ---------- État ---------- */
-let SEL = null, PIN = null;
+let SEL = null, PIN = null, VFILTER = '';
 let FICHES = [], SETTINGS = {purgeDays:30, lockMinutes:1, groupMin:10, backupDays:5, lastBackup:0}, TAB='CIF', QUERY='', EDIT=null, lockMode='unlock', hiddenAt=0;
 const urlCache = new Map();
 
@@ -222,11 +230,13 @@ function render(){
   if (SEL) { const n=SEL.size; $('#selSend').textContent = `Envoyer${n?` (${n})`:''}`; $('#selSend').disabled = $('#selArchive').disabled = !n;
     $('#selArchive').textContent = TAB==='archived' ? 'Remettre' : 'Archiver'; $('#title').textContent = n ? `${n} choisie${n>1?'s':''}` : 'Sélection'; }
   let items = TAB==='archived' ? FICHES.filter(f=>f.status==='archived') : pend.filter(f=>(f.type||'CI')===TAB);
+  syncVFilter(items);
+  if (VFILTER) items = items.filter(f => vehTypes(f).includes(VFILTER));
   if (q) items = items.filter(f => [...FIELDS.map(k=>f[k]||''), f.qualite, f.type, ...(f.vehicules||[]).flatMap(v=>Object.values(v))].join(' ').toLowerCase().includes(q));
   items.sort((a,b)=> TAB==='archived' ? b.archivedAt - a.archivedAt : (b.dateHeure||'').localeCompare(a.dateHeure||''));
   window.visibleIds = items.map(f=>f.id);
   if (!items.length) {
-    $('#list').innerHTML = backupBanner() + `<div class="empty">${q ? 'Aucun résultat.' : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
+    $('#list').innerHTML = backupBanner() + `<div class="empty">${q ? 'Aucun résultat.' : VFILTER ? `Aucune fiche « ${esc(VFILTER)} » ici.<br><a href="#" id="vfReset" style="color:#7fb3ff">Tout afficher</a>` : TAB==='archived' ? 'Aucune archive.' : `Aucun ${TAB} en cours.<br>Touche + pour en créer un.`}</div>`;
     return;
   }
   $('#list').innerHTML = backupBanner() + items.map((f,i)=>{
@@ -324,7 +334,7 @@ async function openDetail(f){
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
   const ident = panel('Identité', [['Date de naissance',f.dateNaissance],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
-      : panel('Pièce d\'identité', [['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
+      : panel('Pièce d\'identité', [['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
   const acc = !f.accident ? '' : panel('Accident', [['Situation familiale',f.sitFam],['E-mail',f.email?`<a href="mailto:${esc(f.email)}">${esc(f.email)}</a>`:'',true],
       ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, ok(f[k]), true])]);
@@ -365,7 +375,7 @@ function openForm(f){
   EDIT = { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
-  $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
+  syncDocPays(); $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
   setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
   renderVehicles();
   $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
@@ -384,7 +394,7 @@ async function closeForm(save){
     if (!E.f.accident) for (const k of ACC_FIELDS) E.f[k] = '';
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
     if (E.f.type === 'CI') { for (const k of CIF_FIELDS) E.f[k] = ''; E.f.resultat = ''; }
-    if (E.f.type === 'CIF' && E.f.docMode === 'Sur dires') for (const k of ['docType','docNumero','docDate','docLieu']) E.f[k] = '';
+    if (E.f.type === 'CIF' && E.f.docMode === 'Sur dires') for (const k of ['docType','docPays','docNumero','docDate','docLieu']) E.f[k] = '';
     if (!E.f.nom && !E.f.prenom && !E.f.observations && !E.f.photos.length && !E.f.vehicules.length) { $('#formErr').textContent = 'Renseigne au moins un nom, une observation ou une photo.'; return; }
     const miss = E.f.accident ? MEMO.filter(([k])=>!E.f[k]).map(m=>m[2]) : [];
     if (miss.length && !await ask(`Accident — photos non cochées :\n• ${miss.join('\n• ')}\n\nEnregistrer quand même ?`, 'Enregistrer', false)) return;
@@ -534,7 +544,7 @@ function ficheSections(f){
   if (f.accident) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
     ['Test stupéfiants',[f.stupHeure && `à ${f.stupHeure}`, f.stupRes].filter(Boolean).join(' — ')]]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
-    : !(f.docType||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',f.docType],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
+    : !(f.docType||f.docPays||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   if (cif) addVeh();
   add('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   return S;
@@ -589,13 +599,13 @@ async function shareFiches(list){
 }
 
 /* ---------- Suggestions (saisie rapide) ---------- */
-const SG_LEARN_MAP = [['nationalite','nats'],['lieuNaissance','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docTypes'],['docLieu','docLieu']];
+const SG_LEARN_MAP = [['nationalite','nats'],['lieuNaissance','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docAbbr'],['docLieu','docLieu']];
 let LEARN = {};
 const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 function sgList(key){ const seen=new Set(), out=[]; for (const v of [...(LEARN[key]||[]), ...(SG_BASE[key]||[])]) { const n=norm(v); if (n && !seen.has(n)) { seen.add(n); out.push(v); } } return out; }
 function learnFrom(f){
   let changed = false;
-  const add = (key, val) => { val=(val||'').trim(); if (!val || val.length<2) return; if (sgList(key).some(x=>norm(x)===norm(val))) return; (LEARN[key] ||= []).unshift(val); LEARN[key]=LEARN[key].slice(0,300); changed = true; };
+  const add = (key, val) => { val=(val||'').trim(); if (!val || val.length<2 || (key==='docAbbr' && DOC_ABBR[val])) return; if (sgList(key).some(x=>norm(x)===norm(val))) return; (LEARN[key] ||= []).unshift(val); LEARN[key]=LEARN[key].slice(0,300); changed = true; };
   for (const [field,key] of SG_LEARN_MAP) add(key, f[field]);
   for (const v of (f.vehicules||[])) { add('brands', v.marque); add('colors', v.couleur); }
   return changed;
@@ -859,6 +869,49 @@ $('#detSend').innerHTML = ICON.send + '<span>Envoyer</span>'; $('#detEdit').inne
   document.addEventListener('focusout', ()=>{ setTimeout(remeasure, 350); setTimeout(remeasure, 900); });
   document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) setTimeout(remeasure, 300); });
 })();
+
+/* ---------- Filtre de la liste par type (VL, 2RM…) ---------- */
+const VF_TYPES = ['VL','2RM','Camion','Vélo','Piéton','Autre'];
+$('#searchbar').insertAdjacentHTML('afterend', `<div id="vfBar" style="display:flex;align-items:center;gap:8px;padding:8px 12px 2px;position:relative;z-index:2">
+  <label id="vfPill" style="position:relative;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:18px;border:1px solid var(--line);background:var(--panel);font-size:14px;color:var(--muted)">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg>
+    <span id="vfLbl">Tous</span><small>▾</small>
+    <select id="vfSel" aria-label="Filtrer par type" style="position:absolute;inset:0;opacity:0;width:100%;height:100%"></select>
+  </label>
+  <button type="button" id="vfClear" class="hidden" style="border:0;background:none;color:#7fb3ff;font-size:14px;padding:6px">Effacer</button></div>`);
+function syncVFilter(items){
+  const n = t => items.filter(f=>vehTypes(f).includes(t)).length;
+  $('#vfSel').innerHTML = `<option value="">Tous (${items.length})</option>` + VF_TYPES.map(t=>`<option value="${t}" ${t===VFILTER?'selected':''}>${t} (${n(t)})</option>`).join('');
+  $('#vfSel').value = VFILTER;
+  $('#vfLbl').textContent = VFILTER || 'Tous';
+  const on = !!VFILTER; $('#vfPill').style.color = on ? '#111' : ''; $('#vfPill').style.background = on ? '#fff' : ''; $('#vfClear').classList.toggle('hidden', !on);
+}
+$('#vfSel').onchange = e=>{ VFILTER = e.target.value; render(); window.scrollTo(0,0); };
+$('#vfClear').onclick = ()=>{ VFILTER = ''; render(); };
+$('#list').addEventListener('click', e=>{ if (e.target.id==='vfReset') { e.preventDefault(); VFILTER = ''; render(); } });
+
+/* ---------- Pièce d'identité : type abrégé + pays sur la même ligne ---------- */
+SG_BASE.docAbbr = DOC_TYPES.map(([a,n])=>`${a} — ${n}`);
+(()=>{
+  const inp = $('#f_docType'); inp.dataset.sg = 'docAbbr'; inp.placeholder = 'CNI, PS, PC, CS, TS…'; inp.autocapitalize = 'characters';
+  const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:stretch';
+  inp.replaceWith(row); row.appendChild(inp); inp.style.flex = '1'; inp.style.minWidth = '0';
+  row.insertAdjacentHTML('beforeend', `<label id="docPaysBox" style="position:relative;flex:0 0 86px;display:flex;align-items:center;justify-content:center;gap:4px;border:1px solid var(--line);border-radius:10px;background:var(--panel);font-weight:700;font-size:16px">
+    <span id="docPaysLbl">Pays</span><small style="font-size:10px;opacity:.7">▾</small>
+    <select id="f_docPays" aria-label="Pays de délivrance" style="position:absolute;inset:0;opacity:0;width:100%;height:100%">${docPaysOptions('')}</select></label>`);
+  $('label[for=f_docType]').textContent = 'Type de document et pays';
+})();
+function syncDocPays(){ const v = $('#f_docPays').value; $('#docPaysLbl').textContent = v || 'Pays'; $('#docPaysLbl').style.color = v ? '' : 'var(--muted)'; }
+$('#f_docPays').addEventListener('change', syncDocPays);
+function guessPays(){ const n = norm($('#f_nationalite').value); const m = NAT_ISO.find(([k])=>n.startsWith(k)); return m ? m[1] : 'FR'; }
+function normDocType(){
+  const el = $('#f_docType'), v = el.value.trim(); if (!v) return;
+  let abbr = /^([A-Z]{2,3}) — /.exec(v)?.[1];
+  if (!abbr) { const nv = norm(v); abbr = DOC_TYPES.find(([a,n])=>norm(a)===nv || norm(n)===nv)?.[0]; }
+  if (abbr) { el.value = abbr; if (!$('#f_docPays').value) { $('#f_docPays').value = guessPays(); syncDocPays(); } }
+}
+$('#f_docType').addEventListener('change', normDocType);
+$('#f_docType').addEventListener('blur', ()=>setTimeout(normDocType, 250));
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
