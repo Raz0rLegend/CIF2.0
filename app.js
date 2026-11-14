@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.3';
+const APP_VERSION = '4.4';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1096,6 +1096,45 @@ function syncAT(){
 }
 $('#f_at').addEventListener('change', syncAT);
 $('#atEpi').addEventListener('click', e=>{ const b = e.target.closest('[data-epi]'); if (!b || !EDIT) return; const k = b.dataset.epi; EDIT.f[k] = !EDIT.f[k] ? 'oui' : EDIT.f[k]==='oui' ? 'non' : ''; syncAT(); draftSoon(); });
+
+/* ---------- Grille de boutons (Accident / Acc. travail / mémo) — v4.4 ---------- */
+document.head.insertAdjacentHTML('beforeend', `<style>
+#accGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+#accGrid .switch{position:relative;margin:0;justify-content:center;text-align:center;padding:12px 6px;border-radius:12px;min-height:52px}
+#accGrid .switch .sw{display:none}
+#accGrid .switch .swl{font-size:15px;color:var(--muted)}
+#accGrid .switch.on{background:#3a2a14;border-color:#f08a24}
+#accGrid .switch.on .swl{color:#ffcf8a}
+#accGrid .switch.at.on{background:#2e2147;border-color:#8a63d2}
+#accGrid .switch.at.on .swl{color:#d6c4ff}
+#accGrid .switch .swl::before{content:'○ ';opacity:.6}
+#accGrid .switch.on .swl::before{content:'✓ ';opacity:1}
+#atBlock{border-left-color:#8a63d2}
+.memo .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.memo .mc{position:relative;justify-content:center;text-align:center;padding:9px 4px;border:1px solid #7a5420;border-radius:10px;font-size:14px;font-weight:600;color:#c9a774;line-height:1.2;min-height:44px}
+.memo .mc input{position:absolute;opacity:0;pointer-events:none}
+.memo .mc.on{background:#f08a24;border-color:#f08a24;color:#1a1004}
+.memo .mc.gr{grid-column:1/-1;background:#4a1714;border-color:#ff5a52;color:#ffb1ab}
+.memo .mc.gr.on{background:#1f5d2a;border-color:#3ccf4e;color:#fff}
+</style>`);
+(()=>{
+  const sa = $('#f_accident').closest('label'), st = $('#f_at').closest('label');
+  sa.insertAdjacentHTML('beforebegin', '<div id="accGrid"></div>');
+  const g = $('#accGrid'); g.append(sa, st); st.classList.add('at');
+  $('#accBlock').after($('#atBlock'));
+  sa.querySelector('.swl').textContent = 'Accident'; st.querySelector('.swl').textContent = 'Acc. travail';
+  const memo = $('#accBlock .memo'); const mg = document.createElement('div'); mg.className = 'mgrid';
+  memo.querySelector('.memo-t').after(mg);
+  const short = {memoCG:'Carte grise', memoAss:'Assurance', memoPR:'Permis recto', memoPV:'Permis verso', memoGR:'Garanties de représentation'};
+  for (const [k] of MEMO) { const l = $('#f_'+k).closest('label'); mg.append(l); l.querySelector('span').textContent = short[k] || l.querySelector('span').textContent; if (k==='memoGR') l.classList.add('gr'); }
+})();
+function paintTiles(){
+  for (const l of document.querySelectorAll('#accGrid .switch, .memo .mc')) { const i = l.querySelector('input'); l.classList.toggle('on', !!i?.checked); }
+  const gr = $('#f_memoGR'); if (gr) gr.nextElementSibling.textContent = (gr.checked ? '✓ ' : '✗ ') + 'Garanties de représentation';
+}
+document.addEventListener('change', e=>{ if (e.target.closest?.('#accGrid, .memo')) paintTiles(); });
+{ const _sa = syncAcc; syncAcc = function(){ _sa(); paintTiles(); }; const _st = syncAT; syncAT = function(){ _st(); paintTiles(); }; }
+paintTiles();
 
 /* ---------- Envoi au format « main courante » ---------- */
 const MC_RES = {
