@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '3.9';
+const APP_VERSION = '4.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1097,6 +1097,20 @@ function prefLieu(t){
   const d = m && DEPTS[m[1].toUpperCase().replace(/^(\d)$/, '0$1')];
   return d ? `la préfecture ${d}` : null;
 }
+/* « FR », « Italie », « MCO », « UK »… : « par les autorités françaises / italiennes », Monaco : « par nos autorités » */
+const PAYS_ALIAS = {M:'MC',MCO:'MC',MON:'MC',UK:'GB',GBR:'GB',ANGLETERRE:'GB',F:'FR',FRA:'FR',I:'IT',ITA:'IT',D:'DE',DEU:'DE',ALL:'DE',CHE:'CH',SUI:'CH',BEL:'BE',ESP:'ES',PRT:'PT',POR:'PT',NLD:'NL',LUX:'LU',USA:'US',ROU:'RO',POL:'PL',MAR:'MA',DZA:'DZ',ALG:'DZ',TUN:'TN',AUT:'AT',GRC:'GR',RUS:'RU',UKR:'UA',TUR:'TR',CHN:'CN',SEN:'SN'};
+function paysLieu(t){
+  const raw = norm(t).replace(/^(par\s+)?(les\s+|nos\s+)?(autorites\s+)?/, '').replace(/^(de\s+la\s+|de\s+l'|du\s+|des\s+|de\s+)/, '').trim();
+  if (!raw) return null;
+  const up = raw.toUpperCase().replace(/[^A-Z]/g,'');
+  let code = PAYS_ALIAS[up] || (up.length === 2 && PAYS_ADJ[up] ? up : null);
+  if (!code) { const hit = [...DOC_PAYS_TOP, ...DOC_PAYS_ALL].find(([c,n]) => norm(n) === raw); code = hit?.[0] || (/^principaute de monaco$/.test(raw) ? 'MC' : /^royaume.uni$/.test(raw) ? 'GB' : null); }
+  if (!code) return null;
+  if (code === 'MC') return 'par nos autorités';
+  const adj = PAYS_ADJ[code]; if (!adj) return null;
+  return 'par les autorités ' + (/^du /.test(adj) ? adj : adjFem(adj) + 's');
+}
+function lieuPhrase(t){ const p = prefLieu(t); if (p) return 'par ' + p; const q = paysLieu(t); if (q) return q; if (/^(les |nos )?autorit/i.test(t)) return 'par ' + (/^(les|nos) /i.test(t) ? t : 'les ' + t); if (/^((sous-)?pr[ée]fecture|mairie|ambassade)\b/i.test(t)) return "par la " + t[0].toLowerCase() + t.slice(1); if (/^consulat\b/i.test(t)) return 'par le c' + t.slice(1); return /^(par|à|a)\s/i.test(t) ? t : 'par ' + t; }
 const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|larvotto|moneghetti|saint[\s-]roman|jardin[\s-]exotique|port[\s-]hercule/i.test(a||'');
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
@@ -1108,7 +1122,7 @@ function mcText(f){
   if (f.adresse) parts.push(`${isMonacoAddr(f.adresse) ? 'résidant' : 'demeurant'} ${f.adresse}`);
   let txt = parts.join(', ') + '.';
   if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
-  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${prefLieu(f.docLieu) ? 'par ' + prefLieu(f.docLieu) : /^(par|à|a)\s/i.test(f.docLieu) ? f.docLieu : 'par ' + f.docLieu}` : '') + '.'; }
+  if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${lieuPhrase(f.docLieu)}` : '') + '.'; }
   const r = effRes(f); if (MC_RES[r]) txt += `\n\n${MC_RES[r][0].toUpperCase()}${MC_RES[r].slice(1)}.`;
   return txt;
 }
