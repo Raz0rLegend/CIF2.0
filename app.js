@@ -1,20 +1,40 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.7';
+const APP_VERSION = '4.8';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const te = new TextEncoder(), td = new TextDecoder();
 const uid = () => Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36);
 const DAY = 864e5;
-const RES_COLORS = {'NDN':'#3ccf4e','Oméga':'#b77cff','CDPA':'#ff5a52','CDPU':'#ff5a52','CDPJ':'#ff5a52'};
+const RES_COLORS = {'NDN':'#3ccf4e','Oméga':'#b77cff','CDPA':'#ff5a52','CDPU':'#ff5a52','CDPJ':'#ff5a52','Non contrôlé':'#e3b341'};
 const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
-const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures'];
+const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures','ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
 const AT_FIELDS = ['atCirconstances','atHauteur','atBlessures'];
 const AT_EPI = [['atChaussures','Chaussures de sécurité','Chaussures'],['atGants','Gants de sécurité','Gants'],['atCasque','Casque','Casque']];
+const CEEA_BADGE = '<span class="badge acc" style="background:#1f5fa8;color:#fff">CEEA</span>';
+const DEP_FIELDS = ['alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
+const IPM_FIELDS = ['ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
+/* Fiche « A » — examen de comportement : [clé, libellé, choix, choix unique ?, section] */
+const IPM_GROUPS = [
+  ['lieu','Lieu de l\'examen',['Sur les lieux des faits','Dans un local de service','Chez le médecin ou à l\'hôpital'],true,''],
+  ['constitution','Constitution physique',['Corpulent','Mince','Moyen'],true,'Aspect général extérieur'],
+  ['lesions','Lésions',['Indemne','Contusions','Blessures'],false,'Aspect général extérieur'],
+  ['visage','Visage',['Normal','Congestionné','Pâle','En sueurs'],false,'Aspect général extérieur'],
+  ['allure','Allure',['Bien éveillé','Somnolent','Abattu','Tremblant','Hoquets','Vomissements','Présence déjections','Vêtements désordonnés','Vêtements ordonnés'],false,'Aspect général extérieur'],
+  ['attitude','Attitude',['Maître de soi','Énervé','Arrogant','Agressif'],false,'Aspects particuliers'],
+  ['regard','Regard',['Normal','Anormal','Yeux voilés','Yeux brillants'],false,'Aspects particuliers'],
+  ['haleine','Odeur de l\'haleine',['Sentant l\'alcool','Indéterminée'],true,'Aspects particuliers'],
+  ['elocution','Élocution',['Normale','Pâteuse','Bégayante','Ne parle pas'],false,'Aspects particuliers'],
+  ['explications','Explications',['Nettes','Embrouillées','Incohérentes','Répétitives','Ne parle pas'],false,'Aspects particuliers'],
+  ['equilibre','Équilibre',['Tient debout','Titube'],true,'Aspects particuliers'],
+  ['resume','En résumé, l\'intéressé semble',['Ne pas être sous l\'influence de l\'alcool','Être sous l\'empire d\'un état alcoolique léger','Être sous l\'empire d\'un état alcoolique important','Être en état d\'ivresse'],true,'Conclusion']
+];
+const IPM_BADGE = '<span class="badge acc" style="background:#0f766e;color:#fff">IPM</span>';
+const ipmVal = (f,k) => (f.ipmSel?.[k]||[]).join(', ');
 const AT_BADGE = '<span class="badge acc" style="background:#5a3a8c;color:#fff">Acc. travail</span>';
 const epiTxt = v => v === 'oui' ? 'porté(s)' : v === 'non' ? 'non porté(s)' : '';
 const epiHTML = v => v === 'oui' ? '<span style="color:#3ccf4e;font-weight:700">✓ Porté</span>' : v === 'non' ? '<span style="color:#ff5a52;font-weight:700">✗ Non porté</span>' : '';
@@ -272,7 +292,7 @@ function render(){
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
-        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.at?AT_BADGE:''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.at?AT_BADGE:''}${f.ceea?CEEA_BADGE:''}${f.ipm?IPM_BADGE:''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
@@ -347,12 +367,12 @@ async function openDetail(f){
   DETAIL = f.id;
   const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length, src = cifSource(f);
   computeGroups(); const mates = groupMates(f);
-  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.at?AT_BADGE:''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
+  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.at?AT_BADGE:''}${f.ceea?CEEA_BADGE:''}${f.ipm?IPM_BADGE:''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
       <div class="chips2">
-        ${!cif ? (src ? `<button type="button" class="chip" data-mate="${src.id}" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(src.resultat)} · hérité du CIF ›</button>` : '') : `<label class="chip" style="position:relative;${f.resultat ? `background:${col}22;color:${col};border:1px solid ${col}66` : 'border:1px dashed #666;color:#bdbdbd'}">${f.resultat ? esc(f.resultat) : 'Résultat'} ▾<select id="detRes" aria-label="Changer le résultat" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;border:0">${['','NDN','Oméga','CDPA','CDPU','CDPJ'].map(r=>`<option value="${r}" ${r===(f.resultat||'')?'selected':''}>${r||'—'}</option>`).join('')}</select></label>`}
+        ${!cif ? (src ? `<button type="button" class="chip" data-mate="${src.id}" style="background:${col}22;color:${col};border:1px solid ${col}66">${esc(src.resultat)} · hérité du CIF ›</button>` : '') : `<label class="chip" style="position:relative;${f.resultat ? `background:${col}22;color:${col};border:1px solid ${col}66` : 'border:1px dashed #666;color:#bdbdbd'}">${f.resultat ? esc(f.resultat) : 'Résultat'} ▾<select id="detRes" aria-label="Changer le résultat" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;border:0">${['','NDN','Oméga','CDPA','CDPU','CDPJ','Non contrôlé'].map(r=>`<option value="${r}" ${r===(f.resultat||'')?'selected':''}>${r||'—'}</option>`).join('')}</select></label>`}
         <button type="button" class="chip" id="detVerif" style="${f.verif ? 'background:#b3261e;color:#fff;border:1px solid #b3261e;font-weight:700' : 'border:1px dashed #666;color:#bdbdbd'}">VERIF</button>
         <span class="chip" style="color:${col}">${ICON_CLOCK}${esc(fmtDT(f.dateHeure))}</span>
         ${f.lieuControle ? (f.geo ? `<a class="chip" href="https://maps.apple.com/?ll=${f.geo.lat},${f.geo.lng}&q=${encodeURIComponent(f.lieuControle)}" style="text-decoration:none;color:inherit">${ICON_PIN}${esc(f.lieuControle)} ›</a>` : `<span class="chip">${ICON_PIN}${esc(f.lieuControle)}</span>`) : ''}
@@ -367,14 +387,17 @@ async function openDetail(f){
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
   const acc = !f.accident ? '' : panel('Accident', [['Kilométrage',kmTxt(f.kilometrage)],['Employeur',f.employeur],['Situation familiale',f.sitFam],['E-mail',f.email?`<a href="mailto:${esc(f.email)}">${esc(f.email)}</a>`:'',true],
       ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k] ? '<span style="color:#3ccf4e;font-weight:700">✓ Oui</span>' : '<span style="color:#ff5a52;font-weight:700">✗ Non</span>') : ok(f[k]), true])]);
-  const dep = !f.accident ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux', f.alcTaux ? `<span style="color:${tauxColor(f.alcTaux)||'inherit'};font-weight:700">${esc(taux(f.alcTaux))}</span>` : '', true],
+  const dep = !(f.accident||f.ceea) ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux', f.alcTaux ? `<span style="color:${tauxColor(f.alcTaux)||'inherit'};font-weight:700">${esc(taux(f.alcTaux))}</span>` : '', true],
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
   const atp = !f.at ? '' : panel('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiHTML(f[k]), true]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
+  const ipmp = !(f.ipm||f.ceea) ? '' : panel('Examen de comportement (fiche A)', [['Heure de l\'examen',f.ipmHeure], ...IPM_GROUPS.filter(g=>g[0]!=='resume').map(([k,l])=>[l, ipmVal(f,k)]),
+      ['Alcool (3 h) — aveu de la personne',f.ipmAveu],['Alcool (3 h) — aveu des témoins',f.ipmTemoins],['Dernière absorption d\'alcool',f.ipmDerniere],
+      ['En résumé, l\'intéressé semble', ipmVal(f,'resume') ? `<b style="color:#5eead4">${esc(ipmVal(f,'resume'))}</b>` : '', true]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
   const recu = f.recu ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Reçue par QR code le ${fmtD(f.recu)}</p>` : '';
   const arch = f.status==='archived' ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '';
-  $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + atp + doc + veh : veh + ident + acc + dep + atp) + ctx + photos + recu + arch;
+  $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + atp + ipmp + doc + veh : veh + ident + acc + dep + atp + ipmp) + ctx + photos + recu + arch;
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore + '<span>Remettre</span>' : ICON.archive + '<span>Archiver</span>';
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
   $('#detVerif').onclick = async ()=>{ const sc = $('#detail .body').scrollTop; f.verif = !f.verif; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.verif ? 'Marquée VERIF' : 'VERIF retiré'); };
@@ -406,7 +429,7 @@ function openForm(f, d){
   EDIT = d ? { isNew, f: structuredClone(d.f), added:[...(d.added||[])], removed:[...(d.removed||[])] } : { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
-  syncDocPays(); $('#f_accident').checked = !!EDIT.f.accident; $('#f_at').checked = !!EDIT.f.at; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
+  syncDocPays(); $('#f_accident').checked = !!EDIT.f.accident; $('#f_at').checked = !!EDIT.f.at; $('#f_ceea').checked = !!EDIT.f.ceea; $('#f_ipm').checked = !!EDIT.f.ipm; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
   setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
   renderVehicles();
   $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
@@ -424,7 +447,9 @@ async function closeForm(save){
     for (const k of FIELDS) E.f[k] = $('#f_'+k).value.trim();
     E.f.type = segVal('typeSeg'); E.f.docMode = segVal('docSeg');
     E.f.accident = $('#f_accident').checked; for (const [k] of MEMO) E.f[k] = E.f.accident && $('#f_'+k).checked;
-    if (!E.f.accident) for (const k of ACC_FIELDS) E.f[k] = '';
+    E.f.ceea = $('#f_ceea').checked;
+    E.f.ipm = $('#f_ipm').checked; if (!E.f.ipm && !E.f.ceea) { for (const k of IPM_FIELDS) E.f[k] = ''; E.f.ipmSel = {}; }
+    if (!E.f.accident) for (const k of ACC_FIELDS) if (!(E.f.ceea && DEP_FIELDS.includes(k))) E.f[k] = '';
     E.f.at = $('#f_at').checked; if (!E.f.at) { for (const k of AT_FIELDS) E.f[k] = ''; for (const [k] of AT_EPI) E.f[k] = ''; }
     E.f.verif = $('#f_verif').classList.contains('on'); E.f.signa = $('#f_signa').checked; E.f.signaAn = E.f.signa ? $('#f_signaAn').value : '';
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
@@ -635,9 +660,11 @@ function ficheSections(f){
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   if (f.accident) add('Accident', [['Kilométrage du véhicule',kmTxt(f.kilometrage)],['Employeur',f.employeur],['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
     ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k]?'oui':'non') : f[k]?'photographié(e)':'non photographié(e)'])]);
-  if (f.accident) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
+  if (f.accident || f.ceea) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
     ['Test stupéfiants',[f.stupHeure && `à ${f.stupHeure}`, f.stupRes].filter(Boolean).join(' — ')]]);
   if (f.at) add('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiTxt(f[k])]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
+  if (f.ipm || f.ceea) add('Examen de comportement (fiche A)', [['Heure de l\'examen',f.ipmHeure], ...IPM_GROUPS.map(([k,l])=>[l, ipmVal(f,k)]),
+    ['Absorption d\'alcool (3 dernières heures) — aveu de la personne',f.ipmAveu],['Absorption d\'alcool (3 dernières heures) — aveu des témoins',f.ipmTemoins],['Dernière heure d\'absorption d\'alcool',f.ipmDerniere]]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
     : !(f.docType||f.docPays||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   if (cif) addVeh();
@@ -646,7 +673,7 @@ function ficheSections(f){
 }
 function ficheText(f){
   const n = (f.photos||[]).length;
-  return `${ficheName(f)} — ${f.type==='CIF'?'CIF':'CI'}${f.accident?' — ACCIDENT':''}\n`
+  return `${ficheName(f)} — ${f.type==='CIF'?'CIF':'CI'}${f.accident?' — ACCIDENT':''}${f.ceea?' — CEEA / CEI / CAUS':''}${f.ipm?' — IPM':''}\n`
     + ficheSections(f).map(([t,rows])=>(t?t.toUpperCase()+'\n':'') + rows.map(r=>`${r[0]} : ${r[1]}`).join('\n')).join('\n\n')
     + (n ? `\n\nPhotos jointes : ${n}` : '');
 }
@@ -1013,6 +1040,7 @@ $('#f_docType').addEventListener('blur', ()=>setTimeout(normDocType, 250));
 
 /* ---------- VERIF (à côté du résultat) et SIGNA (tout en bas, après les observations, CIF seulement) ---------- */
 (()=>{
+  $('#f_resultat').insertAdjacentHTML('beforeend', '<option>Non contrôlé</option>');
   const sel = $('#f_resultat'), row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:stretch';
   sel.replaceWith(row); row.appendChild(sel); sel.style.flex = '1'; sel.style.minWidth = '0';
   row.insertAdjacentHTML('beforeend', `<button type="button" id="f_verif" aria-pressed="false" style="flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px">VERIF</button>`);
@@ -1137,6 +1165,73 @@ document.addEventListener('change', e=>{ if (e.target.closest?.('#accGrid, .memo
 { const _sa = syncAcc; syncAcc = function(){ _sa(); paintTiles(); }; const _st = syncAT; syncAT = function(){ _st(); paintTiles(); }; }
 paintTiles();
 
+/* ---------- CEEA / CEI / CAUS : dépistages alcool et stupéfiants (partagés avec Accident) ---------- */
+document.head.insertAdjacentHTML('beforeend', `<style>
+#accGrid .switch.ceea.on{background:#14304f;border-color:#4a90e2}
+#accGrid .switch.ceea.on .swl{color:#bcd8ff}
+#depBlock{border-left-color:#4a90e2}
+</style>`);
+(()=>{
+  $('#accGrid').insertAdjacentHTML('beforeend', `<label class="switch ceea"><input type="checkbox" id="f_ceea"><span class="sw"></span><span class="swl">CEEA / CEI / CAUS</span></label>`);
+  $('#accBlock').insertAdjacentHTML('afterend', `<div id="depBlock" class="accblock hidden"></div>`);
+  const dep = $('#depBlock'), sect = [...document.querySelectorAll('#accBlock .sect')].find(x=>/pistage/i.test(x.textContent));
+  if (sect) { sect.style.marginTop = '6px'; dep.append(sect); }
+  document.querySelectorAll('#accBlock .test').forEach(t=>dep.append(t));
+})();
+function syncDep(){ $('#depBlock').classList.toggle('hidden', !($('#f_accident').checked || $('#f_ceea').checked)); }
+$('#f_ceea').addEventListener('change', ()=>{ syncDep(); paintTiles(); });
+$('#f_accident').addEventListener('change', syncDep);
+{ const _sa2 = syncAcc; syncAcc = function(){ _sa2(); syncDep(); }; }
+paintTiles();
+
+/* ---------- IPM : examen de comportement (fiche « A ») ---------- */
+document.head.insertAdjacentHTML('beforeend', `<style>
+#accGrid .switch.ipm.on{background:#0d3532;border-color:#14b8a6}
+#accGrid .switch.ipm.on .swl{color:#99f6e4}
+#ipmBlock{border-left-color:#14b8a6}
+#ipmBlock .ig{margin-top:12px}
+#ipmBlock .ig>b{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+#ipmBlock .ich{display:flex;flex-wrap:wrap;gap:6px}
+#ipmBlock .ich button{border:1px solid var(--line);background:var(--panel);color:inherit;border-radius:16px;padding:7px 11px;font-size:14px;line-height:1.2}
+#ipmBlock .ich button.on{background:#0f766e;border-color:#14b8a6;color:#fff;font-weight:700}
+#ipmBlock .ig.res .ich button{flex:1 1 100%;text-align:left;border-radius:10px}
+</style>`);
+(()=>{
+  $('#accGrid').insertAdjacentHTML('beforeend', `<label class="switch ipm"><input type="checkbox" id="f_ipm"><span class="sw"></span><span class="swl">IPM</span></label>`);
+  let sec = '';
+  const groups = IPM_GROUPS.map(([k,l,opts,one,s])=>{ const h = s && s!==sec ? `<div class="sect" style="margin-top:18px">${esc(s)}</div>` : ''; sec = s || sec;
+    return `${h}<div class="ig${k==='resume'?' res':''}"><b>${esc(l)}${one?'':' <small style="font-weight:400">(plusieurs choix possibles)</small>'}</b><div class="ich" data-g="${k}">${opts.map(o=>`<button type="button" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`; });
+  const resume = groups.pop();
+  $('#atBlock').insertAdjacentHTML('afterend', `<div id="ipmBlock" class="accblock hidden">
+    <div class="sect" style="margin-top:6px">Examen de comportement</div>
+    <label class="f" for="f_ipmHeure">Heure de l'examen</label><input id="f_ipmHeure" type="time">
+    ${groups.join('')}
+    <div class="sect" style="margin-top:18px">Renseignements particuliers</div>
+    <p class="hint" style="font-size:13px;color:var(--muted);margin:6px 0 0">Absorption d'alcool au cours des 3 dernières heures</p>
+    <label class="f" for="f_ipmAveu">De l'aveu de la personne concernée</label><textarea id="f_ipmAveu" rows="2"></textarea>
+    <label class="f" for="f_ipmTemoins">De l'aveu du ou des témoins</label><textarea id="f_ipmTemoins" rows="2"></textarea>
+    <label class="f" for="f_ipmDerniere">Dernière heure d'absorption d'alcool</label><input id="f_ipmDerniere" autocomplete="off" placeholder="ex. 21h30">
+    ${resume}
+  </div>`);
+})();
+function syncIPM(){
+  $('#ipmBlock').classList.toggle('hidden', !($('#f_ipm').checked || $('#f_ceea').checked));
+  const sel = EDIT?.f.ipmSel || {};
+  document.querySelectorAll('#ipmBlock .ich').forEach(c=>{ const v = sel[c.dataset.g]||[]; c.querySelectorAll('button').forEach(b=>b.classList.toggle('on', v.includes(b.dataset.o))); });
+}
+$('#ipmBlock').addEventListener('click', e=>{
+  const b = e.target.closest('.ich button'); if (!b || !EDIT) return;
+  const g = b.closest('.ich').dataset.g, one = IPM_GROUPS.find(x=>x[0]===g)[3], o = b.dataset.o;
+  const sel = EDIT.f.ipmSel ||= {}; let v = sel[g] || [];
+  v = v.includes(o) ? v.filter(x=>x!==o) : one ? [o] : [...v, o];
+  /* « Indemne » exclut contusions / blessures, et inversement */
+  if (g==='lesions' && v.includes(o)) v = o==='Indemne' ? ['Indemne'] : v.filter(x=>x!=='Indemne');
+  sel[g] = v; syncIPM(); draftSoon();
+});
+['#f_ipm','#f_ceea'].forEach(id=>$(id).addEventListener('change', e=>{ syncIPM(); paintTiles(); if (e.target.checked && !$('#f_ipmHeure').value) $('#f_ipmHeure').value = new Date().toTimeString().slice(0,5); }));
+{ const _sa3 = syncAcc; syncAcc = function(){ _sa3(); syncIPM(); }; }
+paintTiles();
+
 /* ---------- Personne déjà connue : suggestions sur le nom, reprise de l'identité ---------- */
 const ID_FIELDS = ['nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','filiation','docType','docPays','docNumero','docDate','docLieu','sitFam','email','nbEnfants','nbCharge','employeur'];
 $('#f_nom').insertAdjacentHTML('afterend', `<div id="idSug" class="hidden" style="margin-top:6px;border:1px solid #2d4a7a;border-radius:12px;background:#16233a;overflow:hidden"></div>`);
@@ -1187,6 +1282,7 @@ $('#formCancel').addEventListener('click', ()=>$('#idSug').classList.add('hidden
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['4.8', ['Nouveau bouton « CEEA / CEI / CAUS » : dépistages alcool (heure, résultat, taux) et stupéfiants (heure, résultat), badge bleu, rubrique Dépistages dans la fiche et l\'envoi', 'Résultat : nouveau choix « Non contrôlé » (en jaune)', 'Nouveaux boutons « IPM » et « CEEA » : examen de comportement de la fiche A (lieu, constitution, lésions, visage, allure, attitude, regard, haleine, élocution, explications, équilibre), absorption d\'alcool et résumé']],
   ['4.7', ['Reprise d\'identité : fusionne tous les contrôles de la personne (téléphone, pièce, filiation d\'un ancien CIF repris même si le dernier contrôle est un CI)']],
   ['4.6', ['Personne déjà contrôlée (CI ou CIF, archivé ou non) : en tapant le nom, une liste propose nom, prénom et date de naissance, un appui reprend toute l\'identité et la pièce d\'identité']],
   ['4.5', ['Envoi rapide par e-mail : ouvre l\'appli e-mail par défaut du téléphone (Mail, Outlook, Gmail…)', 'Journal des modifications dans les réglages']],
@@ -1299,15 +1395,15 @@ function snapshot(){
   for (const k of FIELDS) f[k] = $('#f_'+k).value.trim();
   f.type = segVal('typeSeg'); f.docMode = segVal('docSeg');
   f.accident = $('#f_accident').checked; for (const [k] of MEMO) f[k] = $('#f_'+k).checked;
-  f.at = $('#f_at').checked;
+  f.at = $('#f_at').checked; f.ceea = $('#f_ceea').checked; f.ipm = $('#f_ipm').checked;
   f.verif = $('#f_verif').classList.contains('on'); f.signa = $('#f_signa').checked; f.signaAn = f.signa ? $('#f_signaAn').value : '';
   readVehicles(); f.vehicules = structuredClone(EDIT.f.vehicules);
   return {f, isNew:EDIT.isNew, added:[...EDIT.added], removed:[...EDIT.removed], at:Date.now()};
 }
-const draftKey = f => JSON.stringify([FIELDS.filter(k=>k!=='dateHeure').map(k=>f[k]||''), f.type, f.accident||false, MEMO.map(([k])=>!!f[k]), !!f.at, AT_EPI.map(([k])=>f[k]||''), !!f.verif, !!f.signa, f.signaAn||'', (f.vehicules||[]).map(v=>[v.type||'',v.pays||'',...VEH_FIELDS.map(([k])=>v[k]||'')]), f.photos||[]]);
+const draftKey = f => JSON.stringify([FIELDS.filter(k=>k!=='dateHeure').map(k=>f[k]||''), f.type, f.accident||false, MEMO.map(([k])=>!!f[k]), !!f.at, !!f.ceea, !!f.ipm, JSON.stringify(f.ipmSel||{}), AT_EPI.map(([k])=>f[k]||''), !!f.verif, !!f.signa, f.signaAn||'', (f.vehicules||[]).map(v=>[v.type||'',v.pays||'',...VEH_FIELDS.map(([k])=>v[k]||'')]), f.photos||[]]);
 function isDirty(snap){
   const f = snap.f;
-  if (snap.isNew) return FIELDS.some(k=>k!=='dateHeure' && k!=='lieuControle' && f[k]) || (f.photos||[]).length > 0 || (f.vehicules||[]).some(v=>VEH_FIELDS.some(([k])=>v[k])) || !!f.accident || !!f.at || !!f.verif || !!f.signa;
+  if (snap.isNew) return FIELDS.some(k=>k!=='dateHeure' && k!=='lieuControle' && f[k]) || (f.photos||[]).length > 0 || (f.vehicules||[]).some(v=>VEH_FIELDS.some(([k])=>v[k])) || !!f.accident || !!f.at || !!f.ceea || !!f.ipm || !!f.verif || !!f.signa;
   const orig = FICHES.find(x=>x.id===f.id); return !orig || draftKey(orig) !== draftKey(f);
 }
 async function saveDraft(key, snap){
