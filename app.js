@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.9';
+const APP_VERSION = '5.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,7 +12,7 @@ const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
-const FIELDS = ['dateHeure','sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures','ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
+const FIELDS = ['dateHeure','sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures','ipmHeure','ipmAveu','ipmTemoins','ipmDerniere','adrRue','adrVille','adrPays'];
 const AT_FIELDS = ['atCirconstances','atHauteur','atBlessures'];
 const AT_EPI = [['atChaussures','Chaussures de sécurité','Chaussures'],['atGants','Gants de sécurité','Gants'],['atCasque','Casque','Casque']];
 const CEEA_BADGE = '<span class="badge acc" style="background:#1f5fa8;color:#fff">CEEA</span>';
@@ -1233,7 +1233,7 @@ $('#ipmBlock').addEventListener('click', e=>{
 paintTiles();
 
 /* ---------- Personne déjà connue : suggestions sur le nom, reprise de l'identité ---------- */
-const ID_FIELDS = ['sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','filiation','docType','docPays','docNumero','docDate','docLieu','sitFam','email','nbEnfants','nbCharge','employeur'];
+const ID_FIELDS = ['sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','adrRue','adrVille','adrPays','telephone','filiation','docType','docPays','docNumero','docDate','docLieu','sitFam','email','nbEnfants','nbCharge','employeur'];
 $('#f_nom').insertAdjacentHTML('afterend', `<div id="idSug" class="hidden" style="margin-top:6px;border:1px solid #2d4a7a;border-radius:12px;background:#16233a;overflow:hidden"></div>`);
 function idMatches(q){
   const n = norm(q); if (n.length < 2) return [];
@@ -1322,6 +1322,8 @@ function loadCities(){
 function adrJoin(){ const ville = $('#f_adrVille').value.trim(), pays = $('#f_adrPays').value.trim();
   $('#f_adresse').value = [$('#f_adrRue').value.trim(), ville, pays && norm(ville).includes(norm(pays)) ? '' : pays].filter(Boolean).join(', '); }
 function adrSplit(){
+  /* Anciennes fiches (adresse en un seul bloc) : découpage rue / ville / pays */
+  if ($('#f_adrRue').value || $('#f_adrVille').value || $('#f_adrPays').value) return;
   const v = $('#f_adresse').value.trim(), parts = v.split(/,\s*/), j = parts.findIndex(x=>/^\d{5}\s/.test(x));
   $('#f_adrRue').value = j < 0 ? v : parts.slice(0,j).join(', ');
   $('#f_adrVille').value = j < 0 ? '' : parts[j];
@@ -1373,6 +1375,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['5.0', ['Main courante : adresse rédigée « résidant 5 avenue X à Monaco », « demeurant 5 avenue X à Nice (06000) » ou « demeurant au 5 via Y à Sanremo en Italie »', 'Rue, ville et pays enregistrés séparément (ville étrangère en saisie libre, sans code postal)']],
   ['4.9', ['Adresse en trois champs : rue, ville avec suggestions et code postal (toutes les communes de France + Monaco, liste gardée sur le téléphone, recherche hors ligne), pays avec suggestions', 'Bouton Homme / Femme : la main courante écrit « né » ou « née »']],
   ['4.8', ['Nouveau bouton « CEEA / CEI / CAUS » : dépistages alcool (heure, résultat, taux) et stupéfiants (heure, résultat), badge bleu, rubrique Dépistages dans la fiche et l\'envoi', 'Résultat : nouveau choix « Non contrôlé » (en jaune)', 'Nouveaux boutons « IPM » et « CEEA » : examen de comportement de la fiche A (lieu, constitution, lésions, visage, allure, attitude, regard, haleine, élocution, explications, équilibre), absorption d\'alcool et résumé']],
   ['4.7', ['Reprise d\'identité : fusionne tous les contrôles de la personne (téléphone, pièce, filiation d\'un ancien CIF repris même si le dernier contrôle est un CI)']],
@@ -1439,6 +1442,27 @@ function paysLieu(t){
 }
 function lieuPhrase(t){ const p = prefLieu(t); if (p) return 'par ' + p; const q = paysLieu(t); if (q) return q; if (/^(les |nos )?autorit/i.test(t)) return 'par ' + (/^(les|nos) /i.test(t) ? t : 'les ' + t); if (/^((sous-)?pr[ée]fecture|mairie|ambassade)\b/i.test(t)) return "par la " + t[0].toLowerCase() + t.slice(1); if (/^consulat\b/i.test(t)) return 'par le c' + t.slice(1); return /^(par|à|a)\s/i.test(t) ? t : 'par ' + t; }
 const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|larvotto|moneghetti|saint[\s-]roman|jardin[\s-]exotique|port[\s-]hercule/i.test(a||'');
+/* Adresse en main courante :
+   Monaco → « résidant 5 avenue X à Monaco » ; France → « demeurant 5 avenue X à Nice (06000) » ;
+   étranger → « demeurant au 5 via Y à Sanremo en Italie » */
+const PAYS_PREP = {'etats-unis':'aux','pays-bas':'aux','emirats arabes unis':'aux','philippines':'aux','seychelles':'aux','comores':'aux','maldives':'aux',
+  'mexique':'au','cambodge':'au','mozambique':'au','zimbabwe':'au','belize':'au','chypre':'à','malte':'à','cuba':'à','madagascar':'à','singapour':'à','andorre':'en','israel':'en'};
+function enPays(p){
+  const n = norm(p).replace(/^(l'|la |le |les )/,''); if (!n) return '';
+  const prep = PAYS_PREP[n] || (/^[aeiouy]/.test(n) || /e$/.test(n) ? 'en' : 'au');
+  return `${prep} ${p.trim().replace(/^(l'|la |le |les )/i,'')}`;
+}
+const aVille = v => /^le /i.test(v) ? 'au ' + v.slice(3) : /^les /i.test(v) ? 'aux ' + v.slice(4) : 'à ' + v;
+function adrPhrase(f){
+  const rue = (f.adrRue||'').trim(), villeRaw = (f.adrVille||'').trim(), pays = (f.adrPays||'').trim();
+  if (!rue && !villeRaw && !pays) return `${isMonacoAddr(f.adresse) ? 'résidant' : 'demeurant'} ${f.adresse}`;
+  const m = /^(\d{5})\s+(.+)$/.exec(villeRaw), cp = m ? m[1] : '', ville = m ? m[2] : villeRaw;
+  const np = norm(pays), isMC = np === 'monaco' || cp === '98000' || (!np && /^(monaco|monte.carlo)/.test(norm(ville)));
+  const isFR = !isMC && (np === 'france' || (!np && !!cp) || (!np && !!ville));
+  if (isMC) return `résidant ${[rue, aVille(ville || 'Monaco')].filter(Boolean).join(' ')}`;
+  if (isFR) return `demeurant ${[rue, ville && aVille(ville) + (cp ? ` (${cp})` : '')].filter(Boolean).join(' ')}`;
+  return `demeurant ${[rue && 'au ' + rue.replace(/^au\s+/i,''), ville && aVille(ville), enPays(pays)].filter(Boolean).join(' ')}`;
+}
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
   const parts = [[nom, f.prenom].filter(Boolean).join(' ') || 'Individu non identifié'];
@@ -1446,7 +1470,7 @@ function mcText(f){
   if (cif && f.filiation) parts.push(f.filiation);
   if (f.nationalite) parts.push(`de nationalité ${f.nationalite.toLowerCase()}`);
   if (f.profession) parts.push(/^[A-ZÀ-Ý][a-zà-ÿ]/.test(f.profession) ? f.profession[0].toLowerCase() + f.profession.slice(1) : f.profession);
-  if (f.adresse) parts.push(`${isMonacoAddr(f.adresse) ? 'résidant' : 'demeurant'} ${f.adresse}`);
+  if (f.adresse) parts.push(adrPhrase(f));
   let txt = parts.join(', ') + '.';
   if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
   if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${lieuPhrase(f.docLieu)}` : '') + '.'; }
