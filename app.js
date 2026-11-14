@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '5.1';
+const APP_VERSION = '5.2';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1376,6 +1376,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['5.2', ['Main courante (IPM) : phrase finale « Lors du contrôle, l\'intéressé présentait tous les signes extérieurs de l\'ivresse, à savoir : une élocution pâteuse, une allure somnolente, un visage congestionné, une haleine sentant l\'alcool, les yeux voilés et des explications embrouillées », rédigée d\'après la fiche A']],
   ['5.1', ['Fiche A : « Confusions » à la place de « Contusions » (comme sur le formulaire papier)']],
   ['5.0', ['Main courante : adresse rédigée « résidant 5 avenue X à Monaco », « demeurant 5 avenue X à Nice (06000) » ou « demeurant au 5 via Y à Sanremo en Italie »', 'Rue, ville et pays enregistrés séparément (ville étrangère en saisie libre, sans code postal)']],
   ['4.9', ['Adresse en trois champs : rue, ville avec suggestions et code postal (toutes les communes de France + Monaco, liste gardée sur le téléphone, recherche hors ligne), pays avec suggestions', 'Bouton Homme / Femme : la main courante écrit « né » ou « née »']],
@@ -1477,7 +1478,28 @@ function mcText(f){
   if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
   if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${lieuPhrase(f.docLieu)}` : '') + '.'; }
   const r = effRes(f); if (MC_RES[r]) txt += `\n\n${MC_RES[r][0].toUpperCase()}${MC_RES[r].slice(1)}.`;
+  if (f.ipm) { const ip = ipmPhrase(f); if (ip) txt += `\n\n${ip}`; }
   return txt;
+}
+/* IPM : signes extérieurs de l'ivresse relevés sur la fiche A, rédigés en phrase */
+const etList = a => a.length > 1 ? a.slice(0,-1).join(', ') + ' et ' + a[a.length-1] : (a[0] || '');
+const ALLURE_ADJ = {'Bien éveillé':'bien éveillée','Somnolent':'somnolente','Abattu':'abattue','Tremblant':'tremblante'};
+const ALLURE_NOM = {'Hoquets':'des hoquets','Vomissements':'des vomissements','Présence déjections':'la présence de déjections','Vêtements désordonnés':'des vêtements désordonnés','Vêtements ordonnés':'des vêtements ordonnés'};
+function ipmPhrase(f){
+  const sel = k => f.ipmSel?.[k] || [], lc = x => x.toLowerCase(), items = [];
+  const elo = sel('elocution').map(x => x === 'Ne parle pas' ? 'inexistante' : lc(x));
+  if (elo.length) items.push(`une élocution ${etList(elo)}`);
+  const al = sel('allure'), adj = al.filter(x=>ALLURE_ADJ[x]).map(x=>ALLURE_ADJ[x]), nom = al.filter(x=>ALLURE_NOM[x]).map(x=>ALLURE_NOM[x]);
+  if (adj.length || nom.length) items.push(adj.length ? `une allure ${etList(adj)}${nom.length ? `, avec ${etList(nom)}` : ''}` : etList(nom));
+  if (sel('visage').length) items.push(`un visage ${etList(sel('visage').map(lc))}`);
+  for (const h of sel('haleine')) items.push(h === 'Sentant l\'alcool' ? 'une haleine sentant l\'alcool' : `une odeur de l'haleine ${lc(h)}`);
+  const yeux = sel('regard').filter(x=>/^Yeux/.test(x)).map(x=>lc(x.slice(5)));
+  if (yeux.length) items.push(`les yeux ${etList(yeux)}`);
+  if (sel('regard').includes('Anormal')) items.push('un regard anormal');
+  const ex = sel('explications').filter(x => x !== 'Ne parle pas' || !sel('elocution').includes('Ne parle pas'));
+  if (ex.length) items.push(ex.length === 1 && ex[0] === 'Ne parle pas' ? 'aucune explication' : `des explications ${etList(ex.filter(x=>x!=='Ne parle pas').map(lc))}`);
+  if (!items.length) return '';
+  return `Lors du contrôle, ${f.sexe==='F' ? 'l\'intéressée' : 'l\'intéressé'} présentait tous les signes extérieurs de l'ivresse, à savoir : ${etList(items)}.`;
 }
 (()=>{ const c = document.querySelector('#shareSheet [data-sh=cancel]'); if (c) c.insertAdjacentHTML('beforebegin', `<button data-sh="mc"><b>Format main courante</b><small>Texte rédigé, prêt à coller ou à envoyer</small></button>`); })();
 
