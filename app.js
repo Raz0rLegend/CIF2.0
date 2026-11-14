@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.2';
+const APP_VERSION = '4.3';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,7 +12,13 @@ const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
-const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur'];
+const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures'];
+const AT_FIELDS = ['atCirconstances','atHauteur','atBlessures'];
+const AT_EPI = [['atChaussures','Chaussures de sécurité','Chaussures'],['atGants','Gants de sécurité','Gants'],['atCasque','Casque','Casque']];
+const AT_BADGE = '<span class="badge acc" style="background:#5a3a8c;color:#fff">Acc. travail</span>';
+const epiTxt = v => v === 'oui' ? 'porté(s)' : v === 'non' ? 'non porté(s)' : '';
+const epiHTML = v => v === 'oui' ? '<span style="color:#3ccf4e;font-weight:700">✓ Porté</span>' : v === 'non' ? '<span style="color:#ff5a52;font-weight:700">✗ Non porté</span>' : '';
+const hautTxt = h => { const v = String(h||'').trim().replace('.',','); return v ? (/m$/i.test(v) ? v : v + ' m') : ''; };
 const ACC_FIELDS = ['kilometrage','employeur','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const resTest = r => r ? `<span style="color:${r==='Positif'?'#ff5a52':'#3ccf4e'};font-weight:600">${r}</span>` : '';
 const kmTxt = k => { const d = String(k||'').replace(/\D/g,''); return d ? (+d).toLocaleString('fr-FR').replace(/\s/g,' ') + ' km' : ''; };
@@ -266,7 +272,7 @@ function render(){
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
-        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
+        <div class="r1"><div class="name"><span class="badge ${f.type==='CIF'?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.at?AT_BADGE:''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.nom||f.prenom ? esc(name) : name}</div><div class="date" style="color:${resColor(f)}">${effRes(f)?`<b>${esc(effRes(f))}</b> · `:''}${esc(fmtDT(f.dateHeure))}</div></div>
         ${sub ? `<div class="sub">${esc(sub)}</div>` : ''}
         ${f.lieuControle ? `<div class="note">${esc(f.lieuControle)}</div>` : ''}
         ${(f.vehicules||[]).length ? `<div class="note">${esc(f.vehicules.map(v=>[v.type,v.marque,v.plaque && `${v.plaque} (${v.pays||'F'})`].filter(Boolean).join(' ')).join(' · '))}</div>` : ''}
@@ -327,7 +333,7 @@ const ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
 function panel(title, rows, right=''){
   rows = rows.filter(r=>r[1]); if (!rows.length && !right) return '';
-  const LONG = /Adresse|Observations|Filiation|Motif|taux/;
+  const LONG = /Adresse|Observations|Filiation|Motif|taux|Circonstances|blessures/;
   let col = 0; const cells = [];
   rows.forEach(([k,v,raw],i)=>{
     let full = LONG.test(k) || String(raw ? '' : v).length > 22;
@@ -341,7 +347,7 @@ async function openDetail(f){
   DETAIL = f.id;
   const cif = f.type === 'CIF', col = resColor(f), n = (f.photos||[]).length, src = cifSource(f);
   computeGroups(); const mates = groupMates(f);
-  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
+  $('#detTitle').innerHTML = `<span class="badge ${cif?'cif':''}">${esc(f.type||'CI')}</span>${f.accident?'<span class="badge acc">Accident</span>':''}${f.at?AT_BADGE:''}${f.verif?VERIF_BADGE:''}${isMinor(f)?MINOR_BADGE:''}${f.status==='archived'?'Archivée':'En cours'}`;
   const nom = (f.nom||'').toUpperCase(), born = [f.dateNaissance && `Né(e) le ${f.dateNaissance}`, f.lieuNaissance && `à ${f.lieuNaissance}`].filter(Boolean).join(' ');
   const hero = `<div class="hero"><div class="hl">
       <div class="nm">${nom||f.prenom ? `${esc(nom)} <span>${esc(f.prenom||'')}</span>` : '<span style="color:var(--muted)">Sans identité</span>'}</div>
@@ -363,11 +369,12 @@ async function openDetail(f){
       ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k] ? '<span style="color:#3ccf4e;font-weight:700">✓ Oui</span>' : '<span style="color:#ff5a52;font-weight:700">✗ Non</span>') : ok(f[k]), true])]);
   const dep = !f.accident ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux', f.alcTaux ? `<span style="color:${tauxColor(f.alcTaux)||'inherit'};font-weight:700">${esc(taux(f.alcTaux))}</span>` : '', true],
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
+  const atp = !f.at ? '' : panel('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiHTML(f[k]), true]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
   const recu = f.recu ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Reçue par QR code le ${fmtD(f.recu)}</p>` : '';
   const arch = f.status==='archived' ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays?` · suppression auto le ${fmtD(f.archivedAt+SETTINGS.purgeDays*DAY)}`:''}</p>` : '';
-  $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + doc + veh : veh + ident + acc + dep) + ctx + photos + recu + arch;
+  $('#detBody').innerHTML = hero + (cif ? ident + acc + dep + atp + doc + veh : veh + ident + acc + dep + atp) + ctx + photos + recu + arch;
   $('#detArchive').innerHTML = f.status==='archived' ? ICON.restore + '<span>Remettre</span>' : ICON.archive + '<span>Archiver</span>';
   $('#detArchive').setAttribute('aria-label', f.status==='archived' ? 'Remettre en cours' : 'Archiver');
   $('#detVerif').onclick = async ()=>{ const sc = $('#detail .body').scrollTop; f.verif = !f.verif; await saveFiche(f); render(); await openDetail(f); $('#detail .body').scrollTop = sc; toast(f.verif ? 'Marquée VERIF' : 'VERIF retiré'); };
@@ -399,7 +406,7 @@ function openForm(f, d){
   EDIT = d ? { isNew, f: structuredClone(d.f), added:[...(d.added||[])], removed:[...(d.removed||[])] } : { isNew, f: isNew ? {id:uid(), status:'pending', type:(TAB==='CI'?'CI':'CIF'), docMode:'Officiel', photos:[], vehicules:[], createdAt:Date.now(), dateHeure:nowLocal()} : structuredClone(f), added:[], removed:[] };
   if (!EDIT.f.vehicules) EDIT.f.vehicules = [];
   for (const k of FIELDS) $('#f_'+k).value = EDIT.f[k] || '';
-  syncDocPays(); $('#f_accident').checked = !!EDIT.f.accident; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
+  syncDocPays(); $('#f_accident').checked = !!EDIT.f.accident; $('#f_at').checked = !!EDIT.f.at; for (const k of MEMO) $('#f_'+k[0]).checked = !!EDIT.f[k[0]]; syncAcc(); syncTaux();
   setSeg('typeSeg', EDIT.f.type || 'CI'); setSeg('docSeg', EDIT.f.docMode || 'Officiel');
   renderVehicles();
   $('#formTitle').textContent = isNew ? 'Nouvelle fiche' : 'Modifier la fiche';
@@ -418,6 +425,7 @@ async function closeForm(save){
     E.f.type = segVal('typeSeg'); E.f.docMode = segVal('docSeg');
     E.f.accident = $('#f_accident').checked; for (const [k] of MEMO) E.f[k] = E.f.accident && $('#f_'+k).checked;
     if (!E.f.accident) for (const k of ACC_FIELDS) E.f[k] = '';
+    E.f.at = $('#f_at').checked; if (!E.f.at) { for (const k of AT_FIELDS) E.f[k] = ''; for (const [k] of AT_EPI) E.f[k] = ''; }
     E.f.verif = $('#f_verif').classList.contains('on'); E.f.signa = $('#f_signa').checked; E.f.signaAn = E.f.signa ? $('#f_signaAn').value : '';
     readVehicles(); E.f.vehicules = E.f.vehicules.filter(v=>VEH_FIELDS.some(([k])=>v[k]));
     if (E.f.type === 'CI') { for (const k of CIF_FIELDS) E.f[k] = ''; E.f.resultat = ''; E.f.signa = false; E.f.signaAn = ''; }
@@ -629,6 +637,7 @@ function ficheSections(f){
     ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k]?'oui':'non') : f[k]?'photographié(e)':'non photographié(e)'])]);
   if (f.accident) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
     ['Test stupéfiants',[f.stupHeure && `à ${f.stupHeure}`, f.stupRes].filter(Boolean).join(' — ')]]);
+  if (f.at) add('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiTxt(f[k])]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
     : !(f.docType||f.docPays||f.docNumero||f.docDate||f.docLieu) ? [] : [['Identité établie','Pièce officielle'],['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   if (cif) addVeh();
@@ -1014,7 +1023,7 @@ function syncExtra(){
   const on = !!EDIT?.f.verif, b = $('#f_verif');
   b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
   b.style.cssText = 'flex:0 0 96px;border-radius:10px;font-weight:800;letter-spacing:.05em;font-size:15px;' + (on ? 'background:#b3261e;color:#fff;border:1px solid #b3261e' : 'background:transparent;color:#9a9a9a;border:1px dashed #666');
-  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna(); syncMotif(); syncAge();
+  $('#f_signa').checked = !!EDIT?.f.signa; $('#f_signaAn').value = EDIT?.f.signaAn || ''; syncSigna(); syncMotif(); syncAge(); syncAT();
 }
 function syncSigna(){ const on = $('#f_signa').checked; $('#f_signaAn').disabled = !on; $('#f_signaAn').style.opacity = on ? '1' : '.4'; }
 $('#f_verif').onclick = ()=>{ if (!EDIT) return; EDIT.f.verif = !EDIT.f.verif; syncExtra(); };
@@ -1068,6 +1077,25 @@ async function geoFill(auto){
   } finally { geoBusy = false; }
 }
 $('#geoBtn').onclick = ()=>geoFill(false);
+
+/* ---------- Accident du travail : EPI, circonstances, hauteur de chute, blessures ---------- */
+$('#accBlock').insertAdjacentHTML('afterend', `<label class="switch"><input type="checkbox" id="f_at"><span class="sw"></span><span class="swl">Accident du travail</span></label>
+  <div id="atBlock" class="accblock hidden">
+    <div class="sect" style="margin-top:6px">Équipements de protection</div>
+    <div id="atEpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px"></div>
+    <p class="hint" style="font-size:12px;color:var(--muted);margin:6px 0 0">Touche : vert = porté · rouge = non porté · gris = non renseigné</p>
+    <label class="f" for="f_atHauteur">Hauteur de chute (m)</label><input id="f_atHauteur" inputmode="decimal" placeholder="ex. 2,5" autocomplete="off">
+    <label class="f" for="f_atCirconstances">Circonstances de l'accident</label><textarea id="f_atCirconstances" rows="3"></textarea>
+    <label class="f" for="f_atBlessures">Nature des blessures</label><textarea id="f_atBlessures" rows="2"></textarea>
+  </div>`);
+function syncAT(){
+  $('#atBlock').classList.toggle('hidden', !$('#f_at').checked);
+  const f = EDIT?.f || {};
+  $('#atEpi').innerHTML = AT_EPI.map(([k,,s])=>{ const v = f[k] || ''; const st = v==='oui' ? 'background:#1f5d2a;border-color:#3ccf4e;color:#fff' : v==='non' ? 'background:#6b1f1b;border-color:#ff5a52;color:#fff' : 'background:var(--panel);border-color:var(--line);color:var(--muted)';
+    return `<button type="button" data-epi="${k}" style="border:1px solid;border-radius:12px;padding:10px 4px;font-size:14px;font-weight:700;line-height:1.25;${st}">${v==='oui'?'✓':v==='non'?'✗':'·'}<br>${s}</button>`; }).join('');
+}
+$('#f_at').addEventListener('change', syncAT);
+$('#atEpi').addEventListener('click', e=>{ const b = e.target.closest('[data-epi]'); if (!b || !EDIT) return; const k = b.dataset.epi; EDIT.f[k] = !EDIT.f[k] ? 'oui' : EDIT.f[k]==='oui' ? 'non' : ''; syncAT(); draftSoon(); });
 
 /* ---------- Envoi au format « main courante » ---------- */
 const MC_RES = {
@@ -1150,6 +1178,8 @@ $('#motifChips').addEventListener('click', e=>{
 });
 $('#f_motif').addEventListener('input', syncMotif);
 $('#f_motif').addEventListener('change', syncMotif);
+/* Motif « Accident du travail » : ouvre le bloc correspondant */
+$('#motifChips').addEventListener('click', e=>{ const b = e.target.closest('[data-motif]'); if (b && b.dataset.motif === 'Accident du travail' && norm($('#f_motif').value) === norm('Accident du travail') && !$('#f_at').checked) { $('#f_at').checked = true; syncAT(); } });
 
 /* ---------- Brouillon : reprendre un contrôle fermé sans enregistrer ----------
    Le formulaire en cours est copié (chiffré) toutes les secondes de saisie, à la sortie de l'appli
@@ -1160,14 +1190,15 @@ function snapshot(){
   for (const k of FIELDS) f[k] = $('#f_'+k).value.trim();
   f.type = segVal('typeSeg'); f.docMode = segVal('docSeg');
   f.accident = $('#f_accident').checked; for (const [k] of MEMO) f[k] = $('#f_'+k).checked;
+  f.at = $('#f_at').checked;
   f.verif = $('#f_verif').classList.contains('on'); f.signa = $('#f_signa').checked; f.signaAn = f.signa ? $('#f_signaAn').value : '';
   readVehicles(); f.vehicules = structuredClone(EDIT.f.vehicules);
   return {f, isNew:EDIT.isNew, added:[...EDIT.added], removed:[...EDIT.removed], at:Date.now()};
 }
-const draftKey = f => JSON.stringify([FIELDS.filter(k=>k!=='dateHeure').map(k=>f[k]||''), f.type, f.accident||false, MEMO.map(([k])=>!!f[k]), !!f.verif, !!f.signa, f.signaAn||'', (f.vehicules||[]).map(v=>[v.type||'',v.pays||'',...VEH_FIELDS.map(([k])=>v[k]||'')]), f.photos||[]]);
+const draftKey = f => JSON.stringify([FIELDS.filter(k=>k!=='dateHeure').map(k=>f[k]||''), f.type, f.accident||false, MEMO.map(([k])=>!!f[k]), !!f.at, AT_EPI.map(([k])=>f[k]||''), !!f.verif, !!f.signa, f.signaAn||'', (f.vehicules||[]).map(v=>[v.type||'',v.pays||'',...VEH_FIELDS.map(([k])=>v[k]||'')]), f.photos||[]]);
 function isDirty(snap){
   const f = snap.f;
-  if (snap.isNew) return FIELDS.some(k=>k!=='dateHeure' && k!=='lieuControle' && f[k]) || (f.photos||[]).length > 0 || (f.vehicules||[]).some(v=>VEH_FIELDS.some(([k])=>v[k])) || !!f.accident || !!f.verif || !!f.signa;
+  if (snap.isNew) return FIELDS.some(k=>k!=='dateHeure' && k!=='lieuControle' && f[k]) || (f.photos||[]).length > 0 || (f.vehicules||[]).some(v=>VEH_FIELDS.some(([k])=>v[k])) || !!f.accident || !!f.at || !!f.verif || !!f.signa;
   const orig = FICHES.find(x=>x.id===f.id); return !orig || draftKey(orig) !== draftKey(f);
 }
 async function saveDraft(key, snap){
