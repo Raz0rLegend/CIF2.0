@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '5.4';
+const APP_VERSION = '1.0.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -287,7 +287,7 @@ function render(){
     const purgeInfo = f.status==='archived' ? `Archivée le ${fmtD(f.archivedAt)}${+SETTINGS.purgeDays ? ` · suppression le ${fmtD(f.archivedAt + SETTINGS.purgeDays*DAY)}` : ''}` : '';
     const g = GROUPS.get(f.id), prev = items[i-1];
     const link = g && prev && GROUPS.get(prev.id) === g ? `<div class="glink" title="Contrôlés ensemble">${ICON_LINK}</div>` : '';
-    return `${link}<article class="card${SEL&&SEL.has(f.id)?' sel':''}" data-id="${f.id}">
+    return `${link}<article class="card${SEL&&SEL.has(f.id)?' sel':''}${effRes(f)==='Non contrôlé'?' nc':''}" data-id="${f.id}">
       ${SEL ? `<div class="chk">${SEL.has(f.id)?ICON.check:''}</div>` : ''}
       ${n ? `<img class="thumb" data-ph="${f.photos[0]}" alt="">` : ''}
       <div class="main">
@@ -746,13 +746,22 @@ function sgShow(inp){
   const res = [...starts.sort((a,b)=>a.localeCompare(b,'fr')), ...words, ...inc].slice(0,8);
   if (!res.length) return sgHide();
   sgInput = inp;
-  const r = inp.getBoundingClientRect();
-  sgBox.style.left = r.left+'px'; sgBox.style.width = r.width+'px';
-  const below = window.innerHeight - r.bottom;
-  if (below < 220 && r.top > below) { sgBox.style.top=''; sgBox.style.bottom = (window.innerHeight - r.top + 4)+'px'; }
-  else { sgBox.style.bottom=''; sgBox.style.top = (r.bottom + 4)+'px'; }
   sgBox.innerHTML = res.map(v=>{ const n=norm(v), i=n.indexOf(q); return `<button type="button" data-v="${esc(v)}">${i>=0 ? esc(v.slice(0,i))+'<b>'+esc(v.slice(i,i+q.length))+'</b>'+esc(v.slice(i+q.length)) : esc(v)}</button>`; }).join('');
-  sgBox.classList.remove('hidden');
+  sgBox.classList.remove('hidden'); sgPlace(inp);
+}
+/* Liste de suggestions collée sous le champ : elle est placée dans la zone qui défile, et suit donc le champ */
+function sgPlace(inp){
+  const host = inp.closest('.body');
+  if (!host) { const r = inp.getBoundingClientRect(); sgBox.style.position = 'fixed'; sgBox.style.left = r.left+'px'; sgBox.style.width = r.width+'px'; sgBox.style.top = (r.bottom + 2)+'px'; return; }
+  if (sgBox.parentNode !== host) host.appendChild(sgBox);
+  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  const hr = host.getBoundingClientRect(), r = inp.getBoundingClientRect(), h = sgBox.offsetHeight;
+  const vv = window.visualViewport, visBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+  const up = visBottom - r.bottom < h + 8 && r.top - hr.top > h + 8;
+  sgBox.style.position = 'absolute'; sgBox.style.bottom = ''; sgBox.style.margin = '0';
+  sgBox.style.left = (r.left - hr.left + host.scrollLeft) + 'px'; sgBox.style.width = r.width + 'px';
+  sgBox.style.top = (up ? r.top - hr.top + host.scrollTop - h - 2 : r.bottom - hr.top + host.scrollTop + 2) + 'px';
+  sgBox.style.borderRadius = up ? '12px 12px 4px 4px' : '4px 4px 12px 12px';
 }
 document.addEventListener('input', e=>{ if (e.target.dataset?.sg) sgShow(e.target); });
 document.addEventListener('focusin', e=>{ if (e.target.dataset?.sg) sgShow(e.target); else if (!sgBox.contains(e.target)) sgHide(); });
@@ -764,7 +773,7 @@ sgBox.addEventListener('click', e=>{
   const all = [...inp.closest('.body').querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=file]),textarea')].filter(x=>x.offsetParent);
   const nx = all[all.indexOf(inp)+1]; if (nx) nx.focus(); else inp.blur();
 });
-document.querySelectorAll('.sheet .body').forEach(b=>b.addEventListener('scroll', ()=>{ if (sgInput) sgShow(sgInput); }, {passive:true}));
+window.visualViewport?.addEventListener('resize', ()=>{ if (sgInput && !sgBox.classList.contains('hidden')) sgPlace(sgInput); });
 
 /* ---------- Déverrouillage biométrique (WebAuthn + PRF) ----------
    Le téléphone crée une clé d'accès (passkey) liée à Face ID / l'empreinte.
@@ -1344,11 +1353,8 @@ function villeShow(inp){
   res.sort((x,y)=>rank(x)-rank(y)); res.length = Math.min(res.length, 8);
   if (!res.length) return sgHide();
   sgInput = inp;
-  const r = inp.getBoundingClientRect(); sgBox.style.left = r.left+'px'; sgBox.style.width = r.width+'px';
-  const below = window.innerHeight - r.bottom;
-  if (below < 220 && r.top > below) { sgBox.style.top=''; sgBox.style.bottom = (window.innerHeight - r.top + 4)+'px'; } else { sgBox.style.bottom=''; sgBox.style.top = (r.bottom + 4)+'px'; }
   sgBox.innerHTML = res.map(v=>`<button type="button" data-v="${esc(v)}">${esc(v)}</button>`).join('');
-  sgBox.classList.remove('hidden');
+  sgBox.classList.remove('hidden'); sgPlace(inp);
 }
 { const _sgShow = sgShow; sgShow = inp => inp && inp.id === 'f_adrVille' ? villeShow(inp) : _sgShow(inp); }
 $('#f_adrVille').addEventListener('input', e=>villeShow(e.target));
@@ -1372,6 +1378,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.0.0', ['Grosse mise à jour : passage en version 1.0.0', 'Fiches : glisser le doigt vers la gauche ou la droite pour passer à la fiche suivante ou précédente', 'Suggestions collées sous le champ en cours de saisie', 'Nom de famille : plus de correction automatique du clavier', 'Icône « contrôlés ensemble » plus visible', 'Fiches « Non contrôlé » affichées en plus petit et atténuées dans la liste']],
   ['5.4', ['Main courante : filiation précédée de « fils de » ou « fille de » selon le bouton Homme / Femme']],
   ['5.3', ['Fiche A : rubrique « En résumé, l\'intéressé semble » retirée (formulaire, fiche et envoi)']],
   ['5.2', ['Main courante (IPM) : phrase finale « Lors du contrôle, l\'intéressé présentait tous les signes extérieurs de l\'ivresse, à savoir : une élocution pâteuse, une allure somnolente, un visage congestionné, une haleine sentant l\'alcool, les yeux voilés et des explications embrouillées », rédigée d\'après la fiche A']],
@@ -1582,6 +1589,35 @@ $('#list').addEventListener('click', async e=>{
 });
 ['input','change','click'].forEach(ev=>$('#form').addEventListener(ev, ()=>{ if (EDIT) draftSoon(); }));
 document.addEventListener('visibilitychange', ()=>{ if (document.hidden && EDIT && KEY) { clearTimeout(draftT); saveDraft(KEY, snapshot()); } });
+
+/* ---------- v1.0.0 : affichage, clavier, navigation entre fiches ---------- */
+document.head.insertAdjacentHTML('beforeend', `<style>
+#sg{max-height:260px}
+.glink svg{width:30px;height:30px;padding:5px;margin-top:-15px;background:#111;border:2px solid #e6e6e6;color:#fff;box-shadow:0 0 0 3px rgba(0,0,0,.55)}
+.card.nc{opacity:.5;padding-top:7px;padding-bottom:3px}
+.card.nc .name{font-size:15px}
+.card.nc .sub{font-size:13px;margin-top:2px}
+.card.nc .note{display:none}
+.card.nc .thumb{width:40px;height:40px}
+</style>`);
+/* Nom de famille : ni correction ni suggestion orthographique du clavier */
+['autocorrect','autocomplete'].forEach(a=>$('#f_nom').setAttribute(a,'off')); $('#f_nom').spellcheck = false;
+/* Fiche ouverte : glisser vers la gauche = fiche suivante, vers la droite = fiche précédente (ordre de la liste) */
+(()=>{
+  const el = $('#detail'); let sx = 0, sy = 0, st = 0, on = false;
+  el.addEventListener('touchstart', e=>{ on = e.touches.length === 1 && !e.target.closest('select,a,.ph'); if (!on) return; sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); }, {passive:true});
+  el.addEventListener('touchend', async e=>{
+    if (!on || !DETAIL) return; on = false;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < 1.6 * Math.abs(dy) || Date.now() - st > 900) return;
+    const ids = (window.visibleIds||[]).filter(id=>FICHES.some(x=>x.id===id)), i = ids.indexOf(DETAIL); if (i < 0) return;
+    const dir = dx < 0 ? 1 : -1, j = i + dir;
+    if (j < 0 || j >= ids.length) return toast(dir > 0 ? 'Dernière fiche de la liste' : 'Première fiche de la liste');
+    await openDetail(FICHES.find(x=>x.id===ids[j]));
+    $('#detBody').animate?.([{transform:`translateX(${dir*60}px)`, opacity:.2},{transform:'none', opacity:1}], {duration:200, easing:'ease-out'});
+    toast(`Fiche ${j+1} / ${ids.length}`);
+  }, {passive:true});
+})();
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
