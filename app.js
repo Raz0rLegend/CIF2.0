@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '5.0';
+const APP_VERSION = '5.1';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -22,7 +22,7 @@ const IPM_FIELDS = ['ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
 const IPM_GROUPS = [
   ['lieu','Lieu de l\'examen',['Sur les lieux des faits','Dans un local de service','Chez le médecin ou à l\'hôpital'],true,''],
   ['constitution','Constitution physique',['Corpulent','Mince','Moyen'],true,'Aspect général extérieur'],
-  ['lesions','Lésions',['Indemne','Contusions','Blessures'],false,'Aspect général extérieur'],
+  ['lesions','Lésions',['Indemne','Confusions','Blessures'],false,'Aspect général extérieur'],
   ['visage','Visage',['Normal','Congestionné','Pâle','En sueurs'],false,'Aspect général extérieur'],
   ['allure','Allure',['Bien éveillé','Somnolent','Abattu','Tremblant','Hoquets','Vomissements','Présence déjections','Vêtements désordonnés','Vêtements ordonnés'],false,'Aspect général extérieur'],
   ['attitude','Attitude',['Maître de soi','Énervé','Arrogant','Agressif'],false,'Aspects particuliers'],
@@ -34,7 +34,7 @@ const IPM_GROUPS = [
   ['resume','En résumé, l\'intéressé semble',['Ne pas être sous l\'influence de l\'alcool','Être sous l\'empire d\'un état alcoolique léger','Être sous l\'empire d\'un état alcoolique important','Être en état d\'ivresse'],true,'Conclusion']
 ];
 const IPM_BADGE = '<span class="badge acc" style="background:#0f766e;color:#fff">IPM</span>';
-const ipmVal = (f,k) => (f.ipmSel?.[k]||[]).join(', ');
+const ipmVal = (f,k) => (f.ipmSel?.[k]||[]).map(x=>x==='Contusions'?'Confusions':x).join(', ');
 const AT_BADGE = '<span class="badge acc" style="background:#5a3a8c;color:#fff">Acc. travail</span>';
 const epiTxt = v => v === 'oui' ? 'porté(s)' : v === 'non' ? 'non porté(s)' : '';
 const epiHTML = v => v === 'oui' ? '<span style="color:#3ccf4e;font-weight:700">✓ Porté</span>' : v === 'non' ? '<span style="color:#ff5a52;font-weight:700">✗ Non porté</span>' : '';
@@ -1215,6 +1215,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   </div>`);
 })();
 function syncIPM(){
+  const ls = EDIT?.f.ipmSel?.lesions; if (ls) EDIT.f.ipmSel.lesions = ls.map(x=>x==='Contusions'?'Confusions':x);
   $('#ipmBlock').classList.toggle('hidden', !($('#f_ipm').checked || $('#f_ceea').checked));
   const sel = EDIT?.f.ipmSel || {};
   document.querySelectorAll('#ipmBlock .ich').forEach(c=>{ const v = sel[c.dataset.g]||[]; c.querySelectorAll('button').forEach(b=>b.classList.toggle('on', v.includes(b.dataset.o))); });
@@ -1224,7 +1225,7 @@ $('#ipmBlock').addEventListener('click', e=>{
   const g = b.closest('.ich').dataset.g, one = IPM_GROUPS.find(x=>x[0]===g)[3], o = b.dataset.o;
   const sel = EDIT.f.ipmSel ||= {}; let v = sel[g] || [];
   v = v.includes(o) ? v.filter(x=>x!==o) : one ? [o] : [...v, o];
-  /* « Indemne » exclut contusions / blessures, et inversement */
+  /* « Indemne » exclut confusions / blessures, et inversement */
   if (g==='lesions' && v.includes(o)) v = o==='Indemne' ? ['Indemne'] : v.filter(x=>x!=='Indemne');
   sel[g] = v; syncIPM(); draftSoon();
 });
@@ -1375,6 +1376,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['5.1', ['Fiche A : « Confusions » à la place de « Contusions » (comme sur le formulaire papier)']],
   ['5.0', ['Main courante : adresse rédigée « résidant 5 avenue X à Monaco », « demeurant 5 avenue X à Nice (06000) » ou « demeurant au 5 via Y à Sanremo en Italie »', 'Rue, ville et pays enregistrés séparément (ville étrangère en saisie libre, sans code postal)']],
   ['4.9', ['Adresse en trois champs : rue, ville avec suggestions et code postal (toutes les communes de France + Monaco, liste gardée sur le téléphone, recherche hors ligne), pays avec suggestions', 'Bouton Homme / Femme : la main courante écrit « né » ou « née »']],
   ['4.8', ['Nouveau bouton « CEEA / CEI / CAUS » : dépistages alcool (heure, résultat, taux) et stupéfiants (heure, résultat), badge bleu, rubrique Dépistages dans la fiche et l\'envoi', 'Résultat : nouveau choix « Non contrôlé » (en jaune)', 'Nouveaux boutons « IPM » et « CEEA » : examen de comportement de la fiche A (lieu, constitution, lésions, visage, allure, attitude, regard, haleine, élocution, explications, équilibre), absorption d\'alcool et résumé']],
