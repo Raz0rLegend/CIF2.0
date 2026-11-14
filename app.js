@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.5';
+const APP_VERSION = '4.6';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1137,10 +1137,49 @@ document.addEventListener('change', e=>{ if (e.target.closest?.('#accGrid, .memo
 { const _sa = syncAcc; syncAcc = function(){ _sa(); paintTiles(); }; const _st = syncAT; syncAT = function(){ _st(); paintTiles(); }; }
 paintTiles();
 
+/* ---------- Personne déjà connue : suggestions sur le nom, reprise de l'identité ---------- */
+const ID_FIELDS = ['nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','filiation','docType','docPays','docNumero','docDate','docLieu','sitFam','email','nbEnfants','nbCharge','employeur'];
+$('#f_nom').insertAdjacentHTML('afterend', `<div id="idSug" class="hidden" style="margin-top:6px;border:1px solid #2d4a7a;border-radius:12px;background:#16233a;overflow:hidden"></div>`);
+function idMatches(q){
+  const n = norm(q); if (n.length < 2) return [];
+  const seen = new Map();
+  for (const f of FICHES) {
+    if (EDIT && f.id === EDIT.f.id) continue;
+    if (!norm(f.nom).startsWith(n)) continue;
+    const k = [norm(f.nom), norm(f.prenom), f.dateNaissance||''].join('|');
+    const cur = seen.get(k); if (!cur || (f.dateHeure||'') > (cur.f.dateHeure||'')) seen.set(k, {f, n:(cur?.n||0)+1}); else cur.n++;
+  }
+  return [...seen.values()].sort((a,b)=>(b.f.dateHeure||'').localeCompare(a.f.dateHeure||'')).slice(0,6);
+}
+function idSugShow(){
+  const box = $('#idSug'), list = idMatches($('#f_nom').value);
+  if (!list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.innerHTML = `<div style="padding:7px 12px;font-size:12px;color:#9db4d8;border-bottom:1px solid #2d4a7a">Déjà contrôlé · toucher pour reprendre l'identité</div>` + list.map(({f,n})=>`<button type="button" data-idsrc="${f.id}" style="display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #22355a;background:none;color:#e6eefc;padding:10px 12px;font-size:15px">
+    <b>${esc((f.nom||'').toUpperCase())}</b> ${esc(f.prenom||'')}${f.dateNaissance ? ` <span style="color:#9cc0ff">· né(e) le ${esc(f.dateNaissance)}</span>` : ''}
+    <br><small style="color:#9db4d8">${esc(f.type||'CI')} du ${esc(fmtDT(f.dateHeure))}${f.status==='archived'?' · archivé':''}${n>1?` · ${n} contrôles`:''}${f.lieuNaissance?` · ${esc(f.lieuNaissance)}`:''}</small></button>`).join('');
+  box.classList.remove('hidden');
+}
+function idInherit(src){
+  if (!EDIT || !src) return;
+  for (const k of ID_FIELDS) if (src[k]) $('#f_'+k).value = src[k];
+  if (src.docMode) setSeg('docSeg', src.docMode);
+  if (src.signa) { $('#f_signa').checked = true; $('#f_signaAn').value = src.signaAn || ''; syncSigna(); }
+  syncDocPays(); syncAge(); $('#idSug').classList.add('hidden');
+  toast(`Identité reprise du ${src.type||'CI'} du ${fmtD(new Date(src.dateHeure||src.createdAt||Date.now()))}`); draftSoon();
+}
+$('#f_nom').addEventListener('input', idSugShow);
+$('#f_nom').addEventListener('focus', idSugShow);
+$('#f_nom').addEventListener('blur', ()=>setTimeout(()=>$('#idSug').classList.add('hidden'), 250));
+$('#idSug').addEventListener('pointerdown', e=>e.preventDefault());
+$('#idSug').addEventListener('click', e=>{ const b = e.target.closest('[data-idsrc]'); if (b) idInherit(FICHES.find(x=>x.id===b.dataset.idsrc)); });
+$('#formSave').addEventListener('click', ()=>$('#idSug').classList.add('hidden'), true);
+$('#formCancel').addEventListener('click', ()=>$('#idSug').classList.add('hidden'), true);
+
 /* ---------- Libellés « e-mail » et journal des modifications (réglages) ---------- */
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['4.6', ['Personne déjà contrôlée (CI ou CIF, archivé ou non) : en tapant le nom, une liste propose nom, prénom et date de naissance, un appui reprend toute l\'identité et la pièce d\'identité']],
   ['4.5', ['Envoi rapide par e-mail : ouvre l\'appli e-mail par défaut du téléphone (Mail, Outlook, Gmail…)', 'Journal des modifications dans les réglages']],
   ['4.4', ['Accident / Acc. travail en boutons côte à côte', 'Mémo photos en grille, garanties de représentation en vert / rouge']],
   ['4.3', ['Bloc « Accident du travail » : chaussures, gants, casque (porté / non porté), hauteur de chute, circonstances, nature des blessures']],
