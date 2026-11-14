@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.8';
+const APP_VERSION = '4.9';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,7 +12,7 @@ const resColor = f => RES_COLORS[effRes(f)] || '#cfcfcf';
 const vehTypes = f => { const t=[...new Set((f.vehicules||[]).map(v=>v.type||'Autre'))]; return t.length ? t : ['Piéton']; };
 const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${VICON[t]||VICON.Autre}</span>`).join('');
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
-const FIELDS = ['dateHeure','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures','ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
+const FIELDS = ['dateHeure','sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures','ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
 const AT_FIELDS = ['atCirconstances','atHauteur','atBlessures'];
 const AT_EPI = [['atChaussures','Chaussures de sécurité','Chaussures'],['atGants','Gants de sécurité','Gants'],['atCasque','Casque','Casque']];
 const CEEA_BADGE = '<span class="badge acc" style="background:#1f5fa8;color:#fff">CEEA</span>';
@@ -381,7 +381,7 @@ async function openDetail(f){
       [['Marque',v.marque],['Modèle',v.modele],['Couleur',v.couleur],['Propriétaire',v.proprio]],
       v.plaque ? plateHTML(v) : '')).join('');
   const tel = f.telephone ? `<a href="tel:${esc(f.telephone.replace(/[^\d+]/g,''))}">${esc(f.telephone)}</a>` : '';
-  const ident = panel('Identité', [['Date de naissance',f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans)` : f.dateNaissance)],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
+  const ident = panel('Identité', [['Sexe', f.sexe==='H'?'Homme':f.sexe==='F'?'Femme':''],['Date de naissance',f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans)` : f.dateNaissance)],['Lieu de naissance',f.lieuNaissance],['Nationalité',f.nationalite],['Profession',f.profession], ...(cif ? [['Téléphone',tel,true]] : []), ['Adresse',f.adresse], ...(cif ? [['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   const doc = !cif ? '' : f.docMode==='Sur dires' ? panel('Pièce d\'identité', [['Identité établie','Sur dires']])
       : panel('Pièce d\'identité', [['Type',docLabel(f)],['Numéro',f.docNumero],['Délivré le',f.docDate],['Délivré à / par',f.docLieu]]);
   const ok = b => b ? '<span style="color:#3ccf4e">✓ photo prise</span>' : '<span style="color:#ff5a52">✗ à faire</span>';
@@ -656,7 +656,7 @@ function ficheSections(f){
   add('', [['Date & heure',fmtDT(f.dateHeure)],['Résultat', src ? `${src.resultat} (hérité du CIF du ${fmtDT(src.dateHeure)})` : (f.type==='CIF' ? f.resultat : '')],['Vérification',f.verif?'VERIF':''],['Lieu du contrôle',f.lieuControle],['Coordonnées GPS',f.geo?`${f.geo.lat.toFixed(5)}, ${f.geo.lng.toFixed(5)}`:''],['Contrôlé(e) avec',groupMates(f).map(ficheName).join(', ')]]);
   const addVeh = () => (f.vehicules||[]).forEach((v,i)=>add(`Véhicule ${i+1}${v.type?` — ${v.type}`:''}`, VEH_FIELDS.map(([k,l])=>[l, k==='plaque' && v.plaque ? `${v.plaque} (${v.pays||'F'} — ${PAYS_NAME[v.pays||'F']||''})` : v[k]])));
   if (!cif) addVeh(); // CI : le véhicule passe en premier
-  add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Date de naissance',f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans${isMinor(f)?' — MINEUR':''})` : f.dateNaissance)],['Lieu de naissance',f.lieuNaissance],
+  add('Identité', [['Nom',(f.nom||'').toUpperCase()],['Prénom',f.prenom],['Sexe', f.sexe==='H'?'Homme':f.sexe==='F'?'Femme':''],['Date de naissance',f.dateNaissance && (ageOf(f)!==null ? `${f.dateNaissance} (${ageOf(f)} ans${isMinor(f)?' — MINEUR':''})` : f.dateNaissance)],['Lieu de naissance',f.lieuNaissance],
     ['Nationalité',f.nationalite],['Profession',f.profession],['Adresse',f.adresse], ...(cif ? [['Téléphone',f.telephone],['Filiation',f.filiation],['Signalisation',signaLabel(f)]] : [])]);
   if (f.accident) add('Accident', [['Kilométrage du véhicule',kmTxt(f.kilometrage)],['Employeur',f.employeur],['Situation familiale',f.sitFam],['E-mail',f.email],['Nombre d\'enfants',f.nbEnfants],['Dont à charge',f.nbCharge],
     ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k]?'oui':'non') : f[k]?'photographié(e)':'non photographié(e)'])]);
@@ -1233,7 +1233,7 @@ $('#ipmBlock').addEventListener('click', e=>{
 paintTiles();
 
 /* ---------- Personne déjà connue : suggestions sur le nom, reprise de l'identité ---------- */
-const ID_FIELDS = ['nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','filiation','docType','docPays','docNumero','docDate','docLieu','sitFam','email','nbEnfants','nbCharge','employeur'];
+const ID_FIELDS = ['sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','filiation','docType','docPays','docNumero','docDate','docLieu','sitFam','email','nbEnfants','nbCharge','employeur'];
 $('#f_nom').insertAdjacentHTML('afterend', `<div id="idSug" class="hidden" style="margin-top:6px;border:1px solid #2d4a7a;border-radius:12px;background:#16233a;overflow:hidden"></div>`);
 function idMatches(q){
   const n = norm(q); if (n.length < 2) return [];
@@ -1278,10 +1278,102 @@ $('#idSug').addEventListener('click', e=>{ const b = e.target.closest('[data-ids
 $('#formSave').addEventListener('click', ()=>$('#idSug').classList.add('hidden'), true);
 $('#formCancel').addEventListener('click', ()=>$('#idSug').classList.add('hidden'), true);
 
+/* ---------- Adresse : rue + ville avec code postal (toutes les communes de France + Monaco) ----------
+   La liste publique des communes (Etalab) est téléchargée une seule fois puis gardée sur le téléphone :
+   la recherche se fait hors ligne, aucune donnée de fiche n'est envoyée. */
+const COMMUNES_URLS = ['https://cdn.jsdelivr.net/npm/@etalab/decoupage-administratif@6.0.0/data/communes.json',
+                       'https://unpkg.com/@etalab/decoupage-administratif@6.0.0/data/communes.json'];
+let CITIES = null, citiesLoading = null;
+function cityIndex(txt){
+  const names = [], cps = [], nk = [];
+  for (const l of txt.split('\n')) { const i = l.indexOf(';'); if (i < 0) continue; const n = l.slice(0,i); names.push(n); cps.push(l.slice(i+1)); nk.push(' ' + norm(n).replace(/[-'’]/g,' ')); }
+  return {names, cps, nk};
+}
+function compactCommunes(d){
+  const rows = [], seen = new Set();
+  const add = (n, cp, pop) => { const k = n + ';' + cp; if (!seen.has(k)) { seen.add(k); rows.push([pop, k]); } };
+  for (const x of d) if (x.type === 'commune-actuelle') for (const cp of (x.codesPostaux||[])) add(x.nom, cp, x.population||0);
+  for (const x of d) if (x.type === 'commune-deleguee' || x.type === 'commune-associee') for (const cp of (x.codesPostaux||[])) add(x.nom, cp, (x.population||0)/4);
+  rows.sort((a,b)=>b[0]-a[0]);
+  return ['Monaco;98000','Monte-Carlo;98000', ...rows.map(r=>r[1])].join('\n');
+}
+function loadCities(){
+  if (CITIES) return Promise.resolve(CITIES);
+  if (citiesLoading) return citiesLoading;
+  citiesLoading = (async ()=>{
+    let txt = await dbGet('meta','communes').catch(()=>null);
+    if (!txt) {
+      for (const u of COMMUNES_URLS) { try { const r = await fetch(u); if (r.ok) { txt = compactCommunes(await r.json()); break; } } catch {} }
+      if (!txt) throw new Error('offline');
+      await dbPut('meta', txt, 'communes').catch(()=>{});
+    }
+    return CITIES = cityIndex(txt);
+  })().catch(e=>{ citiesLoading = null; throw e; });
+  return citiesLoading;
+}
+(()=>{
+  const a = $('#f_adresse'); a.type = 'hidden';
+  $('label[for=f_adresse]').setAttribute('for', 'f_adrRue');
+  a.insertAdjacentHTML('afterend', `<input id="f_adrRue" autocomplete="off" spellcheck="false" placeholder="N° et rue">
+    <div style="position:relative;margin-top:8px"><input id="f_adrVille" autocomplete="off" spellcheck="false" placeholder="Ville ou code postal (ex. Roqu…, 06190)"></div>
+    <input id="f_adrPays" data-sg="paysAdr" autocomplete="off" spellcheck="false" placeholder="Pays" style="margin-top:8px">
+    <div id="adrHint" style="font-size:12px;color:var(--muted);margin-top:4px"></div>`);
+})();
+function adrJoin(){ const ville = $('#f_adrVille').value.trim(), pays = $('#f_adrPays').value.trim();
+  $('#f_adresse').value = [$('#f_adrRue').value.trim(), ville, pays && norm(ville).includes(norm(pays)) ? '' : pays].filter(Boolean).join(', '); }
+function adrSplit(){
+  const v = $('#f_adresse').value.trim(), parts = v.split(/,\s*/), j = parts.findIndex(x=>/^\d{5}\s/.test(x));
+  $('#f_adrRue').value = j < 0 ? v : parts.slice(0,j).join(', ');
+  $('#f_adrVille').value = j < 0 ? '' : parts[j];
+  $('#f_adrPays').value = j < 0 ? '' : parts.slice(j+1).join(', ') || (parts[j].startsWith('98000') ? 'Monaco' : '');
+}
+SG_BASE.paysAdr = [...DOC_PAYS_TOP, ...DOC_PAYS_ALL].map(x=>x[1]).filter(n=>n!=='Autre / inconnu');
+$('#f_adrPays').addEventListener('input', adrJoin); $('#f_adrPays').addEventListener('change', adrJoin);
+/* Ville choisie dans la liste : pays rempli automatiquement (France ou Monaco) s'il est vide */
+$('#f_adrVille').addEventListener('change', e=>{ const v = e.target.value; if (/^\d{5}\s/.test(v) && !$('#f_adrPays').value.trim()) { $('#f_adrPays').value = v.startsWith('98000') ? 'Monaco' : 'France'; adrJoin(); } });
+['input','change'].forEach(ev=>{ $('#f_adrRue').addEventListener(ev, adrJoin); $('#f_adrVille').addEventListener(ev, adrJoin); });
+function villeShow(inp){
+  const raw = norm(inp.value).replace(/[-'’]/g,' ').replace(/^st /,'saint ').replace(/^ste /,'sainte ').trim();
+  if (!raw) return sgHide();
+  if (!CITIES) { $('#adrHint').textContent = 'Chargement de la liste des communes…'; loadCities().then(()=>{ $('#adrHint').textContent = ''; if (document.activeElement === inp) villeShow(inp); }).catch(()=>{ $('#adrHint').textContent = 'Liste des communes indisponible hors ligne pour l\'instant : saisie libre.'; }); return; }
+  const {names, cps, nk} = CITIES, res = [], isCp = /^\d/.test(raw), q = ' ' + raw;
+  for (let i = 0; i < names.length && res.length < 60; i++) {
+    if (isCp ? cps[i].startsWith(raw) : (nk[i].startsWith(q) || (raw.length > 2 && nk[i].includes(q)))) res.push(`${cps[i]} ${names[i]}`);
+  }
+  /* Priorité : Monaco et Alpes-Maritimes, puis début de nom, puis population */
+  const rank = v => (/^(98|06)/.test(v) ? 0 : 2) + (isCp || (' ' + norm(v.slice(6)).replace(/[-'’]/g,' ')).startsWith(q) ? 0 : 1);
+  res.sort((x,y)=>rank(x)-rank(y)); res.length = Math.min(res.length, 8);
+  if (!res.length) return sgHide();
+  sgInput = inp;
+  const r = inp.getBoundingClientRect(); sgBox.style.left = r.left+'px'; sgBox.style.width = r.width+'px';
+  const below = window.innerHeight - r.bottom;
+  if (below < 220 && r.top > below) { sgBox.style.top=''; sgBox.style.bottom = (window.innerHeight - r.top + 4)+'px'; } else { sgBox.style.bottom=''; sgBox.style.top = (r.bottom + 4)+'px'; }
+  sgBox.innerHTML = res.map(v=>`<button type="button" data-v="${esc(v)}">${esc(v)}</button>`).join('');
+  sgBox.classList.remove('hidden');
+}
+{ const _sgShow = sgShow; sgShow = inp => inp && inp.id === 'f_adrVille' ? villeShow(inp) : _sgShow(inp); }
+$('#f_adrVille').addEventListener('input', e=>villeShow(e.target));
+$('#f_adrVille').addEventListener('focus', e=>{ loadCities().catch(()=>{}); if (e.target.value) villeShow(e.target); });
+{ const _of = openForm; openForm = function(f, d){ _of(f, d); adrSplit(); }; const _ii = idInherit; idInherit = function(src){ _ii(src); adrSplit(); }; }
+/* Téléchargement en arrière-plan, une seule fois, quand l'appli est ouverte */
+setTimeout(()=>{ if (db) dbGet('meta','communes').then(t=>{ if (!t && navigator.onLine) loadCities().catch(()=>{}); }).catch(()=>{}); }, 6000);
+
+/* ---------- Sexe : Homme / Femme (accord « né » / « née » dans la main courante) ---------- */
+(()=>{
+  $('label[for=f_nom]').insertAdjacentHTML('beforebegin', `<label class="f">Sexe</label><input type="hidden" id="f_sexe">
+    <div id="sexeSeg" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button type="button" data-sx="H" style="border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:10px;padding:11px;font-size:15px;font-weight:600">♂ Homme</button>
+      <button type="button" data-sx="F" style="border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:10px;padding:11px;font-size:15px;font-weight:600">♀ Femme</button></div>`);
+})();
+function syncSexe(){ const v = $('#f_sexe').value; document.querySelectorAll('#sexeSeg [data-sx]').forEach(b=>{ const on = b.dataset.sx === v; b.style.background = on ? (v==='H' ? '#1f5fa8' : '#a3367a') : 'var(--panel)'; b.style.color = on ? '#fff' : 'var(--muted)'; b.style.borderColor = on ? 'transparent' : 'var(--line)'; }); }
+$('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-sx]'); if (!b) return; const i = $('#f_sexe'); i.value = i.value === b.dataset.sx ? '' : b.dataset.sx; syncSexe(); draftSoon(); });
+{ const _of2 = openForm; openForm = function(f, d){ _of2(f, d); syncSexe(); }; const _ii2 = idInherit; idInherit = function(src){ _ii2(src); syncSexe(); }; }
+
 /* ---------- Libellés « e-mail » et journal des modifications (réglages) ---------- */
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['4.9', ['Adresse en trois champs : rue, ville avec suggestions et code postal (toutes les communes de France + Monaco, liste gardée sur le téléphone, recherche hors ligne), pays avec suggestions', 'Bouton Homme / Femme : la main courante écrit « né » ou « née »']],
   ['4.8', ['Nouveau bouton « CEEA / CEI / CAUS » : dépistages alcool (heure, résultat, taux) et stupéfiants (heure, résultat), badge bleu, rubrique Dépistages dans la fiche et l\'envoi', 'Résultat : nouveau choix « Non contrôlé » (en jaune)', 'Nouveaux boutons « IPM » et « CEEA » : examen de comportement de la fiche A (lieu, constitution, lésions, visage, allure, attitude, regard, haleine, élocution, explications, équilibre), absorption d\'alcool et résumé']],
   ['4.7', ['Reprise d\'identité : fusionne tous les contrôles de la personne (téléphone, pièce, filiation d\'un ancien CIF repris même si le dernier contrôle est un CI)']],
   ['4.6', ['Personne déjà contrôlée (CI ou CIF, archivé ou non) : en tapant le nom, une liste propose nom, prénom et date de naissance, un appui reprend toute l\'identité et la pièce d\'identité']],
@@ -1350,7 +1442,7 @@ const isMonacoAddr = a => /monaco|monte[\s-]?carlo|98000|fontvieille|condamine|l
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
   const parts = [[nom, f.prenom].filter(Boolean).join(' ') || 'Individu non identifié'];
-  if (f.dateNaissance || f.lieuNaissance) parts.push('né(e)' + (f.dateNaissance ? ` le ${dateLettres(f.dateNaissance)}` : '') + (f.lieuNaissance ? ` à ${f.lieuNaissance}` : ''));
+  if (f.dateNaissance || f.lieuNaissance) parts.push((f.sexe==='F' ? 'née' : f.sexe==='H' ? 'né' : 'né(e)') + (f.dateNaissance ? ` le ${dateLettres(f.dateNaissance)}` : '') + (f.lieuNaissance ? ` à ${f.lieuNaissance}` : ''));
   if (cif && f.filiation) parts.push(f.filiation);
   if (f.nationalite) parts.push(`de nationalité ${f.nationalite.toLowerCase()}`);
   if (f.profession) parts.push(/^[A-ZÀ-Ý][a-zà-ÿ]/.test(f.profession) ? f.profession[0].toLowerCase() + f.profession.slice(1) : f.profession);
