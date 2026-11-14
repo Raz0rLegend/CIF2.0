@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '5.3';
+const APP_VERSION = '5.4';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1372,6 +1372,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['5.4', ['Main courante : filiation précédée de « fils de » ou « fille de » selon le bouton Homme / Femme']],
   ['5.3', ['Fiche A : rubrique « En résumé, l\'intéressé semble » retirée (formulaire, fiche et envoi)']],
   ['5.2', ['Main courante (IPM) : phrase finale « Lors du contrôle, l\'intéressé présentait tous les signes extérieurs de l\'ivresse, à savoir : une élocution pâteuse, une allure somnolente, un visage congestionné, une haleine sentant l\'alcool, les yeux voilés et des explications embrouillées », rédigée d\'après la fiche A']],
   ['5.1', ['Fiche A : « Confusions » à la place de « Contusions » (comme sur le formulaire papier)']],
@@ -1463,11 +1464,17 @@ function adrPhrase(f){
   if (isFR) return `demeurant ${[rue, ville && aVille(ville) + (cp ? ` (${cp})` : '')].filter(Boolean).join(' ')}`;
   return `demeurant ${[rue && 'au ' + rue.replace(/^au\s+/i,''), ville && aVille(ville), enPays(pays)].filter(Boolean).join(' ')}`;
 }
+/* Filiation : « fils de » / « fille de » selon le sexe (« fils d'Antoine et de Marie ») */
+function filPhrase(f){
+  const t = f.filiation.trim(); if (/^(fils|fille|enfant)\s+d/i.test(t)) return t;
+  const rest = t.replace(/^d(e\s+|')/i, ''), who = f.sexe==='F' ? 'fille' : f.sexe==='H' ? 'fils' : 'fils/fille';
+  return `${who} ${/^[aeiouyhàâéèêîïôûAEIOUYHÀÂÉÈÊÎÏÔÛ]/.test(rest) ? "d'" : 'de '}${rest}`;
+}
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
   const parts = [[nom, f.prenom].filter(Boolean).join(' ') || 'Individu non identifié'];
   if (f.dateNaissance || f.lieuNaissance) parts.push((f.sexe==='F' ? 'née' : f.sexe==='H' ? 'né' : 'né(e)') + (f.dateNaissance ? ` le ${dateLettres(f.dateNaissance)}` : '') + (f.lieuNaissance ? ` à ${f.lieuNaissance}` : ''));
-  if (cif && f.filiation) parts.push(f.filiation);
+  if (cif && f.filiation) parts.push(filPhrase(f));
   if (f.nationalite) parts.push(`de nationalité ${f.nationalite.toLowerCase()}`);
   if (f.profession) parts.push(/^[A-ZÀ-Ý][a-zà-ÿ]/.test(f.profession) ? f.profession[0].toLowerCase() + f.profession.slice(1) : f.profession);
   if (f.adresse) parts.push(adrPhrase(f));
