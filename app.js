@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.6';
+const APP_VERSION = '4.7';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1147,7 +1147,7 @@ function idMatches(q){
     if (EDIT && f.id === EDIT.f.id) continue;
     if (!norm(f.nom).startsWith(n)) continue;
     const k = [norm(f.nom), norm(f.prenom), f.dateNaissance||''].join('|');
-    const cur = seen.get(k); if (!cur || (f.dateHeure||'') > (cur.f.dateHeure||'')) seen.set(k, {f, n:(cur?.n||0)+1}); else cur.n++;
+    const cur = seen.get(k); if (!cur) seen.set(k, {f, n:1, all:[f]}); else { cur.n++; cur.all.push(f); if ((f.dateHeure||'') > (cur.f.dateHeure||'')) cur.f = f; }
   }
   return [...seen.values()].sort((a,b)=>(b.f.dateHeure||'').localeCompare(a.f.dateHeure||'')).slice(0,6);
 }
@@ -1161,11 +1161,19 @@ function idSugShow(){
 }
 function idInherit(src){
   if (!EDIT || !src) return;
-  for (const k of ID_FIELDS) if (src[k]) $('#f_'+k).value = src[k];
-  if (src.docMode) setSeg('docSeg', src.docMode);
-  if (src.signa) { $('#f_signa').checked = true; $('#f_signaAn').value = src.signaAn || ''; syncSigna(); }
+  /* Fusion de tous les contrôles de la même personne (même nom, prénom, date de naissance) :
+     pour chaque champ, la valeur la plus récente renseignée (un CI récent ne masque pas le téléphone ou la pièce d'un ancien CIF) */
+  const k0 = [norm(src.nom), norm(src.prenom), src.dateNaissance||''].join('|');
+  const all = FICHES.filter(f=>f.id !== EDIT.f.id && [norm(f.nom), norm(f.prenom), f.dateNaissance||''].join('|') === k0).sort((a,b)=>(b.dateHeure||'').localeCompare(a.dateHeure||''));
+  const pick = k => all.find(f=>f[k])?.[k] || '';
+  for (const k of ID_FIELDS) { const v = pick(k); if (v) $('#f_'+k).value = v; }
+  const docSrc = all.find(f=>f.docType || f.docNumero);
+  if (docSrc) { setSeg('docSeg', 'Officiel'); for (const k of ['docType','docPays','docNumero','docDate','docLieu']) $('#f_'+k).value = docSrc[k] || ''; }
+  const sg = all.find(f=>f.signa);
+  if (sg) { $('#f_signa').checked = true; $('#f_signaAn').value = sg.signaAn || ''; syncSigna(); }
+  if ((pick('telephone') || docSrc || pick('filiation')) && segVal('typeSeg') === 'CI') toast('Astuce : passe en CIF pour garder téléphone, filiation et pièce d\'identité');
   syncDocPays(); syncAge(); $('#idSug').classList.add('hidden');
-  toast(`Identité reprise du ${src.type||'CI'} du ${fmtD(new Date(src.dateHeure||src.createdAt||Date.now()))}`); draftSoon();
+  if (!((pick('telephone') || docSrc || pick('filiation')) && segVal('typeSeg') === 'CI')) toast(`Identité reprise (${all.length} contrôle${all.length>1?'s':''})`); draftSoon();
 }
 $('#f_nom').addEventListener('input', idSugShow);
 $('#f_nom').addEventListener('focus', idSugShow);
@@ -1179,6 +1187,7 @@ $('#formCancel').addEventListener('click', ()=>$('#idSug').classList.add('hidden
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['4.7', ['Reprise d\'identité : fusionne tous les contrôles de la personne (téléphone, pièce, filiation d\'un ancien CIF repris même si le dernier contrôle est un CI)']],
   ['4.6', ['Personne déjà contrôlée (CI ou CIF, archivé ou non) : en tapant le nom, une liste propose nom, prénom et date de naissance, un appui reprend toute l\'identité et la pièce d\'identité']],
   ['4.5', ['Envoi rapide par e-mail : ouvre l\'appli e-mail par défaut du téléphone (Mail, Outlook, Gmail…)', 'Journal des modifications dans les réglages']],
   ['4.4', ['Accident / Acc. travail en boutons côte à côte', 'Mémo photos en grille, garanties de représentation en vert / rouge']],
