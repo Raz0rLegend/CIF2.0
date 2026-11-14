@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '5.2';
+const APP_VERSION = '5.3';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -30,8 +30,7 @@ const IPM_GROUPS = [
   ['haleine','Odeur de l\'haleine',['Sentant l\'alcool','Indéterminée'],true,'Aspects particuliers'],
   ['elocution','Élocution',['Normale','Pâteuse','Bégayante','Ne parle pas'],false,'Aspects particuliers'],
   ['explications','Explications',['Nettes','Embrouillées','Incohérentes','Répétitives','Ne parle pas'],false,'Aspects particuliers'],
-  ['equilibre','Équilibre',['Tient debout','Titube'],true,'Aspects particuliers'],
-  ['resume','En résumé, l\'intéressé semble',['Ne pas être sous l\'influence de l\'alcool','Être sous l\'empire d\'un état alcoolique léger','Être sous l\'empire d\'un état alcoolique important','Être en état d\'ivresse'],true,'Conclusion']
+  ['equilibre','Équilibre',['Tient debout','Titube'],true,'Aspects particuliers']
 ];
 const IPM_BADGE = '<span class="badge acc" style="background:#0f766e;color:#fff">IPM</span>';
 const ipmVal = (f,k) => (f.ipmSel?.[k]||[]).map(x=>x==='Contusions'?'Confusions':x).join(', ');
@@ -391,8 +390,7 @@ async function openDetail(f){
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
   const atp = !f.at ? '' : panel('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiHTML(f[k]), true]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
   const ipmp = !(f.ipm||f.ceea) ? '' : panel('Examen de comportement (fiche A)', [['Heure de l\'examen',f.ipmHeure], ...IPM_GROUPS.filter(g=>g[0]!=='resume').map(([k,l])=>[l, ipmVal(f,k)]),
-      ['Alcool (3 h) — aveu de la personne',f.ipmAveu],['Alcool (3 h) — aveu des témoins',f.ipmTemoins],['Dernière absorption d\'alcool',f.ipmDerniere],
-      ['En résumé, l\'intéressé semble', ipmVal(f,'resume') ? `<b style="color:#5eead4">${esc(ipmVal(f,'resume'))}</b>` : '', true]]);
+      ['Alcool (3 h) — aveu de la personne',f.ipmAveu],['Alcool (3 h) — aveu des témoins',f.ipmTemoins],['Dernière absorption d\'alcool',f.ipmDerniere]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
   const photos = n ? `<section class="panel"><h4><span>Photos</span><span>${n}</span></h4><div class="photos" style="padding:10px">${f.photos.map(id=>`<div class="ph" data-id="${id}"><img alt=""></div>`).join('')}</div></section>` : '';
   const recu = f.recu ? `<p class="hint" style="margin-top:16px;color:var(--muted);font-size:13px">Reçue par QR code le ${fmtD(f.recu)}</p>` : '';
@@ -1201,7 +1199,6 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   let sec = '';
   const groups = IPM_GROUPS.map(([k,l,opts,one,s])=>{ const h = s && s!==sec ? `<div class="sect" style="margin-top:18px">${esc(s)}</div>` : ''; sec = s || sec;
     return `${h}<div class="ig${k==='resume'?' res':''}"><b>${esc(l)}${one?'':' <small style="font-weight:400">(plusieurs choix possibles)</small>'}</b><div class="ich" data-g="${k}">${opts.map(o=>`<button type="button" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`; });
-  const resume = groups.pop();
   $('#atBlock').insertAdjacentHTML('afterend', `<div id="ipmBlock" class="accblock hidden">
     <div class="sect" style="margin-top:6px">Examen de comportement</div>
     <label class="f" for="f_ipmHeure">Heure de l'examen</label><input id="f_ipmHeure" type="time">
@@ -1211,7 +1208,6 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     <label class="f" for="f_ipmAveu">De l'aveu de la personne concernée</label><textarea id="f_ipmAveu" rows="2"></textarea>
     <label class="f" for="f_ipmTemoins">De l'aveu du ou des témoins</label><textarea id="f_ipmTemoins" rows="2"></textarea>
     <label class="f" for="f_ipmDerniere">Dernière heure d'absorption d'alcool</label><input id="f_ipmDerniere" autocomplete="off" placeholder="ex. 21h30">
-    ${resume}
   </div>`);
 })();
 function syncIPM(){
@@ -1376,6 +1372,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['5.3', ['Fiche A : rubrique « En résumé, l\'intéressé semble » retirée (formulaire, fiche et envoi)']],
   ['5.2', ['Main courante (IPM) : phrase finale « Lors du contrôle, l\'intéressé présentait tous les signes extérieurs de l\'ivresse, à savoir : une élocution pâteuse, une allure somnolente, un visage congestionné, une haleine sentant l\'alcool, les yeux voilés et des explications embrouillées », rédigée d\'après la fiche A']],
   ['5.1', ['Fiche A : « Confusions » à la place de « Contusions » (comme sur le formulaire papier)']],
   ['5.0', ['Main courante : adresse rédigée « résidant 5 avenue X à Monaco », « demeurant 5 avenue X à Nice (06000) » ou « demeurant au 5 via Y à Sanremo en Italie »', 'Rue, ville et pays enregistrés séparément (ville étrangère en saisie libre, sans code postal)']],
