@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '4.4';
+const APP_VERSION = '4.5';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -663,9 +663,10 @@ async function shareOut(data, fallbackText){
     catch { toast('Partage impossible sur cet appareil'); }
   }
 }
+/* Envoi rapide : ouvre l'appli e-mail par défaut de l'iPhone (Mail, Outlook, Gmail…) */
 function openOutlook(subject, body){
-  const url = `ms-outlook://compose?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  location.href = url;
+  const enc = t => encodeURIComponent(String(t).replace(/\r?\n/g, '\r\n'));
+  location.href = `mailto:?subject=${enc(subject)}&body=${enc(body)}`;
 }
 const shareFiche = f => shareFiches([f]);
 async function shareFiches(list){
@@ -673,8 +674,8 @@ async function shareFiches(list){
   const n = list.reduce((a,f)=>a+(f.photos||[]).length, 0);
   const choice = await new Promise(res=>{
     const m = $('#shareSheet'); m.classList.remove('hidden');
-    $('#shOutlookHint').textContent = 'Texte seul, tu saisis le destinataire' + (n ? ' (sans les photos)' : '');
-    $('#shShareHint').textContent = n ? `Texte + ${n} photo(s), choisis Outlook dans la liste` : 'Outlook, Mail, AirDrop…';
+    $('#shOutlookHint').textContent = 'Texte seul, dans ton appli e-mail par défaut' + (n ? ' (sans les photos)' : '');
+    $('#shShareHint').textContent = n ? `Texte + ${n} photo(s), choisis ton appli e-mail dans la liste` : 'Mail, Outlook, Gmail, AirDrop…';
     m.onclick = e=>{ const b=e.target.closest('[data-sh]'); if (!b && e.target!==m) return; m.classList.add('hidden'); m.onclick=null; res(b?.dataset.sh); };
   });
   if (!choice || choice === 'cancel') return;
@@ -1135,6 +1136,27 @@ function paintTiles(){
 document.addEventListener('change', e=>{ if (e.target.closest?.('#accGrid, .memo')) paintTiles(); });
 { const _sa = syncAcc; syncAcc = function(){ _sa(); paintTiles(); }; const _st = syncAT; syncAT = function(){ _st(); paintTiles(); }; }
 paintTiles();
+
+/* ---------- Libellés « e-mail » et journal des modifications (réglages) ---------- */
+(()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
+  $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
+const CHANGELOG = [
+  ['4.5', ['Envoi rapide par e-mail : ouvre l\'appli e-mail par défaut du téléphone (Mail, Outlook, Gmail…)', 'Journal des modifications dans les réglages']],
+  ['4.4', ['Accident / Acc. travail en boutons côte à côte', 'Mémo photos en grille, garanties de représentation en vert / rouge']],
+  ['4.3', ['Bloc « Accident du travail » : chaussures, gants, casque (porté / non porté), hauteur de chute, circonstances, nature des blessures']],
+  ['4.2', ['Garanties de représentation : simple oui / non (vert / rouge)']],
+  ['4.1', ['Accident : champ Employeur et case Garanties de représentation']],
+  ['4.0', ['Main courante : « FR », « IT », « UK »… donne « par les autorités françaises / italiennes… », Monaco donne « par nos autorités »']],
+  ['3.9', ['Âge calculé à la date du contrôle, alerte MINEUR']],
+  ['3.8', ['Accident : kilométrage du véhicule']],
+  ['3.7', ['Main courante : « pref 06 » donne « par la préfecture des Alpes-Maritimes »']],
+  ['3.6', ['Main courante : pièce d\'identité écrite en toutes lettres']],
+  ['3.5', ['Lecture de plaque en direct retirée']]
+];
+(()=>{ $('#versionInfo').insertAdjacentHTML('afterend', `<details id="changelog" style="margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--panel)">
+  <summary style="font-weight:600;cursor:pointer">Nouveautés (changelog)</summary>
+  ${CHANGELOG.map(([v,items],i)=>`<div style="margin-top:10px"><b style="color:${i?'inherit':'#7fb3ff'}">v${v}</b>${i?'':' <small style="color:var(--muted)">(actuelle)</small>'}<ul style="margin:4px 0 0;padding-left:18px;font-size:14px;color:var(--muted);line-height:1.4">${items.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`).join('')}
+</details>`); })();
 
 /* ---------- Envoi au format « main courante » ---------- */
 const MC_RES = {
