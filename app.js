@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0.4';
+const APP_VERSION = '1.0.5';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1088,12 +1088,24 @@ async function reverseGeo(lat, lng){
     const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=fr`, {signal:ctl.signal});
     if (!r.ok) return '';
     const a = (await r.json()).address || {};
+    if (a.country_code && a.country_code !== 'mc') { const e = nearestEntry(lat, lng); geoNote = ` — position en France, ramenée à l'${e.n[0].toLowerCase() + e.n.slice(1)}`; return e.n; }
     const street = [a.house_number, a.road || a.pedestrian || a.footway || a.square || a.place].filter(Boolean).join(' ');
     const area = a.suburb || a.quarter || a.neighbourhood || a.city_district || '';
     const city = a.city || a.town || a.village || a.municipality || '';
     return [street, area, city].filter((x,i,arr)=>x && arr.indexOf(x)===i).join(', ');
   } catch { return ''; } finally { clearTimeout(t); }
 }
+/* Lieux connus (rayon en mètres) et entrées de ville de Monaco */
+const GEO_PLACES = [
+  {n:'Entrée de ville Saint-Roman', lat:43.7515236, lng:7.4378675, r:50, entry:true},
+  {n:'Entrée de ville Jardin Exotique', lat:43.7317343, lng:7.4135701, r:50, entry:true},
+  {n:'Entrée de ville Wurtemberg', lat:43.7288362, lng:7.4124804, r:50, entry:true},
+  {n:'Les Poivriers', lat:43.7379667, lng:7.4268282, r:15}
+];
+const geoDist = (a1, o1, a2, o2) => { const R = 6371000, rad = Math.PI/180, dA = (a2-a1)*rad, dO = (o2-o1)*rad; const h = Math.sin(dA/2)**2 + Math.cos(a1*rad)*Math.cos(a2*rad)*Math.sin(dO/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
+const namedPlace = (lat, lng) => GEO_PLACES.map(p=>({p, d:geoDist(lat, lng, p.lat, p.lng)})).filter(x=>x.d <= x.p.r).sort((a,b)=>a.d-b.d)[0]?.p || null;
+const nearestEntry = (lat, lng) => GEO_PLACES.filter(p=>p.entry).sort((a,b)=>geoDist(lat,lng,a.lat,a.lng)-geoDist(lat,lng,b.lat,b.lng))[0];
+let geoNote = '';
 let geoBusy = false;
 async function geoFill(auto){
   if (!EDIT || geoBusy) return;
@@ -1104,11 +1116,12 @@ async function geoFill(auto){
     if (!EDIT || EDIT.f.id !== id) return;
     const lat = +pos.coords.latitude.toFixed(6), lng = +pos.coords.longitude.toFixed(6);
     EDIT.f.geo = {lat, lng, acc:Math.round(pos.coords.accuracy||0)};
-    let label = SETTINGS.geoMode === 'gps' ? '' : await reverseGeo(lat, lng);
+    geoNote = ''; const known = namedPlace(lat, lng);
+    let label = known ? known.n : SETTINGS.geoMode === 'gps' ? '' : await reverseGeo(lat, lng);
     if (!EDIT || EDIT.f.id !== id) return;
     const inp = $('#f_lieuControle');
     if (!inp.value.trim() || !auto) inp.value = label || `GPS ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    hint.textContent = `📍 Position enregistrée (précision ± ${EDIT.f.geo.acc} m)` + (label || SETTINGS.geoMode === 'gps' ? '' : ' — adresse introuvable, coordonnées notées');
+    hint.textContent = `📍 Position enregistrée (précision ± ${EDIT.f.geo.acc} m)` + (known ? ' — lieu connu' : geoNote) + (label || SETTINGS.geoMode === 'gps' ? '' : ' — adresse introuvable, coordonnées notées');
   } catch (e) {
     hint.textContent = e && e.code === 1 ? '📍 Localisation refusée : autorise-la dans Réglages iPhone › Confidentialité › Service de localisation › Safari' : (auto ? '' : '📍 Position introuvable, réessaie');
   } finally { geoBusy = false; }
@@ -1379,6 +1392,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.0.5', ['Localisation : lieux connus reconnus automatiquement (entrées de ville Saint-Roman, Jardin Exotique et Wurtemberg dans un rayon de 50 m, Les Poivriers dans un rayon de 15 m)', 'Position détectée en France : le lieu devient l\'entrée de ville de Monaco la plus proche']],
   ['1.0.4', ['Mineur : champ « Responsable légal » affiché automatiquement', 'Case « Sous tutelle » avec le nom du tuteur', 'Badge SDS (sans adresse ni profession) et main courante « sans profession et sans adresse »', 'VERIF : champ du capitaine de permanence et phrase de main courante (antécédents, avis à la permanence judiciaire, conduite en nos locaux)', 'Case « Antécédents judiciaires » : garde à vue, incarcération, condamnation… par année et motif, rédigés dans la main courante']],
   ['1.0.3', ['Écrans verrouillés : plus de zoom (pincement, double tap, zoom automatique sur un champ) ni de glissement de la page vers la gauche ou la droite, le défilement reste vertical', 'Zoom conservé uniquement sur les photos ouvertes en plein écran (fiche et feuille de service)', 'Numérotation des versions : petites mises à jour en 1.0.x']],
   ['1.0.2', ['Service du jour déplacé sur l\'écran de déverrouillage : photo de la feuille dans un carré à gauche, missions du jour à droite (3 affichées, celle en cours mise en avant)', 'Bouton « Modifier » : photo, missions, DPU / SPG (effacé à minuit) ou DPU / SN (effacé à midi)']],
