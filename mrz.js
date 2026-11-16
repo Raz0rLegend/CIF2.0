@@ -7,7 +7,8 @@
     tess:   ['https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js', 'https://unpkg.com/tesseract.js@5.1.1/dist/tesseract.min.js'],
     worker: ['https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js', 'https://unpkg.com/tesseract.js@5.1.1/dist/worker.min.js'],
     core:   ['https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/tesseract-core-lstm.wasm.js', 'https://unpkg.com/tesseract.js-core@5.1.1/tesseract-core-lstm.wasm.js'],
-    lang:   ['https://cdn.jsdelivr.net/gh/DoubangoTelecom/tesseractMRZ@master/tessdata_fast/mrz.traineddata', 'https://raw.githubusercontent.com/DoubangoTelecom/tesseractMRZ/master/tessdata_fast/mrz.traineddata']
+    lang:   ['https://cdn.jsdelivr.net/gh/DoubangoTelecom/tesseractMRZ@master/tessdata_fast/mrz.traineddata', 'https://raw.githubusercontent.com/DoubangoTelecom/tesseractMRZ/master/tessdata_fast/mrz.traineddata'],
+    fra:    ['https://cdn.jsdelivr.net/npm/@tesseract.js-data/fra@1.0.0/4.0.0_best_int/fra.traineddata.gz', 'https://unpkg.com/@tesseract.js-data/fra@1.0.0/4.0.0_best_int/fra.traineddata.gz']
   };
   const LIBV = 1;
   let worker = null, loading = null;
@@ -18,11 +19,11 @@
   }
   const blobURL = (data, type='text/javascript') => URL.createObjectURL(new Blob([data], {type}));
   /* Le modèle de lecture est déposé là où le moteur le cherche (sa propre petite base locale), sans aucun accès réseau */
-  const seed = data => new Promise((res,rej)=>{
+  const seed = (data, name='mrz') => new Promise((res,rej)=>{
     const rq = indexedDB.open('keyval-store');
     rq.onupgradeneeded = ()=>rq.result.createObjectStore('keyval');
     rq.onerror = ()=>rej(rq.error);
-    rq.onsuccess = ()=>{ const d = rq.result, tx = d.transaction('keyval','readwrite'); tx.objectStore('keyval').put(data, './mrz.traineddata'); tx.oncomplete = ()=>{ d.close(); res(); }; tx.onerror = ()=>{ d.close(); rej(tx.error); }; };
+    rq.onsuccess = ()=>{ const d = rq.result, tx = d.transaction('keyval','readwrite'); tx.objectStore('keyval').put(data, `./${name}.traineddata`); tx.oncomplete = ()=>{ d.close(); res(); }; tx.onerror = ()=>{ d.close(); rej(tx.error); }; };
   });
   function getWorker(){
     if (worker) return Promise.resolve(worker);
@@ -40,6 +41,21 @@
       await w.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<', tessedit_pageseg_mode:'6'});
       return worker = w;
     })().catch(e=>{ loading = null; throw e; });
+  }
+  /* Lecture du texte imprimé (champs numérotés du permis) : modèle français, ≈ 0,7 Mo, téléchargé une fois */
+  let fraW = null, fraLoading = null;
+  function getFra(){
+    if (fraW) return Promise.resolve(fraW);
+    return fraLoading ||= (async ()=>{
+      await getWorker();
+      let d = await dbGet('meta','ocrfra').catch(()=>null);
+      if (!d) { status('Premier usage : téléchargement de la lecture du permis (≈ 0,7 Mo)…'); d = await grab(SRC.fra, true); await dbPut('meta', d, 'ocrfra').catch(()=>{}); }
+      const lib = await dbGet('meta','mrzlib');
+      await seed(new Uint8Array(d), 'fra');
+      const w = await Tesseract.createWorker('fra', 1, {workerPath:blobURL(lib.worker), corePath:blobURL(lib.core) + '#core.js', workerBlobURL:false, cacheMethod:'readOnly', gzip:false, langPath:'.'});
+      await w.setParameters({tessedit_pageseg_mode:'6'});
+      return fraW = w;
+    })().catch(e=>{ fraLoading = null; throw e; });
   }
 
   /* ----- Analyse de la bande ----- */
@@ -92,16 +108,68 @@
   const iso2 = c => ISO3[String(c||'').replace(/</g,'')] || '';
   window.mrzParse = parse;
 
+  /* ----- Permis de conduire européen : champs numérotés (directive 2006/126/CE, identiques dans toute l'UE) -----
+     1 nom · 2 prénom · 3 date et lieu de naissance · 4a délivrance · 4b expiration · 4c autorité · 5 numéro */
+  const DFIX = {O:'0',o:'0',Q:'0',D:'0',I:'1',l:'1','|':'1','!':'1',Z:'2',z:'2',S:'5',B:'8',G:'6',C:'0',c:'0',e:'6'};
+  function dateIn(t){
+    const m = /([0-9OoQDIl|!ZzSBGCc]{2})\s?[.\/,;:-]?\s?([0-9OoQDIl|!ZzSBGCc]{2})\s?[.\/,;:-]?\s?([0-9OoQDIl|!ZzSBGCce]{4}|[0-9OoQDIl|!ZzSBGCce]{2})(?![0-9])/.exec(t);
+    if (!m) return null;
+    const f = x => [...x].map(c=>DFIX[c]||c).join(''), dd = +f(m[1]), mm = +f(m[2]); let y = f(m[3]);
+    if (!/^\d+$/.test(y) || !(dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12)) return null;
+    if (y.length === 2) y = String((+y > new Date().getFullYear() % 100 ? 1900 : 2000) + +y);
+    if (+y < 1900 || +y > new Date().getFullYear() + 20) return null;
+    return {v:`${String(dd).padStart(2,'0')}/${String(mm).padStart(2,'0')}/${y}`, end:m.index + m[0].length};
+  }
+  const word = t => t.replace(/[^A-Za-zÀ-ÿ' -]/g,' ').replace(/\s+/g,' ').trim();
+  function permisFields(text){
+    const F = {};
+    for (const raw of text.split(/\n/)) {
+      const m = /^[^A-Za-z0-9]{0,4}(4\s?[aAbBcCdD]|[1-5lIz|])\s?[.,:;]?\s+(.+)$/.exec(raw.trim()); if (!m) continue;
+      let k = m[1].replace(/\s/g,'').toLowerCase().replace(/^[li|]$/,'1').replace(/^z$/,'2'); const v = m[2].trim();
+      if (F[k]) continue;
+      if (k === '1' || k === '2') { const w = word(v).split(' ').filter(x=>x.length > 1 || /[A-Z]/.test(x)).join(' '); if (w.replace(/[^A-Za-zÀ-ÿ]/g,'').length >= 2) F[k] = k === '1' ? w.toUpperCase() : cap(w); }
+      else if (k === '3') { const d = dateIn(v); if (d) { F.dn = d.v; let r2 = v.slice(d.end).trim(); const pm = /^\(([^)]*)\)?/.exec(r2); r2 = pm ? pm[1] : r2.replace(/\([^)]*\)\s*$/,''); const lieu = word(r2); if (lieu.length >= 2) F.lieu = cap(lieu); } }
+      else if (k === '4a') { const d = dateIn(v); if (d) F.del = d.v; }
+      else if (k === '4c') { const w = v.replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim(); if (w.length >= 3) F.aut = w; }
+      else if (k === '5') { const n = v.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); if (n.length >= 5 && n.length <= 16) F.num = n; }
+    }
+    return F;
+  }
+  window.permisFields = permisFields;
+  async function readPermis(file){
+    const w = await getFra(); status('Lecture des champs du permis…');
+    const c = clean(await toCanvas(file, 2400, ''));
+    let best = {};
+    for (const psm of ['6','4']) {
+      await w.setParameters({tessedit_pageseg_mode:psm});
+      const F = permisFields((await w.recognize(c)).data.text || '');
+      for (const k in F) if (!best[k]) best[k] = F[k];
+      if (best[2] && best.dn && best.lieu && best.del && best[1]) break;
+    }
+    return best;
+  }
+
   /* ----- Image ----- */
-  async function toCanvas(file, max=2000){
+  async function toCanvas(file, max=2000, filter='grayscale(1) contrast(1.4)'){
     const url = URL.createObjectURL(file);
     try {
       const img = await new Promise((res,rej)=>{ const i = new Image(); i.onload = ()=>res(i); i.onerror = rej; i.src = url; });
       const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
       const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth*s); c.height = Math.round(img.naturalHeight*s);
-      const g = c.getContext('2d'); g.filter = 'grayscale(1) contrast(1.4)'; g.drawImage(img, 0, 0, c.width, c.height);
+      const g = c.getContext('2d'); if (filter) g.filter = filter; g.drawImage(img, 0, 0, c.width, c.height);
       return c;
     } finally { URL.revokeObjectURL(url); }
+  }
+  /* Fond rose de sécurité effacé : on garde le canal le plus sombre, contraste étiré, image agrandie si petite */
+  function clean(c){
+    const k = c.width < 1600 ? 2 : 1, o = document.createElement('canvas'); o.width = c.width*k; o.height = c.height*k;
+    const g = o.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height);
+    const im = g.getImageData(0, 0, o.width, o.height), d = im.data, h = new Uint32Array(256), n = d.length/4;
+    for (let i = 0; i < d.length; i += 4) h[Math.min(d[i], d[i+1], d[i+2])]++;
+    const pct = q => { let a = 0; for (let v = 0; v < 256; v++) { a += h[v]; if (a >= n*q) return v; } return 255; };
+    const lo = pct(.02), hi = Math.max(lo + 1, pct(.6));
+    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, (Math.min(d[i], d[i+1], d[i+2]) - lo) * 255 / (hi - lo))); d[i] = d[i+1] = d[i+2] = v; }
+    g.putImageData(im, 0, 0); return o;
   }
   function crop(c, y0, y1){ const o = document.createElement('canvas'); o.width = c.width; o.height = Math.round(c.height*(y1-y0)); o.getContext('2d').drawImage(c, 0, c.height*y0, c.width, o.height, 0, 0, o.width, o.height); return o; }
 
@@ -119,6 +187,20 @@
     $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
     draftSoon();
   }
+  const mark = id => { const el = $('#'+id); if (!el) return; el.style.outline = '2px solid #f39c34'; el.style.outlineOffset = '-1px'; el.dataset.chk = '1'; };
+  document.addEventListener('input', e=>{ if (e.target.dataset?.chk) { e.target.style.outline = ''; delete e.target.dataset.chk; } });
+  function fillPermis(r, F){
+    const got = [];
+    const put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
+    if (F[1] && (!r.nom || F[1].replace(/\s/g,'').startsWith(r.nom.replace(/\s/g,'')))) { if (!r.nom || F[1].length > r.nom.length) put('f_nom', F[1], 'nom'); }
+    put('f_prenom', F[2], 'prénom'); put('f_dateNaissance', F.dn, 'date de naissance');
+    if (F.lieu && $('#f_naisVille')) { $('#f_naisVille').value = F.lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); got.push('lieu de naissance'); }
+    put('f_docDate', F.del, 'date de délivrance'); put('f_docLieu', F.aut, 'autorité');
+    if (!r.num && F.num) put('f_docNumero', F.num, 'numéro');
+    setSeg('docSeg', 'Officiel'); if (!$('#f_docType').value) $('#f_docType').value = 'PC';
+    syncAge(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true})); draftSoon();
+    return got;
+  }
   const KIND = {PS:'passeport', CNI:'carte d\'identité', TS:'titre de séjour', PC:'permis de conduire'};
   async function scan(file){
     if (!EDIT) return;
@@ -129,9 +211,18 @@
       const c = await toCanvas(file);
       let r = null;
       for (const part of [c, crop(c, .5, 1), crop(c, .25, .8)]) { const {data} = await w.recognize(part), x = parse(data.text || ''); if (x && x.nom && (!r || x.ok)) r = x; if (r && r.ok) break; }
-      if (!r) { status('Bande non trouvée. Cadre de près les lignes « <<< », pièce bien à plat, nette et sans reflet.'); return; }
+      if (!r || r.type === 'PC') {
+        let F = {}; try { F = await readPermis(file); } catch (e) { if (!r) throw e; }
+        const n = ['1','2','dn','5'].filter(k=>F[k] || (k === '5' && F.num)).length;
+        if (!r && n < 2) { status('Rien de lisible. Passeport : page photo · carte d\'identité ou titre de séjour : face avec les lignes « <<< » · permis : recto. Pièce à plat, nette, sans reflet, cadrée de près.'); return; }
+        if (r) fill(r);
+        const got = fillPermis(r || {}, F);
+        status(`${r && r.ok ? '✓ Permis lu (nom et numéro sûrs)' : '⚠ Permis lu sans bande : tout vérifier'}` + (got.length ? ` · à vérifier, en orange : ${got.join(', ')}` : ' · champs du permis illisibles : prénom et date de naissance à saisir'));
+        toast('Permis lu : vérifie les champs en orange');
+        return;
+      }
       fill(r);
-      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}` + (r.type === 'PC' ? ` · le permis ne donne que le numéro et le nom${r.cut ? ' (8 premières lettres, à compléter)' : ''} : prénom et date de naissance à saisir` : ''));
+      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}`);
       toast(r.ok ? 'Pièce d\'identité lue' : 'Lecture incertaine : vérifie les champs');
     } catch (e) {
       status(e && e.message === 'offline' ? 'Il faut du réseau la première fois pour télécharger le module de lecture.' : 'Lecture impossible sur cet appareil.');
@@ -143,5 +234,5 @@
     <div id="mrzInfo" style="font-size:13px;color:#9cc0ff;margin-top:6px"></div><input type="file" id="mrzFile" accept="image/*" capture="environment" hidden>`);
   $('#mrzBtn').onclick = ()=>$('#mrzFile').click();
   $('#mrzFile').onchange = e=>{ const f = e.target.files[0]; e.target.value = ''; if (f) scan(f); };
-  { const _of = openForm; openForm = function(f, d){ _of(f, d); status(''); }; }
+  { const _of = openForm; openForm = function(f, d){ _of(f, d); status(''); document.querySelectorAll('[data-chk]').forEach(el=>{ el.style.outline = ''; delete el.dataset.chk; }); }; }
 })();
