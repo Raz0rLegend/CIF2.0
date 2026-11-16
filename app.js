@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0.3';
+const APP_VERSION = '1.0.4';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1379,6 +1379,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.0.4', ['Mineur : champ « Responsable légal » affiché automatiquement', 'Case « Sous tutelle » avec le nom du tuteur', 'Badge SDS (sans adresse ni profession) et main courante « sans profession et sans adresse »', 'VERIF : champ du capitaine de permanence et phrase de main courante (antécédents, avis à la permanence judiciaire, conduite en nos locaux)', 'Case « Antécédents judiciaires » : garde à vue, incarcération, condamnation… par année et motif, rédigés dans la main courante']],
   ['1.0.3', ['Écrans verrouillés : plus de zoom (pincement, double tap, zoom automatique sur un champ) ni de glissement de la page vers la gauche ou la droite, le défilement reste vertical', 'Zoom conservé uniquement sur les photos ouvertes en plein écran (fiche et feuille de service)', 'Numérotation des versions : petites mises à jour en 1.0.x']],
   ['1.0.2', ['Service du jour déplacé sur l\'écran de déverrouillage : photo de la feuille dans un carré à gauche, missions du jour à droite (3 affichées, celle en cours mise en avant)', 'Bouton « Modifier » : photo, missions, DPU / SPG (effacé à minuit) ou DPU / SN (effacé à midi)']],
   ['1.0.1', ['Envoi d\'une fiche en image JPG, telle qu\'elle s\'affiche dans l\'appli', 'Accueil : « Service du jour » avec la photo de la feuille de service et les consignes (heure de début – heure de fin : consigne), consigne en cours mise en avant', 'Service DPU / SPG effacé automatiquement à minuit, DPU / SN à midi']],
@@ -1489,10 +1490,13 @@ function mcText(f){
   if (f.nationalite) parts.push(`de nationalité ${f.nationalite.toLowerCase()}`);
   if (f.profession) parts.push(/^[A-ZÀ-Ý][a-zà-ÿ]/.test(f.profession) ? f.profession[0].toLowerCase() + f.profession.slice(1) : f.profession);
   if (f.adresse) parts.push(adrPhrase(f));
+  if (isSDS(f)) parts.push('sans profession et sans adresse');
   let txt = parts.join(', ') + '.';
   if (cif && f.telephone) txt += ` Joignable au ${f.telephone}.`;
+  txt += mcIdExtra(f);
   if (cif && f.docMode !== 'Sur dires' && (f.docType || f.docNumero)) { const dp = docPhrase(f); txt += `\n\nIdentité relevée sur ${dp.art}${dp.txt}` + (f.docNumero ? ` nº ${f.docNumero}` : '') + (f.docDate || f.docLieu ? (dp.art ? (dp.fem ? ' délivrée' : ' délivré') : ' délivré(e)') : '') + (f.docDate ? ` le ${f.docDate}` : '') + (f.docLieu ? ` ${lieuPhrase(f.docLieu)}` : '') + '.'; }
   const r = effRes(f); if (MC_RES[r]) txt += `\n\n${MC_RES[r][0].toUpperCase()}${MC_RES[r].slice(1)}.`;
+  txt += mcExtra(f);
   if (f.ipm) { const ip = ipmPhrase(f); if (ip) txt += `\n\n${ip}`; }
   return txt;
 }
@@ -1817,6 +1821,101 @@ input,select,textarea{min-width:0;max-width:100%}
   const unzoom = () => { if (!vp) return; vp.content = VP.replace('maximum-scale=1', 'maximum-scale=1.01'); setTimeout(()=>{ vp.content = VP; }, 60); window.scrollTo(0, window.scrollY); };
   ['#viewer','#svcView'].forEach(s=>$(s)?.addEventListener('click', unzoom));
 })();
+
+/* ---------- v1.0.4 : responsable légal, tutelle, SDS, VERIF et antécédents ---------- */
+FIELDS.push('respLegal','tuteur','permCap'); ID_FIELDS.push('tuteur');
+const ANT_TYPES = [['GAV','Garde à vue','ayant donné lieu à un placement en garde à vue'],['INC','Incarcération','ayant donné lieu à une incarcération'],['CDN','Condamnation','ayant donné lieu à une condamnation'],['MEX','Mise en examen','ayant donné lieu à une mise en examen'],['AUT','Autre','']];
+SG_BASE.antMotif = ['vol','vol avec violences','violences volontaires','violences conjugales','usage de stupéfiants','trafic de stupéfiants','escroquerie','recel','cambriolage','dégradations','outrage','rébellion','menaces','harcèlement','port d\'arme prohibée','conduite sous l\'empire d\'un état alcoolique','conduite sans permis','agression sexuelle','viol','abus de confiance','faux et usage de faux'];
+const isSDS = f => !!(f.nom || f.prenom) && !String(f.adresse||'').trim() && !String(f.profession||'').trim();
+const SDS_BADGE = '<span class="badge" style="background:#5c5c5c;color:#fff">SDS</span>';
+const TUT_BADGE = '<span class="badge" style="background:#8a6d3b;color:#fff">TUTELLE</span>';
+const antOK = f => f.antec ? (f.antList||[]).filter(a=>a.y || a.m) : [];
+document.head.insertAdjacentHTML('beforeend', `<style>
+#antList .ar{display:grid;grid-template-columns:1fr 84px 40px;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+#antList .ar:first-child{border-top:0;padding-top:0}
+#antList .ar input[data-a=m]{grid-column:1/3}
+#antList .ar button{border:0;background:none;color:inherit;opacity:.6;font-size:18px}
+#antBlock,#tutBlock{border-left-color:#8a6d3b}
+</style>`);
+(()=>{
+  $('#ageHint').insertAdjacentHTML('afterend', `<div id="respBox" class="hidden"><label class="f" for="f_respLegal">Responsable légal</label><input id="f_respLegal" autocomplete="off" spellcheck="false" placeholder="Nom, prénom, lien (père, mère…), téléphone"></div>`);
+  $('#adrHint').insertAdjacentHTML('afterend', `<label class="switch"><input type="checkbox" id="f_tutelle"><span class="sw"></span><span class="swl">Sous tutelle</span></label>
+    <div id="tutBlock" class="accblock hidden"><label class="f" for="f_tuteur" style="margin-top:4px">Tuteur</label><input id="f_tuteur" autocomplete="off" spellcheck="false" placeholder="Nom du tuteur ou de l'organisme"></div>`);
+  $('#f_verif').parentNode.insertAdjacentHTML('afterend', `<div id="permBox" class="hidden"><label class="f" for="f_permCap">Permanence judiciaire — capitaine de police</label><input id="f_permCap" autocomplete="off" spellcheck="false" placeholder="Nom (XXXX si vide)"></div>
+    <label class="switch"><input type="checkbox" id="f_antec"><span class="sw"></span><span class="swl">Antécédents judiciaires</span></label>
+    <div id="antBlock" class="accblock hidden"><div id="antList"></div><button type="button" class="addveh" id="antAdd">+ Ajouter un antécédent</button></div>`);
+})();
+function renderAnt(){
+  const L = EDIT?.f.antList || [];
+  $('#antList').innerHTML = L.map((a,i)=>`<div class="ar" data-i="${i}"><select data-a="t" aria-label="Type">${ANT_TYPES.map(([c,n])=>`<option value="${c}" ${a.t===c?'selected':''}>${n}</option>`).join('')}</select>
+    <input data-a="y" inputmode="numeric" maxlength="4" placeholder="Année" value="${esc(a.y||'')}" autocomplete="off">
+    <button type="button" data-rmant="${i}" aria-label="Retirer">✕</button>
+    <input data-a="m" data-sg="antMotif" placeholder="Motif (ex. vol, violences…)" value="${esc(a.m||'')}" autocomplete="off" spellcheck="false"></div>`).join('');
+}
+function readAnt(){ if (!EDIT) return; EDIT.f.antList = [...document.querySelectorAll('#antList .ar')].map(r=>({t:r.querySelector('[data-a=t]').value, y:r.querySelector('[data-a=y]').value.replace(/\D/g,'').slice(0,4), m:r.querySelector('[data-a=m]').value.trim()})); }
+function syncNew(){
+  if (!EDIT) return;
+  const a = ageOf({dateNaissance:$('#f_dateNaissance').value, dateHeure:$('#f_dateHeure').value});
+  $('#respBox').classList.toggle('hidden', !((a !== null && a < 18) || $('#f_respLegal').value.trim()));
+  $('#tutBlock').classList.toggle('hidden', !$('#f_tutelle').checked);
+  $('#permBox').classList.toggle('hidden', !EDIT.f.verif);
+  $('#antBlock').classList.toggle('hidden', !$('#f_antec').checked);
+  for (const id of ['#f_tutelle','#f_antec']) $(id).closest('.switch').style.borderColor = $(id).checked ? '#c9a227' : '';
+}
+$('#f_tutelle').addEventListener('change', e=>{ if (EDIT) EDIT.f.tutelle = e.target.checked; syncNew(); if (e.target.checked) $('#f_tuteur').focus(); });
+$('#f_antec').addEventListener('change', e=>{ if (!EDIT) return; EDIT.f.antec = e.target.checked; EDIT.f.antList ||= []; if (e.target.checked && !EDIT.f.antList.length) { EDIT.f.antList.push({t:'GAV', y:'', m:''}); renderAnt(); } syncNew(); });
+$('#antAdd').onclick = ()=>{ readAnt(); EDIT.f.antList.push({t:'GAV', y:'', m:''}); renderAnt(); draftSoon(); };
+$('#antList').addEventListener('click', e=>{ const b = e.target.closest('[data-rmant]'); if (!b) return; readAnt(); EDIT.f.antList.splice(+b.dataset.rmant, 1); renderAnt(); draftSoon(); });
+['input','change'].forEach(ev=>$('#antList').addEventListener(ev, readAnt));
+{ const _sa = syncAge; syncAge = function(){ _sa(); syncNew(); }; }
+{ const _se = syncExtra; syncExtra = function(){ _se(); syncNew(); }; }
+{ const _of = openForm; openForm = function(f, d){ _of(f, d); EDIT.f.antList ||= []; $('#f_tutelle').checked = !!EDIT.f.tutelle; $('#f_antec').checked = !!EDIT.f.antec; renderAnt(); syncNew(); }; }
+{ const _ii = idInherit; idInherit = function(src){ _ii(src); if (!EDIT) return; if ($('#f_tuteur').value.trim()) { EDIT.f.tutelle = true; $('#f_tutelle').checked = true; } syncNew(); }; }
+{ const _cf = closeForm; closeForm = async function(save){
+  if (save && EDIT) {
+    readAnt(); EDIT.f.tutelle = $('#f_tutelle').checked; EDIT.f.antec = $('#f_antec').checked;
+    if (!EDIT.f.tutelle) $('#f_tuteur').value = '';
+    if (!$('#f_verif').classList.contains('on')) $('#f_permCap').value = '';
+    EDIT.f.antList = EDIT.f.antec ? EDIT.f.antList.filter(a=>a.y || a.m) : [];
+    if (!EDIT.f.antList.length) EDIT.f.antec = false;
+  }
+  return _cf(save);
+}; }
+/* Badges SDS / TUTELLE dans la liste et la fiche */
+const extraBadges = f => (isSDS(f) ? SDS_BADGE : '') + (f.tutelle ? TUT_BADGE : '');
+const addBadges = (el, f) => { const b = extraBadges(f); if (!b || !el) return; const last = [...el.querySelectorAll('.badge')].pop(); last ? last.insertAdjacentHTML('afterend', b) : el.insertAdjacentHTML('afterbegin', b); };
+{ const _r = render; render = function(){ _r(); document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id===c.dataset.id); if (f) addBadges(c.querySelector('.name'), f); }); }; }
+const antLabel = a => [ANT_TYPES.find(t=>t[0]===a.t)?.[1], a.y].filter(Boolean).join(' ');
+const sitRows = f => [['Responsable légal', f.respLegal], ['Sous tutelle', f.tutelle ? (f.tuteur ? `oui — tuteur : ${f.tuteur}` : 'oui') : ''], ['Situation', isSDS(f) ? 'SDS — sans profession et sans adresse' : ''],
+  ...antOK(f).map((a,i)=>[`Antécédent ${i+1}`, [antLabel(a), a.m].filter(Boolean).join(' — ')]), ['Permanence judiciaire', f.verif && f.permCap ? `Capitaine de police ${f.permCap}` : '']];
+{ const _od = openDetail; openDetail = async function(f){ await _od(f); if (DETAIL !== f.id) return; addBadges($('#detTitle'), f);
+  const html = panel('Situation', sitRows(f)); if (!html) return;
+  const id = [...$('#detBody').querySelectorAll('section.panel')].find(s=>s.querySelector('h4 span')?.textContent === 'Identité');
+  id ? id.insertAdjacentHTML('afterend', html) : $('#detBody .hero')?.insertAdjacentHTML('afterend', html); }; }
+{ const _fs = ficheSections; ficheSections = function(f){ const S = _fs(f), rows = sitRows(f).filter(r=>r[1]); if (rows.length) { const i = S.findIndex(x=>x[0]==='Identité'); S.splice(i < 0 ? S.length : i+1, 0, ['Situation', rows]); } return S; }; }
+/* Main courante */
+function mcIdExtra(f){
+  const F = f.sexe==='F', le = F ? "L'intéressée" : "L'intéressé", e = F ? 'e' : '';
+  let t = '';
+  if (f.respLegal && isMinor(f)) t += ` ${le} étant mineur${e}, son responsable légal est ${f.respLegal}.`;
+  else if (f.respLegal) t += ` Responsable légal : ${f.respLegal}.`;
+  if (f.tutelle) t += ` ${le} est placé${e} sous tutelle${f.tuteur ? `, son tuteur étant ${f.tuteur}` : ''}.`;
+  return t;
+}
+const lcFirst = s => /^[A-ZÀ-Ý][a-zà-ÿ]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s;
+function mcExtra(f){
+  const ants = antOK(f); if (!ants.length && !f.verif) return '';
+  const F = f.sexe==='F', le = F ? "l'intéressée" : "l'intéressé", e = F ? 'e' : '';
+  const items = ants.map((a,i)=>{
+    const m = lcFirst(a.m||''), de = /^[aeiouyhàâéèêîïôû]/i.test(m) ? "d'" : 'de ';
+    const head = m ? (i ? de : 'des faits ' + de) + m : (i ? 'de faits' : 'des faits') + ' non précisés';
+    const tp = ANT_TYPES.find(t=>t[0]===a.t)?.[2];
+    return head + (a.y ? ` en ${a.y}` : '') + (tp ? `, ${tp}` : '');
+  });
+  let t = `\n\nInterrogé${e} sur d'éventuels antécédents judiciaires, ${le} nous répondait d'initiative être défavorablement connu${e} des services de police${items.length ? ' pour ' + (items.length > 1 && items.some(x=>x.includes(',')) ? items.slice(0,-1).join(', ') + ', et ' + items[items.length-1] : etList(items)) : ''}.`;
+  if (f.verif) t += ` Fort de ces éléments, nous avisions le service de la permanence judiciaire en la personne du capitaine de police ${f.permCap || 'XXXX'}. Sur ces instructions, ${le} était invité${e} à nous suivre en nos locaux à des fins de vérification d'identité.`;
+  return t;
+}
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
