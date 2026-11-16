@@ -77,9 +77,11 @@
     for (let i = 0; i < L.length; i++) {
       const a = L[i], b = L[i+1] || '', c = L[i+2] || '';
       /* Permis de conduire européen (1 ligne de 30 : D1FRA + numéro + … + 8 premières lettres du nom + clé) */
-      if (/^D[1<I]FRA/.test(a) && a.length >= 28 && a.length <= 32) {
-        const l = pad(a,30), nf = alpha(l.slice(21,29)), cut = !/</.test(nf);
-        return {kind:'DL', type:'PC', pays:'FRA', nat:'', num:l.slice(5,14).replace(/</g,''), nom:nf.replace(/[^A-Z<]/g,'').replace(/<+/g,' ').trim(), prenom:'', dn:'', sexe:'', cut, ok:chk(l.slice(0,29), dig(l[29]))};
+      if (/^[DB0][1<I]FRA/.test(a) && a.length >= 28 && a.length <= 33) {
+        /* Le nom suit la dernière date (6 chiffres) ; longueur de la ligne variable selon les permis */
+        const m = /(\d{6})([A-Z][A-Z<]*)[0-9A-Z]?$/.exec(a.slice(14)), nf = m ? alpha(m[2]) : alpha(pad(a,30).slice(21,29));
+        const nom = nf.split('<')[0], cut = !/</.test(nf) && nom.length >= 8;
+        return {kind:'DL', type:'PC', pays:'FRA', nat:'', num:a.slice(5,14).replace(/</g,''), nom, prenom:'', dn:'', sexe:'', cut, ok:a.length === 30 && chk(a.slice(0,29), dig(a[29]))};
       }
       /* Ancienne carte d'identité française (2 × 36) */
       if (/^[I1]DFRA/.test(a) && a.length >= 34 && a.length <= 38 && b.length >= 33 && b.length <= 38) {
@@ -133,21 +135,64 @@
       else if (k === '4c') { const w = v.replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim(); if (w.length >= 3) F.aut = w; }
       else if (k === '5') { const n = v.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); if (n.length >= 5 && n.length <= 16) F.num = n; }
     }
+    const lines = text.split(/\n/);
+    /* 4c souvent sur la même ligne que 4a ; 4a parfois mal lu (« sa », « Aa », « da ») */
+    for (const raw of lines) {
+      const c4 = /4\s?[cC]\s?[.,:;]?\s+(.{3,})$/.exec(raw); if (c4 && !F.aut) F.aut = c4[1].replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim();
+      if (!F.del) { const a4 = /^[^A-Za-z0-9]{0,3}[4AaSsdy]\s?[aàâ]\s?[.,:;]?\s+(.+)$/.exec(raw.trim()); if (a4) { const d = dateIn(a4[1]); if (d) F.del = d.v; } }
+    }
+    /* Dernier recours : les dates du recto autres que la naissance, la plus ancienne passée = délivrance */
+    if (!F.del) {
+      const ds = []; const re = /[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4}/g;
+      for (const raw of lines) for (const m of raw.matchAll(re)) { const d = dateIn(m[0]); if (d && d.v !== F.dn) ds.push(d.v); }
+      const t = v => { const [d, m, y] = v.split('/'); return new Date(+y, m-1, +d).getTime(); };
+      const past = [...new Set(ds)].filter(v => t(v) <= Date.now() && (!F.dn || t(v) > t(F.dn))).sort((a,b)=>t(a)-t(b));
+      if (past.length) F.del = past[0];
+    }
     return F;
   }
-  window.permisFields = permisFields;
-  async function readPermis(file){
-    const w = await getFra(); status('Lecture des champs du permis…');
-    const c = clean(await toCanvas(file, 2400, ''));
-    let best = {};
-    for (const psm of ['6','4']) {
-      await w.setParameters({tessedit_pageseg_mode:psm});
-      const F = permisFields((await w.recognize(c)).data.text || '');
-      for (const k in F) if (!best[k]) best[k] = F[k];
-      if (best[2] && best.dn && best.lieu && best.del && best[1]) break;
+  /* Recto d'une carte d'identité, d'un passeport ou d'un titre de séjour : lieu de naissance (absent de la bande) */
+  function lieuFields(text){
+    const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), out = {};
+    const clean = t => { const w = word(t.replace(/\([^)]*\)/g,'')).replace(/\b(lieu|de|naissance|place|of|birth|luogo|di|nascita|lugar|nacimiento|geburtsort)\b/gi,'').trim(); return w.length >= 2 ? cap(w) : ''; };
+    for (let i = 0; i < L.length; i++) {
+      const m = /(lieu\s*de\s*naissance|place\s*of\s*birth|luogo\s*di\s*nascita|lugar\s*de\s*nacimiento|geburtsort)[^A-Za-zÀ-ÿ]*(.*)$/i.exec(L[i]);
+      if (m) { let v = clean(m[2].replace(/^.*birth/i,'')); if (!v && L[i+1]) v = clean(L[i+1]); if (v) { out.lieu = v; break; } }
+      const o = /[nN][ée]e?\s*\(?e?\)?\s*le\b.*?(?:^|\s)[àa]\s*[:.]?\s+([A-ZÀ-Ý][A-ZÀ-Ý' -]{1,})/.exec(L[i]);
+      if (o) { const v = clean(o[1]); if (v) { out.lieu = v; break; } }
     }
-    return best;
+    return out;
   }
+  window.lieuFields = lieuFields;
+  /* Intitulé illisible (trop petit) : on cherche une commune connue parmi les lignes en majuscules, près de « NOM D'USAGE » d'abord */
+  async function findLieu(texts){
+    const V = merge(texts, lieuFields); if (V.lieu) return V.lieu;
+    let C = null; try { C = await loadCities(); } catch {}
+    if (!C) return '';
+    const set = C._set ||= new Set(C.nk.map(x=>x.trim()));
+    const skip = new Set([norm($('#f_nom')?.value), norm($('#f_prenom')?.value), 'france','republique','francaise'].filter(Boolean));
+    const isCity = t => { const k = norm(t).replace(/[-'’]/g,' ').replace(/\s+/g,' ').trim(); return k.length >= 3 && !skip.has(k) && set.has(k); };
+    for (const t of texts) {
+      const L = t.split(/\n/).map(x=>x.trim()).filter(Boolean);
+      const u = L.findIndex(x=>/NOM\s*D.?USAGE|ALTERNATE/i.test(x));
+      const near = u > 0 ? L.slice(Math.max(0, u-4), u).reverse() : [];
+      for (const line of [...near, ...L]) {
+        const w = line.replace(/\([^)]*\)/g,'').replace(/[^A-ZÀ-Ý' -]/g,' ').replace(/\s+/g,' ').trim();
+        if (w.length >= 3 && isCity(w)) return cap(w);
+        for (const part of w.split(' ')) if (part.length >= 4 && isCity(part)) return cap(part);
+      }
+    }
+    return '';
+  }
+  window.permisFields = permisFields;
+  async function readText(file, psms=['6','4']){
+    const w = await getFra(); status('Lecture du texte de la pièce…');
+    const c = clean(await toCanvas(file, 2400, ''));
+    const out = [];
+    for (const psm of psms) { await w.setParameters({tessedit_pageseg_mode:psm}); out.push((await w.recognize(c)).data.text || ''); }
+    return out;
+  }
+  const merge = (texts, fn) => { const best = {}; for (const t of texts) { const F = fn(t); for (const k in F) if (!best[k]) best[k] = F[k]; } return best; };
 
   /* ----- Image ----- */
   async function toCanvas(file, max=2000, filter='grayscale(1) contrast(1.4)'){
@@ -211,10 +256,15 @@
       const c = await toCanvas(file);
       let r = null;
       for (const part of [c, crop(c, .5, 1), crop(c, .25, .8)]) { const {data} = await w.recognize(part), x = parse(data.text || ''); if (x && x.nom && (!r || x.ok)) r = x; if (r && r.ok) break; }
+      let texts = [];
       if (!r || r.type === 'PC') {
-        let F = {}; try { F = await readPermis(file); } catch (e) { if (!r) throw e; }
-        const n = ['1','2','dn','5'].filter(k=>F[k] || (k === '5' && F.num)).length;
-        if (!r && n < 2) { status('Rien de lisible. Passeport : page photo · carte d\'identité ou titre de séjour : face avec les lignes « <<< » · permis : recto. Pièce à plat, nette, sans reflet, cadrée de près.'); return; }
+        try { texts = await readText(file); } catch (e) { if (!r) throw e; }
+        const F = merge(texts, permisFields), n = ['1','2','dn'].filter(k=>F[k]).length + (F.num ? 1 : 0);
+        if (!r && n < 2) {
+          const lieu = await findLieu(texts);
+          if (lieu && $('#f_naisVille')) { $('#f_naisVille').value = lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); draftSoon(); status(`Recto lu : lieu de naissance « ${lieu} » (à vérifier, en orange)`); toast('Lieu de naissance lu'); return; }
+          status('Rien de lisible. Passeport : page photo · carte d\'identité ou titre de séjour : face avec les lignes « <<< » (puis le recto pour le lieu de naissance) · permis : recto. Pièce à plat, nette, sans reflet, cadrée de près.'); return;
+        }
         if (r) fill(r);
         const got = fillPermis(r || {}, F);
         status(`${r && r.ok ? '✓ Permis lu (nom et numéro sûrs)' : '⚠ Permis lu sans bande : tout vérifier'}` + (got.length ? ` · à vérifier, en orange : ${got.join(', ')}` : ' · champs du permis illisibles : prénom et date de naissance à saisir'));
@@ -222,7 +272,12 @@
         return;
       }
       fill(r);
-      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}`);
+      /* Lieu de naissance : sur la même face pour le passeport et l'ancienne carte, sinon au recto (2e scan) */
+      let lieu = '';
+      /* Verso des cartes récentes (3 lignes) : l'adresse y figure, on ne cherche pas le lieu ici pour ne pas la confondre */
+      if (r.kind !== 'TD1') try { texts = await readText(file, ['6']); lieu = merge(texts, lieuFields).lieu || ''; } catch {}
+      if (lieu && $('#f_naisVille')) { $('#f_naisVille').value = lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); draftSoon(); }
+      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}` + (lieu ? ` · lieu de naissance « ${lieu} » à vérifier (orange)` : ' · lieu de naissance absent de cette face : scanne aussi le recto'));
       toast(r.ok ? 'Pièce d\'identité lue' : 'Lecture incertaine : vérifie les champs');
     } catch (e) {
       status(e && e.message === 'offline' ? 'Il faut du réseau la première fois pour télécharger le module de lecture.' : 'Lecture impossible sur cet appareil.');
