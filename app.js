@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.0.3';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1379,8 +1379,9 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
-  ['1.2.0', ['Service du jour déplacé sur l\'écran de déverrouillage : photo de la feuille dans un carré à gauche, missions du jour à droite (3 affichées, celle en cours mise en avant)', 'Bouton « Modifier » : photo, missions, DPU / SPG (effacé à minuit) ou DPU / SN (effacé à midi)']],
-  ['1.1.0', ['Envoi d\'une fiche en image JPG, telle qu\'elle s\'affiche dans l\'appli', 'Accueil : « Service du jour » avec la photo de la feuille de service et les consignes (heure de début – heure de fin : consigne), consigne en cours mise en avant', 'Service DPU / SPG effacé automatiquement à minuit, DPU / SN à midi']],
+  ['1.0.3', ['Écrans verrouillés : plus de zoom (pincement, double tap, zoom automatique sur un champ) ni de glissement de la page vers la gauche ou la droite, le défilement reste vertical', 'Zoom conservé uniquement sur les photos ouvertes en plein écran (fiche et feuille de service)', 'Numérotation des versions : petites mises à jour en 1.0.x']],
+  ['1.0.2', ['Service du jour déplacé sur l\'écran de déverrouillage : photo de la feuille dans un carré à gauche, missions du jour à droite (3 affichées, celle en cours mise en avant)', 'Bouton « Modifier » : photo, missions, DPU / SPG (effacé à minuit) ou DPU / SN (effacé à midi)']],
+  ['1.0.1', ['Envoi d\'une fiche en image JPG, telle qu\'elle s\'affiche dans l\'appli', 'Accueil : « Service du jour » avec la photo de la feuille de service et les consignes (heure de début – heure de fin : consigne), consigne en cours mise en avant', 'Service DPU / SPG effacé automatiquement à minuit, DPU / SN à midi']],
   ['1.0.0', ['Grosse mise à jour : passage en version 1.0.0', 'Fiches : glisser le doigt vers la gauche ou la droite pour passer à la fiche suivante ou précédente', 'Suggestions collées sous le champ en cours de saisie', 'Nom de famille : plus de correction automatique du clavier', 'Icône « contrôlés ensemble » plus visible', 'Fiches « Non contrôlé » affichées en plus petit et atténuées dans la liste']],
   ['5.4', ['Main courante : filiation précédée de « fils de » ou « fille de » selon le bouton Homme / Femme']],
   ['5.3', ['Fiche A : rubrique « En résumé, l\'intéressé semble » retirée (formulaire, fiche et envoi)']],
@@ -1622,7 +1623,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   }, {passive:true});
 })();
 
-/* ---------- v1.1.0 : fiche en image JPG ----------
+/* ---------- v1.0.1 : fiche en image JPG ----------
    La fiche est dessinée sur le téléphone (bibliothèque html2canvas, téléchargée une fois puis gardée) : rien n'est envoyé. */
 const H2C_URLS = ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js','https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js'];
 let h2cLoading = null;
@@ -1682,7 +1683,7 @@ async function shareJPG(list){
 }
 (()=>{ const c = document.querySelector('#shareSheet [data-sh=cancel]'); if (c) c.insertAdjacentHTML('beforebegin', `<button data-sh="jpg"><b>Fiche en image (JPG)</b><small>Telle qu'elle s'affiche dans l'appli</small></button>`); })();
 
-/* ---------- v1.2.0 : Service du jour sur l'écran de déverrouillage ----------
+/* ---------- v1.0.2 : Service du jour sur l'écran de déverrouillage ----------
    Carré à gauche : photo de la feuille de service. À droite : missions du jour (début – fin : mission).
    Visible avant le code, donc gardé sur le téléphone SANS chiffrement (aucune fiche n'y figure).
    DPU / SPG : effacé à minuit · DPU / SN : effacé à midi. */
@@ -1790,11 +1791,32 @@ $('#svcFile').onchange = async e=>{
   catch { toast('La photo n’a pas pu être lue'); }
 };
 { const _sl = showLock; showLock = function(setup){ _sl(setup); svcLoad().then(renderLockSvc).catch(()=>{}); }; }
-/* Ancien emplacement (v1.1.0, sur l'accueil et chiffré) : on reprend la feuille et les consignes une fois déverrouillé */
+/* Ancien emplacement (v1.0.1, sur l'accueil et chiffré) : on reprend la feuille et les consignes une fois déverrouillé */
 { const _oa = openApp; openApp = async function(){ await _oa(); const o = LEARN.svc; if (!o) return;
   try { await svcLoad(); if (!SVC.items.length && !SVC.photo) { SVC = {items:o.items||[], type:o.type||'', start:o.start}; if (o.photo) { const buf = await photoBuf(o.photo); if (buf) SVC.photo = buf; } svcSetUrl(); await svcSave(); }
     if (o.photo) await removePhoto(o.photo).catch(()=>{}); delete LEARN.svc; await saveLearn(); } catch {} }; }
 setInterval(()=>{ if (!$('#lock').classList.contains('hidden') && $('#svcEd').classList.contains('hidden')) renderLockSvc(); }, 60000);
+
+/* ---------- v1.0.3 : écran verrouillé (ni zoom, ni glissement latéral) ----------
+   Seul le défilement vertical est permis. Le zoom reste possible sur les photos en plein écran. */
+(()=>{
+  const vp = document.querySelector('meta[name=viewport]'), VP = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+  if (vp) vp.content = VP;
+  document.head.insertAdjacentHTML('beforeend', `<style>
+html,body{overflow-x:hidden;max-width:100%;overscroll-behavior-x:none;touch-action:pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.sheet,.sheet .body,#list,#app,#lock,#svcEd{overflow-x:hidden;touch-action:pan-y}
+.switch{position:relative;overflow:hidden}
+input,select,textarea{min-width:0;max-width:100%}
+#viewer,#viewer *,#svcView,#svcView *{touch-action:pinch-zoom pan-x pan-y}
+</style>`);
+  const inViewer = t => !!(t && t.closest && t.closest('#viewer,#svcView'));
+  ['gesturestart','gesturechange'].forEach(ev=>document.addEventListener(ev, e=>{ if (!inViewer(e.target)) e.preventDefault(); }, {passive:false}));
+  document.addEventListener('touchmove', e=>{ if (e.touches.length > 1 && !inViewer(e.target)) e.preventDefault(); }, {passive:false});
+  /* Double tap : déjà neutralisé par touch-action:pan-y */
+  /* En quittant une photo zoomée : retour à l'échelle normale */
+  const unzoom = () => { if (!vp) return; vp.content = VP.replace('maximum-scale=1', 'maximum-scale=1.01'); setTimeout(()=>{ vp.content = VP; }, 60); window.scrollTo(0, window.scrollY); };
+  ['#viewer','#svcView'].forEach(s=>$(s)?.addEventListener('click', unzoom));
+})();
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
