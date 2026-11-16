@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0.7';
+let APP_VERSION = '1.0.8';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -722,7 +722,7 @@ async function shareFiches(list){
 }
 
 /* ---------- Suggestions (saisie rapide) ---------- */
-const SG_LEARN_MAP = [['nationalite','nats'],['lieuNaissance','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docAbbr'],['docLieu','docLieu'],['motif','motifs']];
+const SG_LEARN_MAP = [['nationalite','nats'],['naisVille','villes'],['lieuControle','lieux'],['profession','prof'],['docType','docAbbr'],['docLieu','docLieu'],['motif','motifs']];
 let LEARN = {};
 const norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
 function sgList(key){ const seen=new Set(), out=[]; for (const v of [...(LEARN[key]||[]), ...(SG_BASE[key]||[])]) { const n=norm(v); if (n && !seen.has(n)) { seen.add(n); out.push(v); } } return out; }
@@ -862,14 +862,14 @@ $('#btnSettings').onclick = async ()=>{
   $('#settings').classList.remove('hidden');
 };
 async function remoteVersion(){
-  const r = await fetch('./app.js?v=' + Date.now(), {cache:'reload'});
+  const r = await fetch('./version.js', {cache:'reload'});
   if (!r.ok) throw new Error(r.status);
-  return ((await r.text()).match(/APP_VERSION = '([^']+)'/) || [])[1] || null;
+  return ((await r.text()).match(/version:\s*'([^']+)'/) || [])[1] || null;
 }
 async function applyUpdate(){
   toast('Mise à jour…');
   try {
-    for (const f of ['./index.html','./app.js','./data.js','./style.css','./sw.js']) await fetch(f, {cache:'reload'});
+    for (const f of ['./index.html','./app.js','./data.js','./style.css','./sw.js','./version.js', ...((window.CIF && CIF.modules) || []).map(m=>'./' + m)]) await fetch(f, {cache:'reload'});
     const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update();
     for (const k of await caches.keys()) await caches.delete(k);
   } catch {}
@@ -1357,7 +1357,7 @@ $('#f_adrVille').addEventListener('change', e=>{ const v = e.target.value; if (/
 function villeShow(inp){
   const raw = norm(inp.value).replace(/[-'’]/g,' ').replace(/^st /,'saint ').replace(/^ste /,'sainte ').trim();
   if (!raw) return sgHide();
-  if (!CITIES) { $('#adrHint').textContent = 'Chargement de la liste des communes…'; loadCities().then(()=>{ $('#adrHint').textContent = ''; if (document.activeElement === inp) villeShow(inp); }).catch(()=>{ $('#adrHint').textContent = 'Liste des communes indisponible hors ligne pour l\'instant : saisie libre.'; }); return; }
+  if (!CITIES) { const hint = $(inp.id === 'f_naisVille' ? '#naisHint' : '#adrHint'); hint.textContent = 'Chargement de la liste des communes…'; loadCities().then(()=>{ hint.textContent = ''; if (document.activeElement === inp) sgShow(inp); }).catch(()=>{ hint.textContent = 'Liste des communes indisponible hors ligne pour l\'instant : saisie libre.'; }); return; }
   const {names, cps, nk} = CITIES, res = [], isCp = /^\d/.test(raw), q = ' ' + raw;
   for (let i = 0; i < names.length && res.length < 60; i++) {
     if (isCp ? cps[i].startsWith(raw) : (nk[i].startsWith(q) || (raw.length > 2 && nk[i].includes(q)))) res.push(`${cps[i]} ${names[i]}`);
@@ -1421,10 +1421,11 @@ const CHANGELOG = [
   ['3.6', ['Main courante : pièce d\'identité écrite en toutes lettres']],
   ['3.5', ['Lecture de plaque en direct retirée']]
 ];
-(()=>{ $('#versionInfo').insertAdjacentHTML('afterend', `<details id="changelog" style="margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--panel)">
+function renderChangelog(){ $('#changelog')?.remove(); $('#versionInfo').insertAdjacentHTML('afterend', `<details id="changelog" style="margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--panel)">
   <summary style="font-weight:600;cursor:pointer">Nouveautés (changelog)</summary>
   ${CHANGELOG.map(([v,items],i)=>`<div style="margin-top:10px"><b style="color:${i?'inherit':'#7fb3ff'}">v${v}</b>${i?'':' <small style="color:var(--muted)">(actuelle)</small>'}<ul style="margin:4px 0 0;padding-left:18px;font-size:14px;color:var(--muted);line-height:1.4">${items.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`).join('')}
-</details>`); })();
+</details>`); }
+renderChangelog();
 
 /* ---------- Envoi au format « main courante » ---------- */
 const MC_RES = {
@@ -1501,7 +1502,7 @@ function filPhrase(f){
 function mcText(f){
   const nom = (f.nom||'').toUpperCase(), cif = f.type === 'CIF';
   const parts = [[nom, f.prenom].filter(Boolean).join(' ') || 'Individu non identifié'];
-  if (f.dateNaissance || f.lieuNaissance) parts.push((f.sexe==='F' ? 'née' : f.sexe==='H' ? 'né' : 'né(e)') + (f.dateNaissance ? ` le ${dateLettres(f.dateNaissance)}` : '') + (f.lieuNaissance ? ` à ${f.lieuNaissance}` : ''));
+  if (f.dateNaissance || f.lieuNaissance) parts.push((f.sexe==='F' ? 'née' : f.sexe==='H' ? 'né' : 'né(e)') + (f.dateNaissance ? ` le ${dateLettres(f.dateNaissance)}` : '') + (naisPhrase(f) ? ' ' + naisPhrase(f) : ''));
   if (cif && f.filiation) parts.push(filPhrase(f));
   if (f.nationalite) parts.push(`de nationalité ${f.nationalite.toLowerCase()}`);
   if (f.profession) parts.push(/^[A-ZÀ-Ý][a-zà-ÿ]/.test(f.profession) ? f.profession[0].toLowerCase() + f.profession.slice(1) : f.profession);
@@ -2043,6 +2044,117 @@ function diffAlertShow(){
   { const _lk = lock; lock = function(){ sh.classList.add('hidden'); _lk(); }; }
 })();
 
+/* ---------- v1.0.8 : lieu de naissance (ville + code postal, ou ville + pays) ----------
+   « née à Nice (06000) », « né à Pigna en Italie », « né à Monaco » */
+FIELDS.push('naisVille','naisPays'); ID_FIELDS.push('naisVille','naisPays');
+(()=>{
+  const l = $('#f_lieuNaissance'); l.removeAttribute('data-sg'); l.type = 'hidden';
+  $('label[for=f_lieuNaissance]')?.setAttribute('for', 'f_naisVille');
+  l.insertAdjacentHTML('afterend', `<input id="f_naisVille" data-sg="villes" autocapitalize="words" autocomplete="off" spellcheck="false" placeholder="Ville ou code postal (ex. Nice, Pigna)">
+    <input id="f_naisPays" data-sg="paysAdr" autocomplete="off" spellcheck="false" placeholder="Pays" style="margin-top:8px">
+    <div id="naisHint" style="font-size:12px;color:var(--muted);margin-top:4px"></div>`);
+})();
+function naisInfo(f){
+  const raw = (f.naisVille||'').trim(), pays = (f.naisPays||'').trim(), m = /^(\d{5})\s+(.+)$/.exec(raw);
+  const cp = m ? m[1] : '', ville = m ? m[2] : raw, np = norm(pays);
+  const isMC = np === 'monaco' || cp === '98000' || (!np && /^(monaco|monte.carlo)$/.test(norm(ville)));
+  return {cp, ville, pays, isMC, isFR: !isMC && (np === 'france' || !np)};
+}
+function naisPhrase(f){
+  if (!(f.naisVille||'').trim() && !(f.naisPays||'').trim()) return f.lieuNaissance ? `à ${f.lieuNaissance}` : '';
+  const i = naisInfo(f);
+  if (i.isMC) return aVille(i.ville || 'Monaco');
+  if (i.isFR) return i.ville ? aVille(i.ville) + (i.cp ? ` (${i.cp})` : '') : 'en France';
+  return [i.ville && aVille(i.ville), i.pays && enPays(i.pays)].filter(Boolean).join(' ');
+}
+function naisJoin(){
+  const i = naisInfo({naisVille:$('#f_naisVille').value, naisPays:$('#f_naisPays').value});
+  $('#f_lieuNaissance').value = i.isMC ? (i.ville || 'Monaco') : i.isFR ? (i.ville ? i.ville + (i.cp ? ` (${i.cp})` : '') : i.pays) : (i.ville && i.pays ? `${i.ville} (${i.pays})` : i.ville || i.pays);
+}
+function naisSplit(){
+  /* Anciennes fiches : « Nice (06000) », « Pigna (Italie) » ou texte libre */
+  if ($('#f_naisVille').value || $('#f_naisPays').value) return;
+  const v = $('#f_lieuNaissance').value.trim(); if (!v) return;
+  let m = /^(.+?)\s*\((\d{5})\)$/.exec(v);
+  if (m) { $('#f_naisVille').value = `${m[2]} ${m[1]}`; return; }
+  m = /^(.+?)\s*\(([^)\d]+)\)$/.exec(v);
+  if (m) { $('#f_naisVille').value = m[1]; $('#f_naisPays').value = m[2]; return; }
+  $('#f_naisVille').value = v;
+}
+['input','change'].forEach(ev=>{ $('#f_naisVille').addEventListener(ev, naisJoin); $('#f_naisPays').addEventListener(ev, naisJoin); });
+$('#f_naisVille').addEventListener('change', e=>{ const v = e.target.value; if (/^\d{5}\s/.test(v) && !$('#f_naisPays').value.trim()) { $('#f_naisPays').value = v.startsWith('98000') ? 'Monaco' : 'France'; naisJoin(); } });
+$('#f_naisVille').addEventListener('focus', ()=>loadCities().catch(()=>{}));
+/* Suggestions : communes de France et Monaco avec code postal, sinon villes déjà saisies */
+{ const _s = sgShow; sgShow = inp => {
+    if (!inp || inp.id !== 'f_naisVille') return _s(inp);
+    if (/^\d{5}\s/.test(inp.value)) return sgHide();
+    const np = norm($('#f_naisPays').value);
+    if (!np || np === 'france' || np === 'monaco') { villeShow(inp); if (!sgBox.classList.contains('hidden')) return; }
+    _s(inp);
+  }; }
+{ const _of = openForm; openForm = function(f, d){ _of(f, d); naisSplit(); }; const _ii = idInherit; idInherit = function(src){ _ii(src); naisSplit(); }; }
+
+/* ---------- v1.0.8 : zoom sur la feuille de service et les photos ----------
+   Zoom à deux doigts, double tap pour zoomer / revenir, un doigt pour se déplacer une fois zoomé.
+   Un tap simple (sans zoom) ou la croix ferment. Le reste de l'appli reste verrouillé. */
+(()=>{
+  document.head.insertAdjacentHTML('beforeend', `<style>
+#viewer,#viewer *,#svcView,#svcView *{touch-action:none}
+#viewer,#svcView{overflow:hidden}
+#viewer img,#svcView img{transform-origin:0 0;will-change:transform;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#svcView .zx{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:10px;color:#fff;background:rgba(40,40,40,.7)}
+</style>`);
+  document.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+  if (!$('#svcView .zx')) $('#svcView').insertAdjacentHTML('beforeend', `<button class="ib zx" aria-label="Fermer">${ICON.x}</button>`);
+  function zoomable(box){
+    const img = box.querySelector('img'); if (!img) return;
+    let s = 1, x = 0, y = 0, g = null, quiet = 0, lastTap = 0, tt = null;
+    const clampXY = () => {
+      const w = img.offsetWidth, h = img.offsetHeight, bw = box.clientWidth, bh = box.clientHeight, ox = img.offsetLeft, oy = img.offsetTop;
+      const fit = (v, size, bsize, o) => { const sz = size * s; return sz <= bsize ? (bsize - sz) / 2 - o : Math.min(-o, Math.max(bsize - o - sz, v)); };
+      x = fit(x, w, bw, ox); y = fit(y, h, bh, oy);
+    };
+    const apply = () => { if (s <= 1.001) { s = 1; x = y = 0; img.style.transform = ''; } else { clampXY(); img.style.transform = `translate(${x}px,${y}px) scale(${s})`; } };
+    const reset = () => { s = 1; x = y = 0; apply(); };
+    const local = (cx, cy) => { const r = box.getBoundingClientRect(); return [cx - r.left - img.offsetLeft, cy - r.top - img.offsetTop]; };
+    const zoomTo = (ns, cx, cy) => { const [px, py] = local(cx, cy), lx = (px - x) / s, ly = (py - y) / s; s = Math.min(6, Math.max(1, ns)); x = px - s * lx; y = py - s * ly; apply(); };
+    const pts = e => [...e.touches].map(t=>[t.clientX, t.clientY]);
+    box.addEventListener('touchstart', e=>{
+      const p = pts(e);
+      if (p.length >= 2) { const [a, b] = p; g = {pinch:true, s0:s, x0:x, y0:y, d0:Math.hypot(a[0]-b[0], a[1]-b[1]) || 1, m0:local((a[0]+b[0])/2, (a[1]+b[1])/2)}; }
+      else if (p.length === 1) g = {pinch:false, x0:x, y0:y, p0:p[0], moved:false};
+    }, {passive:true});
+    box.addEventListener('touchmove', e=>{
+      if (!g) return; e.preventDefault(); const p = pts(e);
+      if (g.pinch && p.length >= 2) {
+        const [a, b] = p, d = Math.hypot(a[0]-b[0], a[1]-b[1]), m = local((a[0]+b[0])/2, (a[1]+b[1])/2);
+        const ns = Math.min(6, Math.max(1, g.s0 * d / g.d0)), lx = (g.m0[0] - g.x0) / g.s0, ly = (g.m0[1] - g.y0) / g.s0;
+        s = ns; x = m[0] - s * lx; y = m[1] - s * ly; apply(); quiet = Date.now() + 400;
+      } else if (!g.pinch && p.length === 1) {
+        const dx = p[0][0] - g.p0[0], dy = p[0][1] - g.p0[1];
+        if (Math.abs(dx) + Math.abs(dy) > 8) g.moved = true;
+        if (g.moved) { quiet = Date.now() + 400; if (s > 1) { x = g.x0 + dx; y = g.y0 + dy; apply(); } }
+      }
+    }, {passive:false});
+    box.addEventListener('touchend', e=>{
+      if (!e.touches.length) g = null;
+      else if (e.touches.length === 1) { const t = e.touches[0]; g = {pinch:false, x0:x, y0:y, p0:[t.clientX, t.clientY], moved:true}; }
+    }, {passive:true});
+    const close = () => { clearTimeout(tt); box.classList.add('hidden'); reset(); };
+    box.onclick = e => {
+      if (e.target.closest('button')) return close();
+      if (Date.now() < quiet) return;
+      const now = Date.now();
+      if (now - lastTap < 320) { clearTimeout(tt); lastTap = 0; if (s > 1) reset(); else zoomTo(2.5, e.clientX, e.clientY); return; }
+      lastTap = now; clearTimeout(tt);
+      if (s === 1) tt = setTimeout(close, 330);
+    };
+    img.addEventListener('load', reset);
+    new MutationObserver(()=>{ if (box.classList.contains('hidden')) reset(); }).observe(box, {attributes:true, attributeFilter:['class']});
+  }
+  zoomable($('#viewer')); zoomable($('#svcView'));
+})();
+
 /* ---------- Démarrage ---------- */
 (async ()=>{
   try {
@@ -2059,5 +2171,16 @@ function diffAlertShow(){
 (()=>{ const sc = document.createElement('script'); sc.src = 'adr.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
 /* Partage de fiches par QR code : module séparé */
 (()=>{ const sc = document.createElement('script'); sc.src = 'share.js?v=' + APP_VERSION; document.body.appendChild(sc); })();
+/* Version, nouveautés et modules récents : décrits dans version.js (petit fichier mis à jour seul) */
+(async ()=>{
+  const load = src => new Promise(res=>{ const sc = document.createElement('script'); sc.src = src; sc.onload = sc.onerror = res; document.body.appendChild(sc); });
+  await load('version.js');
+  const C = window.CIF; if (!C) return;
+  if (C.version) APP_VERSION = C.version;
+  for (const e of [...(C.changelog || [])].reverse()) if (!CHANGELOG.some(x=>x[0] === e[0])) CHANGELOG.unshift(e);
+  renderChangelog();
+  for (const m of (C.modules || [])) await load(m + '?v=' + APP_VERSION);
+  if (KEY) render();
+})();
 /* Ancien module de lecture de plaque (retiré en 3.5) : on libère son cache */
 setTimeout(()=>{ if (db) dbDel('meta','ocrlib').catch(()=>{}); }, 3000);
