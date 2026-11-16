@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — lecture de la bande MRZ (lignes « <<< ») d'une pièce d'identité.
+/* CIF 2.0 — lecture de la bande MRZ (lignes « <<< ») d'une pièce d'identité ou d'un permis de conduire.
    Tout se passe sur le téléphone : la photo n'est ni envoyée ni conservée.
    Le module de lecture (Tesseract + modèle MRZ, ≈ 5 Mo) est téléchargé une seule fois puis gardé. */
 (()=>{
@@ -60,6 +60,11 @@
     const L = text.split(/\n/).map(l=>l.toUpperCase().replace(/[^A-Z0-9<]/g,'')).filter(l=>l.length >= 26);
     for (let i = 0; i < L.length; i++) {
       const a = L[i], b = L[i+1] || '', c = L[i+2] || '';
+      /* Permis de conduire européen (1 ligne de 30 : D1FRA + numéro + … + 8 premières lettres du nom + clé) */
+      if (/^D[1<I]FRA/.test(a) && a.length >= 28 && a.length <= 32) {
+        const l = pad(a,30), nf = alpha(l.slice(21,29)), cut = !/</.test(nf);
+        return {kind:'DL', type:'PC', pays:'FRA', nat:'', num:l.slice(5,14).replace(/</g,''), nom:nf.replace(/[^A-Z<]/g,'').replace(/<+/g,' ').trim(), prenom:'', dn:'', sexe:'', cut, ok:chk(l.slice(0,29), dig(l[29]))};
+      }
       /* Ancienne carte d'identité française (2 × 36) */
       if (/^[I1]DFRA/.test(a) && a.length >= 34 && a.length <= 38 && b.length >= 33 && b.length <= 38) {
         const l1 = pad(a,36), l2 = pad(b,36), txt = f => alpha(f).replace(/[^A-Z<]/g,'').replace(/<+$/,'').replace(/<+/g,' ').trim();
@@ -114,7 +119,7 @@
     $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
     draftSoon();
   }
-  const KIND = {PS:'passeport', CNI:'carte d\'identité', TS:'titre de séjour'};
+  const KIND = {PS:'passeport', CNI:'carte d\'identité', TS:'titre de séjour', PC:'permis de conduire'};
   async function scan(file){
     if (!EDIT) return;
     const btn = $('#mrzBtn'); btn.disabled = true; btn.style.opacity = '.6';
@@ -126,7 +131,7 @@
       for (const part of [c, crop(c, .5, 1), crop(c, .25, .8)]) { const {data} = await w.recognize(part), x = parse(data.text || ''); if (x && x.nom && (!r || x.ok)) r = x; if (r && r.ok) break; }
       if (!r) { status('Bande non trouvée. Cadre de près les lignes « <<< », pièce bien à plat, nette et sans reflet.'); return; }
       fill(r);
-      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}`);
+      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}` + (r.type === 'PC' ? ` · le permis ne donne que le numéro et le nom${r.cut ? ' (8 premières lettres, à compléter)' : ''} : prénom et date de naissance à saisir` : ''));
       toast(r.ok ? 'Pièce d\'identité lue' : 'Lecture incertaine : vérifie les champs');
     } catch (e) {
       status(e && e.message === 'offline' ? 'Il faut du réseau la première fois pour télécharger le module de lecture.' : 'Lecture impossible sur cet appareil.');
