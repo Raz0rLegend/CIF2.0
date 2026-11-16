@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1379,6 +1379,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.2.0', ['Service du jour déplacé sur l\'écran de déverrouillage : photo de la feuille dans un carré à gauche, missions du jour à droite (3 affichées, celle en cours mise en avant)', 'Bouton « Modifier » : photo, missions, DPU / SPG (effacé à minuit) ou DPU / SN (effacé à midi)']],
   ['1.1.0', ['Envoi d\'une fiche en image JPG, telle qu\'elle s\'affiche dans l\'appli', 'Accueil : « Service du jour » avec la photo de la feuille de service et les consignes (heure de début – heure de fin : consigne), consigne en cours mise en avant', 'Service DPU / SPG effacé automatiquement à minuit, DPU / SN à midi']],
   ['1.0.0', ['Grosse mise à jour : passage en version 1.0.0', 'Fiches : glisser le doigt vers la gauche ou la droite pour passer à la fiche suivante ou précédente', 'Suggestions collées sous le champ en cours de saisie', 'Nom de famille : plus de correction automatique du clavier', 'Icône « contrôlés ensemble » plus visible', 'Fiches « Non contrôlé » affichées en plus petit et atténuées dans la liste']],
   ['5.4', ['Main courante : filiation précédée de « fils de » ou « fille de » selon le bouton Homme / Femme']],
@@ -1681,90 +1682,119 @@ async function shareJPG(list){
 }
 (()=>{ const c = document.querySelector('#shareSheet [data-sh=cancel]'); if (c) c.insertAdjacentHTML('beforebegin', `<button data-sh="jpg"><b>Fiche en image (JPG)</b><small>Telle qu'elle s'affiche dans l'appli</small></button>`); })();
 
-/* ---------- v1.1.0 : Service du jour (accueil) ----------
-   Photo de la feuille de service + consignes « début – fin : consigne ». Gardé chiffré avec le reste (et dans la sauvegarde).
+/* ---------- v1.2.0 : Service du jour sur l'écran de déverrouillage ----------
+   Carré à gauche : photo de la feuille de service. À droite : missions du jour (début – fin : mission).
+   Visible avant le code, donc gardé sur le téléphone SANS chiffrement (aucune fiche n'y figure).
    DPU / SPG : effacé à minuit · DPU / SN : effacé à midi. */
 document.head.insertAdjacentHTML('beforeend', `<style>
-#svc{margin:10px 12px 4px;position:relative;z-index:2}
-#svc:empty{display:none}
-#svc .sv{border:1px solid #3a3a3a;border-radius:12px;background:rgba(30,30,30,.95);overflow:hidden}
-#svc .svh{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:inherit;text-align:left;padding:11px 14px;font-size:15px}
-#svc .svh small{color:var(--muted)}
-#svc .cur{display:block;margin-top:3px;font-weight:700;color:#fff}
-#svc .svb{padding:0 14px 12px;border-top:1px solid #2e2e2e}
-#svc .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-#svc .seg button{border:1px solid #444;background:#202020;color:var(--muted);border-radius:10px;padding:9px 4px;font-size:14px;line-height:1.25}
-#svc .seg button.on{background:#f2f2f2;color:#111;border-color:#f2f2f2;font-weight:700}
-#svc .ph{margin-top:10px;border-radius:10px;overflow:hidden;background:#000}
-#svc .ph img{display:block;width:100%;max-height:240px;object-fit:contain}
-#svc .row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:6px;border-radius:10px;background:#232323;font-size:15px}
-#svc .row.now{background:#f2f2f2;color:#111}
-#svc .row span{flex:1}
-#svc .row button{border:0;background:none;color:inherit;opacity:.6;font-size:18px;padding:0 4px}
-#svc .add{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
-#svc .add input{min-width:0}
-#svc .add #svcT{grid-column:1/-1}
-#svc .btns{display:flex;gap:8px;margin-top:10px}
-#svc .btns button{flex:1;border:1px solid #444;background:#202020;color:inherit;border-radius:10px;padding:10px 6px;font-size:14px}
+#lock{flex-direction:column;gap:16px}
+#lock.svcOn img#lockIcon{height:110px;margin-bottom:14px}
+#lsvc{width:100%;max-width:340px;display:flex;gap:10px;text-align:left}
+#lsvc .sq{flex:0 0 118px;height:118px;border-radius:14px;overflow:hidden;background:#1d1d1d;border:1px solid #3a3a3a;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;text-align:center;line-height:1.3;padding:0}
+#lsvc .sq img{width:100%;height:100%;object-fit:cover;margin:0;filter:none}
+#lsvc .ms{flex:1;min-width:0;border-radius:14px;background:#1d1d1d;border:1px solid #3a3a3a;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+#lsvc .mh{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#lsvc .mh button{border:0;background:none;color:#cfcfcf;font-size:13px;padding:0 2px;letter-spacing:0;text-transform:none}
+#lsvc .mi{font-size:13px;line-height:1.25;padding:4px 6px;border-radius:7px;background:#262626}
+#lsvc .mi span{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+#lsvc .mi.now{background:#f2f2f2;color:#111;font-weight:600}
+#lsvc .none{font-size:12px;color:var(--muted);margin:auto 0}
+#svcEd,#svcView{position:fixed;inset:0;z-index:60;background:var(--bg)}
+#svcView{background:#000;display:flex;align-items:center;justify-content:center}
+#svcView img{max-width:100%;max-height:100%}
+#svcEd{overflow-y:auto;padding:calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 24px)}
+#svcEd h3{margin:4px 0 10px;font-size:20px}
+#svcEd .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#svcEd .seg button{border:1px solid #444;background:#202020;color:var(--muted);border-radius:10px;padding:10px 4px;font-size:14px;line-height:1.25}
+#svcEd .seg button.on{background:#f2f2f2;color:#111;border-color:#f2f2f2;font-weight:700}
+#svcEd .row{display:flex;align-items:center;gap:8px;padding:9px 10px;margin-top:6px;border-radius:10px;background:#232323;font-size:15px}
+#svcEd .row span{flex:1}
+#svcEd .row button{border:0;background:none;color:inherit;opacity:.6;font-size:18px}
+#svcEd .add{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+#svcEd .add input{min-width:0}
+#svcEd .add #svcT{grid-column:1/-1}
+#svcEd .btns{display:flex;gap:8px;margin-top:10px}
+#svcEd .btns button{flex:1;border:1px solid #444;background:#202020;color:inherit;border-radius:10px;padding:11px 6px;font-size:15px}
+#svcEd .sect{margin-top:18px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#modal{z-index:80}
 </style>`);
-$('#list').insertAdjacentHTML('beforebegin', '<section id="svc"></section>');
-document.body.insertAdjacentHTML('beforeend', '<input type="file" id="svcFile" accept="image/*" hidden>');
-let SVC_OPEN = false;
+$('#lock').insertAdjacentHTML('afterbegin', '<div id="lsvc"></div>');
+document.body.insertAdjacentHTML('beforeend', '<input type="file" id="svcFile" accept="image/*" hidden><div id="svcEd" class="hidden"></div><div id="svcView" class="hidden"><img alt=""></div>');
+let SVC = {items:[]}, svcUrl = '';
 const hm = t => String(t||'').replace(':','h');
 const nowHM = () => new Date().toTimeString().slice(0,5);
-const svcGet = () => (LEARN.svc ||= {items:[]});
-const svcSave = () => saveLearn().catch(()=>{});
-function svcReset(s){ if (s.photo) removePhoto(s.photo).catch(()=>{}); LEARN.svc = {items:[], type:s.type}; svcSave(); }
-function svcExpired(s){
-  if (!s.type || !s.start) return false;
-  const d = new Date(s.start), b = new Date(s.start);
-  if (s.type === 'SN') { b.setHours(12,0,0,0); if (b <= d) b.setDate(b.getDate()+1); } else b.setHours(24,0,0,0);
+const isNow = (it, n) => it.d && (!it.f ? n >= it.d : it.f > it.d ? n >= it.d && n < it.f : n >= it.d || n < it.f);
+const svcSorted = () => [...SVC.items].sort((a,b)=>(a.d||'').localeCompare(b.d||''));
+const svcLine = it => `${esc(hm(it.d))}${it.f ? ' – ' + esc(hm(it.f)) : ''} : ${esc(it.t)}`;
+async function svcLoad(){ SVC = await dbGet('meta','svc').catch(()=>null) || {items:[]}; SVC.items ||= []; svcSetUrl(); }
+function svcSetUrl(){ if (svcUrl) URL.revokeObjectURL(svcUrl); svcUrl = SVC.photo ? URL.createObjectURL(new Blob([SVC.photo], {type:'image/jpeg'})) : ''; }
+async function svcSave(){ await dbPut('meta', SVC, 'svc').catch(()=>{}); }
+const svcTouch = () => { if (!SVC.start) SVC.start = Date.now(); };
+function svcExpired(){
+  if (!SVC.type || !SVC.start) return false;
+  const d = new Date(SVC.start), b = new Date(SVC.start);
+  if (SVC.type === 'SN') { b.setHours(12,0,0,0); if (b <= d) b.setDate(b.getDate()+1); } else b.setHours(24,0,0,0);
   return Date.now() >= b.getTime();
 }
-const svcTouch = s => { if (!s.start) s.start = Date.now(); };
-const isNow = (it, n) => it.d && (!it.f ? n >= it.d : it.f > it.d ? n >= it.d && n < it.f : n >= it.d || n < it.f);
-function renderSvc(){
-  const el = $('#svc'); if (!el) return;
-  if (!KEY || TAB === 'archived' || SEL) { el.innerHTML = ''; return; }
-  let s = svcGet(); if (svcExpired(s)) { svcReset(s); s = svcGet(); }
-  const items = [...s.items].sort((a,b)=>(a.d||'').localeCompare(b.d||'')), n = nowHM(), cur = items.find(it=>isNow(it, n));
-  const lbl = s.type === 'SN' ? 'DPU / SN' : s.type === 'SPG' ? 'DPU / SPG' : '';
-  const sub = cur ? `<span class="cur">${esc(hm(cur.d))}${cur.f ? ' – ' + esc(hm(cur.f)) : ''} : ${esc(cur.t)}</span>` : items.length ? `<small>${items.length} consigne${items.length>1?'s':''}</small>` : `<small>${s.photo ? 'Photo du service enregistrée' : 'Toucher pour ajouter la feuille et les consignes'}</small>`;
-  el.innerHTML = `<div class="sv"><button type="button" class="svh" data-sv="toggle"><span style="font-size:20px">📋</span><span style="flex:1"><b>Service du jour</b>${lbl ? ` <small>· ${lbl}</small>` : ''}<br>${sub}</span><span style="opacity:.6">${SVC_OPEN ? '▴' : '▾'}</span></button>
-    ${!SVC_OPEN ? '' : `<div class="svb">
-      <div class="seg"><button type="button" data-sv="type" data-t="SPG" class="${s.type==='SPG'?'on':''}">DPU / SPG<br><small>effacé à minuit</small></button><button type="button" data-sv="type" data-t="SN" class="${s.type==='SN'?'on':''}">DPU / SN<br><small>effacé à midi</small></button></div>
-      ${s.photo ? `<div class="ph"><img data-svph="${s.photo}" alt="Feuille de service"></div>` : ''}
-      <div class="btns"><button type="button" data-sv="photo">📷 ${s.photo ? 'Changer la photo' : 'Photo de la feuille'}</button>${s.photo ? '<button type="button" data-sv="rmphoto">Retirer la photo</button>' : ''}</div>
-      ${items.map(it=>`<div class="row${it===cur?' now':''}"><span><b>${esc(hm(it.d))}${it.f ? ' – ' + esc(hm(it.f)) : ''}</b> : ${esc(it.t)}</span><button type="button" data-sv="del" data-i="${s.items.indexOf(it)}" aria-label="Supprimer">✕</button></div>`).join('')}
-      <div class="add"><input type="time" id="svcD" aria-label="Heure de début"><input type="time" id="svcF" aria-label="Heure de fin"><input id="svcT" placeholder="Consigne (ex. ronde secteur X)" autocomplete="off"></div>
-      <div class="btns"><button type="button" data-sv="add"><b>+ Ajouter la consigne</b></button></div>
-      <div class="btns"><button type="button" data-sv="reset" style="color:#ff8a80">Nouveau service (tout effacer)</button></div>
-    </div>`}</div>`;
-  el.querySelectorAll('img[data-svph]').forEach(async i=>{ i.src = await photoURL(i.dataset.svph); });
+async function svcReset(){ SVC = {items:[], type:SVC.type}; svcSetUrl(); await svcSave(); }
+async function renderLockSvc(){
+  if (svcExpired()) await svcReset();
+  const el = $('#lsvc'), n = nowHM(), items = svcSorted(), cur = items.find(it=>isNow(it, n));
+  /* Au plus 3 missions affichées : la mission en cours et les suivantes en priorité */
+  const ci = cur ? items.indexOf(cur) : items.findIndex(it=>(it.d||'') > n), start = Math.max(0, Math.min(ci < 0 ? items.length - 3 : ci, items.length - 3));
+  const shown = items.slice(start, start + 3);
+  const lbl = SVC.type === 'SN' ? 'DPU / SN' : SVC.type === 'SPG' ? 'DPU / SPG' : 'Missions du jour';
+  el.innerHTML = `<button type="button" class="sq" data-ls="photo">${svcUrl ? `<img src="${svcUrl}" alt="Service du jour">` : '📷<br>Service<br>du jour'}</button>
+    <div class="ms"><div class="mh"><span>${lbl}</span><button type="button" data-ls="edit">✎ Modifier</button></div>
+    ${shown.length ? shown.map(it=>`<div class="mi${it===cur?' now':''}"><span>${svcLine(it)}</span></div>`).join('') : '<div class="none">Aucune mission. Touche « Modifier » pour les ajouter.</div>'}</div>`;
+  $('#lock').classList.add('svcOn');
 }
-{ const _r = render; render = function(){ _r(); renderSvc(); }; }
-$('#svc').addEventListener('click', async e=>{
-  const b = e.target.closest('[data-sv]'), img = e.target.closest('img[data-svph]');
-  if (img) { $('#viewer img').src = img.src; $('#viewer').classList.remove('hidden'); return; }
-  if (!b) return; const s = svcGet(), a = b.dataset.sv;
-  if (a === 'toggle') { SVC_OPEN = !SVC_OPEN; return renderSvc(); }
-  if (a === 'type') { s.type = s.type === b.dataset.t ? '' : b.dataset.t; svcTouch(s); svcSave(); return renderSvc(); }
+function renderSvcEd(){
+  const n = nowHM(), items = svcSorted();
+  $('#svcEd').innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between"><h3>Service du jour</h3><button type="button" class="btn" data-se="close" style="width:auto;padding:8px 16px">Terminé</button></div>
+    <div class="seg"><button type="button" data-se="type" data-t="SPG" class="${SVC.type==='SPG'?'on':''}">DPU / SPG<br><small>effacé à minuit</small></button><button type="button" data-se="type" data-t="SN" class="${SVC.type==='SN'?'on':''}">DPU / SN<br><small>effacé à midi</small></button></div>
+    <div class="sect">Feuille de service</div>
+    ${svcUrl ? `<img src="${svcUrl}" alt="" data-se="view" style="display:block;width:100%;max-height:260px;object-fit:contain;margin-top:8px;border-radius:10px;background:#000">` : ''}
+    <div class="btns"><button type="button" data-se="photo">📷 ${svcUrl ? 'Changer la photo' : 'Prendre la feuille en photo'}</button>${svcUrl ? '<button type="button" data-se="rmphoto">Retirer</button>' : ''}</div>
+    <div class="sect">Missions</div>
+    ${items.map(it=>`<div class="row"${isNow(it, n)?' style="background:#f2f2f2;color:#111"':''}><span><b>${esc(hm(it.d))}${it.f ? ' – ' + esc(hm(it.f)) : ''}</b> : ${esc(it.t)}</span><button type="button" data-se="del" data-i="${SVC.items.indexOf(it)}" aria-label="Supprimer">✕</button></div>`).join('')}
+    <div class="add"><input type="time" id="svcD" aria-label="Heure de début"><input type="time" id="svcF" aria-label="Heure de fin"><input id="svcT" placeholder="Mission (ex. ronde secteur X)" autocomplete="off"></div>
+    <div class="btns"><button type="button" data-se="add"><b>+ Ajouter la mission</b></button></div>
+    <div class="btns" style="margin-top:22px"><button type="button" data-se="reset" style="color:#ff8a80">Nouveau service (tout effacer)</button></div>`;
+}
+function openSvcEd(){ renderSvcEd(); $('#svcEd').classList.remove('hidden'); }
+$('#lsvc').addEventListener('click', e=>{
+  const b = e.target.closest('[data-ls]'); if (!b) return;
+  if (b.dataset.ls === 'edit') return openSvcEd();
+  if (svcUrl) { $('#svcView img').src = svcUrl; $('#svcView').classList.remove('hidden'); } else $('#svcFile').click();
+});
+$('#svcView').onclick = ()=>$('#svcView').classList.add('hidden');
+$('#svcEd').addEventListener('click', async e=>{
+  const b = e.target.closest('[data-se]'); if (!b) return; const a = b.dataset.se;
+  if (a === 'close') { $('#svcEd').classList.add('hidden'); return renderLockSvc(); }
+  if (a === 'view') { $('#svcView img').src = svcUrl; $('#svcView').classList.remove('hidden'); return; }
+  if (a === 'type') { SVC.type = SVC.type === b.dataset.t ? '' : b.dataset.t; svcTouch(); await svcSave(); return renderSvcEd(); }
   if (a === 'photo') return $('#svcFile').click();
-  if (a === 'rmphoto') { if (!await ask('Retirer la photo du service ?', 'Retirer')) return; await removePhoto(s.photo).catch(()=>{}); s.photo = null; svcSave(); return renderSvc(); }
-  if (a === 'del') { s.items.splice(+b.dataset.i, 1); svcSave(); return renderSvc(); }
+  if (a === 'rmphoto') { if (!await ask('Retirer la photo du service ?', 'Retirer')) return; SVC.photo = null; svcSetUrl(); await svcSave(); return renderSvcEd(); }
+  if (a === 'del') { SVC.items.splice(+b.dataset.i, 1); await svcSave(); return renderSvcEd(); }
   if (a === 'add') {
     const d = $('#svcD').value, f = $('#svcF').value, t = $('#svcT').value.trim();
-    if (!d || !t) return toast('Indique au moins l\'heure de début et la consigne');
-    s.items.push({d, f, t}); svcTouch(s); svcSave(); renderSvc(); setTimeout(()=>$('#svcD')?.focus(), 50); return;
+    if (!d || !t) return toast('Indique au moins l\'heure de début et la mission');
+    SVC.items.push({d, f, t}); svcTouch(); await svcSave(); renderSvcEd(); return;
   }
-  if (a === 'reset') { if (!await ask('Effacer la feuille et toutes les consignes du service ?', 'Effacer')) return; svcReset(s); SVC_OPEN = true; renderSvc(); }
+  if (a === 'reset') { if (!await ask('Effacer la feuille et toutes les missions du service ?', 'Effacer')) return; await svcReset(); renderSvcEd(); }
 });
 $('#svcFile').onchange = async e=>{
-  const file = e.target.files[0]; e.target.value = ''; if (!file || !KEY) return;
-  try { const s = svcGet(), id = await savePhoto(await shrink(file, 2200, .85)); if (s.photo) await removePhoto(s.photo).catch(()=>{}); s.photo = id; svcTouch(s); await svcSave(); SVC_OPEN = true; renderSvc(); toast(s.type ? 'Photo du service enregistrée' : 'Photo enregistrée : choisis DPU / SPG ou DPU / SN'); }
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  try { SVC.photo = await (await shrink(file, 2200, .85)).arrayBuffer(); svcTouch(); svcSetUrl(); await svcSave(); if (!$('#svcEd').classList.contains('hidden')) renderSvcEd(); renderLockSvc(); toast(SVC.type ? 'Photo du service enregistrée' : 'Photo enregistrée : choisis DPU / SPG ou DPU / SN dans « Modifier »'); }
   catch { toast('La photo n’a pas pu être lue'); }
 };
-setInterval(()=>{ if (KEY && !$('#svc').contains(document.activeElement)) renderSvc(); }, 60000);
+{ const _sl = showLock; showLock = function(setup){ _sl(setup); svcLoad().then(renderLockSvc).catch(()=>{}); }; }
+/* Ancien emplacement (v1.1.0, sur l'accueil et chiffré) : on reprend la feuille et les consignes une fois déverrouillé */
+{ const _oa = openApp; openApp = async function(){ await _oa(); const o = LEARN.svc; if (!o) return;
+  try { await svcLoad(); if (!SVC.items.length && !SVC.photo) { SVC = {items:o.items||[], type:o.type||'', start:o.start}; if (o.photo) { const buf = await photoBuf(o.photo); if (buf) SVC.photo = buf; } svcSetUrl(); await svcSave(); }
+    if (o.photo) await removePhoto(o.photo).catch(()=>{}); delete LEARN.svc; await saveLearn(); } catch {} }; }
+setInterval(()=>{ if (!$('#lock').classList.contains('hidden') && $('#svcEd').classList.contains('hidden')) renderLockSvc(); }, 60000);
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
