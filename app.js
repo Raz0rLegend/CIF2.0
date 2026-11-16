@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -705,6 +705,7 @@ async function shareFiches(list){
   });
   if (!choice || choice === 'cancel') return;
   if (choice === 'qr') { if (SEL) { SEL = null; render(); } return window.QRS?.show(list); }
+  if (choice === 'jpg') { await shareJPG(list); if (SEL) { SEL = null; render(); } return; }
   if (choice === 'mc') { const t = list.map(mcText).join('\n\n'); await shareOut({title:list.map(ficheSubject).join(' / '), text:t}, t); if (SEL) { SEL = null; render(); } return; }
   const subject = list.map(ficheSubject).join(' / ');
   const text = list.map(ficheText).join('\n\n— — — — —\n\n');
@@ -1378,6 +1379,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.1.0', ['Envoi d\'une fiche en image JPG, telle qu\'elle s\'affiche dans l\'appli', 'Accueil : « Service du jour » avec la photo de la feuille de service et les consignes (heure de début – heure de fin : consigne), consigne en cours mise en avant', 'Service DPU / SPG effacé automatiquement à minuit, DPU / SN à midi']],
   ['1.0.0', ['Grosse mise à jour : passage en version 1.0.0', 'Fiches : glisser le doigt vers la gauche ou la droite pour passer à la fiche suivante ou précédente', 'Suggestions collées sous le champ en cours de saisie', 'Nom de famille : plus de correction automatique du clavier', 'Icône « contrôlés ensemble » plus visible', 'Fiches « Non contrôlé » affichées en plus petit et atténuées dans la liste']],
   ['5.4', ['Main courante : filiation précédée de « fils de » ou « fille de » selon le bouton Homme / Femme']],
   ['5.3', ['Fiche A : rubrique « En résumé, l\'intéressé semble » retirée (formulaire, fiche et envoi)']],
@@ -1618,6 +1620,151 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     toast(`Fiche ${j+1} / ${ids.length}`);
   }, {passive:true});
 })();
+
+/* ---------- v1.1.0 : fiche en image JPG ----------
+   La fiche est dessinée sur le téléphone (bibliothèque html2canvas, téléchargée une fois puis gardée) : rien n'est envoyé. */
+const H2C_URLS = ['https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js','https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js'];
+let h2cLoading = null;
+function loadH2C(){
+  if (window.html2canvas) return Promise.resolve(window.html2canvas);
+  return h2cLoading ||= (async ()=>{
+    let txt = await dbGet('meta','h2c').catch(()=>null);
+    if (!txt) {
+      for (const u of H2C_URLS) { try { const r = await fetch(u); if (r.ok) { txt = await r.text(); break; } } catch {} }
+      if (!txt) throw new Error('offline');
+      await dbPut('meta', txt, 'h2c').catch(()=>{});
+    }
+    const url = URL.createObjectURL(new Blob([txt], {type:'text/javascript'}));
+    await new Promise((res,rej)=>{ const sc = document.createElement('script'); sc.src = url; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+    URL.revokeObjectURL(url);
+    if (!window.html2canvas) throw new Error('h2c');
+    return window.html2canvas;
+  })().catch(e=>{ h2cLoading = null; throw e; });
+}
+async function ficheJPG(f){
+  const h2c = await loadH2C(), was = DETAIL;
+  await openDetail(f);
+  const bg = getComputedStyle($('#detail')).backgroundColor || '#1c1c1c';
+  const box = document.createElement('div');
+  box.style.cssText = `position:fixed;left:-10000px;top:0;width:430px;background:${bg};color:#f2f2f2;padding:10px 14px 18px;box-sizing:border-box`;
+  box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:15px;font-weight:600;padding:2px 2px 8px;border-bottom:1px solid #333">${$('#detTitle').innerHTML}</div>` + $('#detBody').innerHTML;
+  box.querySelectorAll('select').forEach(x=>x.remove());
+  if (!f.verif) box.querySelector('#detVerif')?.remove();
+  box.querySelectorAll('.chip').forEach(x=>{ for (const n of x.childNodes) if (n.nodeType === 3) n.textContent = n.textContent.replace(/\s*[▾›]\s*$/,''); });
+  document.body.appendChild(box);
+  try {
+    await Promise.all([...box.querySelectorAll('img')].map(i=>i.complete ? 0 : new Promise(r=>{ i.onload = i.onerror = r; })));
+    const c = await h2c(box, {backgroundColor:bg, scale:2, logging:false});
+    return await new Promise((res,rej)=>c.toBlob(b=>b ? res(b) : rej(new Error('jpeg')), 'image/jpeg', .9));
+  } finally {
+    box.remove();
+    if (!was) closeDetail(); else if (was !== f.id) { const w = FICHES.find(x=>x.id===was); if (w) await openDetail(w); }
+  }
+}
+async function shareJPG(list){
+  toast('Préparation de l\'image…');
+  let files = [];
+  try {
+    for (const f of list) files.push(new File([await ficheJPG(f)], `${((f.nom||'fiche')+'_'+(f.prenom||'')).replace(/[^\w-]+/g,'_')}.jpg`, {type:'image/jpeg'}));
+  } catch { return toast('Image impossible : il faut du réseau la première fois'); }
+  const go = () => navigator.share({files, title:list.map(ficheSubject).join(' / ')});
+  if (!(navigator.canShare && navigator.canShare({files}))) {
+    for (const fl of files) { const a = document.createElement('a'); a.href = URL.createObjectURL(fl); a.download = fl.name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000); }
+    return;
+  }
+  try { await go(); }
+  catch (e) {
+    if (e.name === 'AbortError') return;
+    /* iOS refuse parfois le partage après le calcul de l'image : on redemande un appui */
+    if (await ask(files.length > 1 ? `${files.length} images prêtes.` : 'Image prête.', 'Partager', false)) go().catch(()=>{});
+  }
+}
+(()=>{ const c = document.querySelector('#shareSheet [data-sh=cancel]'); if (c) c.insertAdjacentHTML('beforebegin', `<button data-sh="jpg"><b>Fiche en image (JPG)</b><small>Telle qu'elle s'affiche dans l'appli</small></button>`); })();
+
+/* ---------- v1.1.0 : Service du jour (accueil) ----------
+   Photo de la feuille de service + consignes « début – fin : consigne ». Gardé chiffré avec le reste (et dans la sauvegarde).
+   DPU / SPG : effacé à minuit · DPU / SN : effacé à midi. */
+document.head.insertAdjacentHTML('beforeend', `<style>
+#svc{margin:10px 12px 4px;position:relative;z-index:2}
+#svc:empty{display:none}
+#svc .sv{border:1px solid #3a3a3a;border-radius:12px;background:rgba(30,30,30,.95);overflow:hidden}
+#svc .svh{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;color:inherit;text-align:left;padding:11px 14px;font-size:15px}
+#svc .svh small{color:var(--muted)}
+#svc .cur{display:block;margin-top:3px;font-weight:700;color:#fff}
+#svc .svb{padding:0 14px 12px;border-top:1px solid #2e2e2e}
+#svc .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+#svc .seg button{border:1px solid #444;background:#202020;color:var(--muted);border-radius:10px;padding:9px 4px;font-size:14px;line-height:1.25}
+#svc .seg button.on{background:#f2f2f2;color:#111;border-color:#f2f2f2;font-weight:700}
+#svc .ph{margin-top:10px;border-radius:10px;overflow:hidden;background:#000}
+#svc .ph img{display:block;width:100%;max-height:240px;object-fit:contain}
+#svc .row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:6px;border-radius:10px;background:#232323;font-size:15px}
+#svc .row.now{background:#f2f2f2;color:#111}
+#svc .row span{flex:1}
+#svc .row button{border:0;background:none;color:inherit;opacity:.6;font-size:18px;padding:0 4px}
+#svc .add{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+#svc .add input{min-width:0}
+#svc .add #svcT{grid-column:1/-1}
+#svc .btns{display:flex;gap:8px;margin-top:10px}
+#svc .btns button{flex:1;border:1px solid #444;background:#202020;color:inherit;border-radius:10px;padding:10px 6px;font-size:14px}
+</style>`);
+$('#list').insertAdjacentHTML('beforebegin', '<section id="svc"></section>');
+document.body.insertAdjacentHTML('beforeend', '<input type="file" id="svcFile" accept="image/*" hidden>');
+let SVC_OPEN = false;
+const hm = t => String(t||'').replace(':','h');
+const nowHM = () => new Date().toTimeString().slice(0,5);
+const svcGet = () => (LEARN.svc ||= {items:[]});
+const svcSave = () => saveLearn().catch(()=>{});
+function svcReset(s){ if (s.photo) removePhoto(s.photo).catch(()=>{}); LEARN.svc = {items:[], type:s.type}; svcSave(); }
+function svcExpired(s){
+  if (!s.type || !s.start) return false;
+  const d = new Date(s.start), b = new Date(s.start);
+  if (s.type === 'SN') { b.setHours(12,0,0,0); if (b <= d) b.setDate(b.getDate()+1); } else b.setHours(24,0,0,0);
+  return Date.now() >= b.getTime();
+}
+const svcTouch = s => { if (!s.start) s.start = Date.now(); };
+const isNow = (it, n) => it.d && (!it.f ? n >= it.d : it.f > it.d ? n >= it.d && n < it.f : n >= it.d || n < it.f);
+function renderSvc(){
+  const el = $('#svc'); if (!el) return;
+  if (!KEY || TAB === 'archived' || SEL) { el.innerHTML = ''; return; }
+  let s = svcGet(); if (svcExpired(s)) { svcReset(s); s = svcGet(); }
+  const items = [...s.items].sort((a,b)=>(a.d||'').localeCompare(b.d||'')), n = nowHM(), cur = items.find(it=>isNow(it, n));
+  const lbl = s.type === 'SN' ? 'DPU / SN' : s.type === 'SPG' ? 'DPU / SPG' : '';
+  const sub = cur ? `<span class="cur">${esc(hm(cur.d))}${cur.f ? ' – ' + esc(hm(cur.f)) : ''} : ${esc(cur.t)}</span>` : items.length ? `<small>${items.length} consigne${items.length>1?'s':''}</small>` : `<small>${s.photo ? 'Photo du service enregistrée' : 'Toucher pour ajouter la feuille et les consignes'}</small>`;
+  el.innerHTML = `<div class="sv"><button type="button" class="svh" data-sv="toggle"><span style="font-size:20px">📋</span><span style="flex:1"><b>Service du jour</b>${lbl ? ` <small>· ${lbl}</small>` : ''}<br>${sub}</span><span style="opacity:.6">${SVC_OPEN ? '▴' : '▾'}</span></button>
+    ${!SVC_OPEN ? '' : `<div class="svb">
+      <div class="seg"><button type="button" data-sv="type" data-t="SPG" class="${s.type==='SPG'?'on':''}">DPU / SPG<br><small>effacé à minuit</small></button><button type="button" data-sv="type" data-t="SN" class="${s.type==='SN'?'on':''}">DPU / SN<br><small>effacé à midi</small></button></div>
+      ${s.photo ? `<div class="ph"><img data-svph="${s.photo}" alt="Feuille de service"></div>` : ''}
+      <div class="btns"><button type="button" data-sv="photo">📷 ${s.photo ? 'Changer la photo' : 'Photo de la feuille'}</button>${s.photo ? '<button type="button" data-sv="rmphoto">Retirer la photo</button>' : ''}</div>
+      ${items.map(it=>`<div class="row${it===cur?' now':''}"><span><b>${esc(hm(it.d))}${it.f ? ' – ' + esc(hm(it.f)) : ''}</b> : ${esc(it.t)}</span><button type="button" data-sv="del" data-i="${s.items.indexOf(it)}" aria-label="Supprimer">✕</button></div>`).join('')}
+      <div class="add"><input type="time" id="svcD" aria-label="Heure de début"><input type="time" id="svcF" aria-label="Heure de fin"><input id="svcT" placeholder="Consigne (ex. ronde secteur X)" autocomplete="off"></div>
+      <div class="btns"><button type="button" data-sv="add"><b>+ Ajouter la consigne</b></button></div>
+      <div class="btns"><button type="button" data-sv="reset" style="color:#ff8a80">Nouveau service (tout effacer)</button></div>
+    </div>`}</div>`;
+  el.querySelectorAll('img[data-svph]').forEach(async i=>{ i.src = await photoURL(i.dataset.svph); });
+}
+{ const _r = render; render = function(){ _r(); renderSvc(); }; }
+$('#svc').addEventListener('click', async e=>{
+  const b = e.target.closest('[data-sv]'), img = e.target.closest('img[data-svph]');
+  if (img) { $('#viewer img').src = img.src; $('#viewer').classList.remove('hidden'); return; }
+  if (!b) return; const s = svcGet(), a = b.dataset.sv;
+  if (a === 'toggle') { SVC_OPEN = !SVC_OPEN; return renderSvc(); }
+  if (a === 'type') { s.type = s.type === b.dataset.t ? '' : b.dataset.t; svcTouch(s); svcSave(); return renderSvc(); }
+  if (a === 'photo') return $('#svcFile').click();
+  if (a === 'rmphoto') { if (!await ask('Retirer la photo du service ?', 'Retirer')) return; await removePhoto(s.photo).catch(()=>{}); s.photo = null; svcSave(); return renderSvc(); }
+  if (a === 'del') { s.items.splice(+b.dataset.i, 1); svcSave(); return renderSvc(); }
+  if (a === 'add') {
+    const d = $('#svcD').value, f = $('#svcF').value, t = $('#svcT').value.trim();
+    if (!d || !t) return toast('Indique au moins l\'heure de début et la consigne');
+    s.items.push({d, f, t}); svcTouch(s); svcSave(); renderSvc(); setTimeout(()=>$('#svcD')?.focus(), 50); return;
+  }
+  if (a === 'reset') { if (!await ask('Effacer la feuille et toutes les consignes du service ?', 'Effacer')) return; svcReset(s); SVC_OPEN = true; renderSvc(); }
+});
+$('#svcFile').onchange = async e=>{
+  const file = e.target.files[0]; e.target.value = ''; if (!file || !KEY) return;
+  try { const s = svcGet(), id = await savePhoto(await shrink(file, 2200, .85)); if (s.photo) await removePhoto(s.photo).catch(()=>{}); s.photo = id; svcTouch(s); await svcSave(); SVC_OPEN = true; renderSvc(); toast(s.type ? 'Photo du service enregistrée' : 'Photo enregistrée : choisis DPU / SPG ou DPU / SN'); }
+  catch { toast('La photo n’a pas pu être lue'); }
+};
+setInterval(()=>{ if (KEY && !$('#svc').contains(document.activeElement)) renderSvc(); }, 60000);
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
