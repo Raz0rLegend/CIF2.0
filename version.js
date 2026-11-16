@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.11',
+  version: '1.0.12',
   modules: ['mrz.js', 'naissance.js'],
   changelog: [
+    ['1.0.12', ['Permis : date de délivrance mieux lue (4a souvent sur la même ligne que 4c), ligne du bas « D1FRA » ou « B1FRA » de longueur variable', 'Carte d\'identité récente : scanner le verso (identité) puis le recto, qui remplit le lieu de naissance (ville reconnue dans la liste des communes, en orange à vérifier)', 'Passeport et ancienne carte d\'identité : lieu de naissance lu sur la même face quand il est lisible']],
     ['1.0.11', ['Scan du permis de conduire : lecture des champs numérotés du modèle européen (1 nom, 2 prénom, 3 date et lieu de naissance, 4a date de délivrance, 4c autorité, 5 numéro), identiques dans tous les pays de l\'UE', 'Champs lus sur le permis surlignés en orange « à vérifier » ; nom et numéro confirmés par la ligne du bas quand elle existe (permis français)', 'Petit module de lecture supplémentaire (≈ 0,7 Mo) téléchargé une seule fois, tout reste sur le téléphone']],
     ['1.0.10', ['Scan : permis de conduire français lu (ligne du bas du recto) : nom et numéro du permis remplis, type PC et pays FR ; prénom et date de naissance restent à saisir']],
     ['1.0.9', ['Lieu de naissance en un seul champ, sans le pays : commune avec code postal (« né à Nice (06000) »), Monaco, ou ville étrangère en saisie libre (« Pigna », ou « Pigna, Italie » pour écrire « né à Pigna en Italie »)']],
