@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0.6';
+const APP_VERSION = '1.0.7';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1392,6 +1392,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.0.7', ['Réglages › Outils : répertoire « Diffusion » (personnes recherchées : nom, prénom, date de naissance, photo), chiffré et inclus dans la sauvegarde', 'Nouvelle fiche : alerte rouge « PERSONNE RECHERCHÉE » si l\'identité correspond à une diffusion, alerte « nom diffusé » si seul le nom de famille correspond', 'Badge rouge RECHERCHÉ dans la liste, bandeau dans la fiche et mention dans l\'envoi']],
   ['1.0.6', ['Accident du travail : tuile « Permis de travail » (en règle / non en règle), reprise dans la fiche et l\'envoi']],
   ['1.0.5', ['Localisation : lieux connus reconnus automatiquement (entrées de ville Saint-Roman, Jardin Exotique et Wurtemberg dans un rayon de 50 m, Les Poivriers dans un rayon de 15 m)', 'Position détectée en France : le lieu devient l\'entrée de ville de Monaco la plus proche']],
   ['1.0.4', ['Mineur : champ « Responsable légal » affiché automatiquement', 'Case « Sous tutelle » avec le nom du tuteur', 'Badge SDS (sans adresse ni profession) et main courante « sans profession et sans adresse »', 'VERIF : champ du capitaine de permanence et phrase de main courante (antécédents, avis à la permanence judiciaire, conduite en nos locaux)', 'Case « Antécédents judiciaires » : garde à vue, incarcération, condamnation… par année et motif, rédigés dans la main courante']],
@@ -1931,6 +1932,116 @@ function mcExtra(f){
   if (f.verif) t += ` Fort de ces éléments, nous avisions le service de la permanence judiciaire en la personne du capitaine de police ${f.permCap || 'XXXX'}. Sur ces instructions, ${le} était invité${e} à nous suivre en nos locaux à des fins de vérification d'identité.`;
   return t;
 }
+
+/* ---------- v1.0.7 : Diffusion (personnes recherchées) ----------
+   Répertoire chiffré (gardé avec les suggestions, donc dans la sauvegarde) : nom, prénom, date de naissance, photo.
+   Une fiche dont le nom (ou l'identité complète) correspond est signalée en rouge. */
+const diffList = () => LEARN.diff || [];
+function diffMatches(f){
+  const n = norm(f.nom); if (!n) return [];
+  return diffList().filter(d=>norm(d.nom) === n).map(d=>({d, full: !!norm(d.prenom) && norm(d.prenom) === norm(f.prenom) && (!d.dn || !f.dateNaissance || d.dn === f.dateNaissance)})).sort((a,b)=>b.full - a.full);
+}
+const diffMatch = f => diffMatches(f)[0] || null;
+const diffName = d => [(d.nom||'').toUpperCase(), d.prenom].filter(Boolean).join(' ');
+const WANTED_BADGE = '<span class="badge" style="background:#e01b1b;color:#fff;letter-spacing:.04em">RECHERCHÉ</span>';
+const WANTED2_BADGE = '<span class="badge" style="background:transparent;color:#ff6b6b;border:1px solid #e01b1b">NOM DIFFUSÉ</span>';
+document.head.insertAdjacentHTML('beforeend', `<style>
+.card.wanted{box-shadow:inset 5px 0 0 #e01b1b;background:rgba(92,12,12,.72)}
+.card.wanted2{box-shadow:inset 5px 0 0 #e01b1b}
+.dalert{display:flex;align-items:center;gap:10px;margin-top:8px;padding:10px 12px;border-radius:12px;border:2px solid #e01b1b;background:#4a0d0d;color:#fff;font-size:15px;line-height:1.3}
+.dalert.part{background:#2a1212;border-width:1px}
+.dalert img,.dalert .noph{flex:0 0 54px;width:54px;height:54px;border-radius:8px;object-fit:cover;background:#000;display:flex;align-items:center;justify-content:center;font-size:22px}
+.dalert b{color:#ff8a8a;letter-spacing:.03em}
+#diffList .drow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+#diffList .drow img,#diffList .drow .noph{flex:0 0 52px;width:52px;height:52px;border-radius:8px;object-fit:cover;background:#000;display:flex;align-items:center;justify-content:center;font-size:20px}
+#diffList .drow .dn{flex:1;min-width:0}
+#diffList .drow small{color:var(--muted)}
+#diffList .drow button{border:0;background:none;color:inherit;opacity:.7;padding:8px}
+#diffList .drow button svg{width:22px;height:22px}
+</style>`);
+function diffAlertHTML(list){
+  return list.map(({d, full})=>`<div class="dalert${full?'':' part'}">${d.photo ? `<img data-dph="${d.photo}" alt="">` : '<span class="noph">👤</span>'}<span>${full ? '<b>⚠ PERSONNE RECHERCHÉE</b>' : '<b>⚠ NOM DIFFUSÉ</b> — vérifier l\'identité'}<br>${esc(diffName(d))}${d.dn ? ` · né(e) le ${esc(d.dn)}` : ''}</span></div>`).join('');
+}
+function diffLoadImgs(root){ root.querySelectorAll('img[data-dph]').forEach(async img=>{ img.src = await photoURL(img.dataset.dph); }); }
+/* Formulaire : alerte sous le nom */
+$('#idSug').insertAdjacentHTML('afterend', '<div id="diffAlert"></div>');
+let diffSeen = '';
+function diffAlertShow(){
+  const box = $('#diffAlert'); if (!box || !EDIT) return;
+  const list = diffMatches({nom:$('#f_nom').value, prenom:$('#f_prenom').value, dateNaissance:$('#f_dateNaissance').value});
+  const key = list.map(x=>x.d.id + (x.full?'F':'p')).join(',');
+  if (key === diffSeen) return; diffSeen = key;
+  box.innerHTML = diffAlertHTML(list); diffLoadImgs(box);
+  if (list.some(x=>x.full)) { toast('⚠ PERSONNE RECHERCHÉE'); navigator.vibrate?.([200,100,200]); }
+}
+['f_nom','f_prenom','f_dateNaissance'].forEach(id=>['input','change','blur'].forEach(ev=>$('#'+id).addEventListener(ev, ()=>setTimeout(diffAlertShow))));
+{ const _of = openForm; openForm = function(f, d){ _of(f, d); diffSeen = ' '; diffAlertShow(); }; }
+{ const _ii = idInherit; idInherit = function(src){ _ii(src); diffAlertShow(); }; }
+/* Liste, fiche et envoi */
+{ const _r = render; render = function(){ _r(); if (!diffList().length) return; document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id===c.dataset.id), m = f && diffMatch(f); if (!m) return; c.classList.add(m.full ? 'wanted' : 'wanted2'); c.querySelector('.name')?.insertAdjacentHTML('afterbegin', m.full ? WANTED_BADGE : WANTED2_BADGE); }); }; }
+{ const _od = openDetail; openDetail = async function(f){ await _od(f); if (DETAIL !== f.id) return; const list = diffMatches(f); if (!list.length) return;
+  $('#detTitle').insertAdjacentHTML('afterbegin', list[0].full ? WANTED_BADGE : WANTED2_BADGE);
+  const hero = $('#detBody .hero'); if (hero) { hero.insertAdjacentHTML('afterend', `<div id="detDiff">${diffAlertHTML(list)}</div>`); const imgs = [...$('#detDiff').querySelectorAll('img[data-dph]')]; await Promise.all(imgs.map(async i=>{ i.src = await photoURL(i.dataset.dph); })); } }; }
+{ const _fs = ficheSections; ficheSections = function(f){ const S = _fs(f), m = diffMatch(f); if (m) { const row = ['Diffusion', m.full ? `PERSONNE RECHERCHÉE (${diffName(m.d)}${m.d.dn ? ', né(e) le ' + m.d.dn : ''})` : `nom de famille figurant en diffusion (${diffName(m.d)})`]; S[0] && S[0][0] === '' ? S[0][1].push(row) : S.unshift(['', [row]]); } return S; }; }
+/* Répertoire : Réglages › Outils › Diffusion */
+(()=>{
+  const sh = document.createElement('div'); sh.id = 'diffusion'; sh.className = 'sheet hidden';
+  sh.innerHTML = `<div class="top"><button class="ib" id="diffBack" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><h2>Diffusion</h2></div>
+  <div class="body">
+    <p class="hint" style="color:var(--muted);font-size:13px;margin:10px 0 0">Personnes recherchées. Une fiche portant le même nom est signalée en rouge. Répertoire chiffré, gardé sur le téléphone.</p>
+    <label class="f" for="d_nom">Nom</label><input id="d_nom" autocomplete="off" autocorrect="off" spellcheck="false" autocapitalize="characters">
+    <label class="f" for="d_prenom">Prénom</label><input id="d_prenom" autocomplete="off" spellcheck="false">
+    <label class="f" for="d_dn">Date de naissance</label><input id="d_dn" inputmode="numeric" placeholder="JJ/MM/AAAA" autocomplete="off">
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px"><div id="d_prev" style="flex:0 0 64px;width:64px;height:64px;border-radius:10px;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px">👤</div>
+      <button type="button" class="addveh" id="d_photo" style="margin:0;flex:1">📷 Photo</button></div>
+    <input type="file" id="d_file" accept="image/*" hidden>
+    <div style="display:flex;gap:8px;margin-top:14px"><button type="button" class="btn" id="d_save" style="flex:1">Ajouter</button><button type="button" class="btn" id="d_cancel" style="flex:0 0 110px;background:#333;color:#fff;display:none">Annuler</button></div>
+    <div class="sect" id="diffCount">Répertoire</div>
+    <div id="diffList"></div>
+  </div>`;
+  document.body.appendChild(sh);
+  const h = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent==='Outils');
+  h?.insertAdjacentHTML('afterend', `<button class="btn sec" id="t_diff" style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e01b1b"></span>Diffusion (personnes recherchées)</button>`);
+  let editId = null, photo = null, photoNew = false;
+  const prev = async () => { $('#d_prev').innerHTML = photo ? `<img src="${await photoURL(photo)}" alt="" style="width:100%;height:100%;object-fit:cover">` : '👤'; };
+  const dropNew = async () => { if (photo && photoNew) await removePhoto(photo).catch(()=>{}); };
+  const reset = () => { editId = null; photo = null; photoNew = false; for (const id of ['d_nom','d_prenom','d_dn']) $('#'+id).value = ''; $('#d_save').textContent = 'Ajouter'; $('#d_cancel').style.display = 'none'; prev(); };
+  function list(){
+    const L = [...diffList()].sort((a,b)=>diffName(a).localeCompare(diffName(b), 'fr'));
+    $('#diffCount').textContent = `Répertoire (${L.length})`;
+    $('#diffList').innerHTML = L.length ? L.map(d=>`<div class="drow" data-id="${d.id}">${d.photo ? `<img data-dph="${d.photo}" alt="">` : '<span class="noph">👤</span>'}<div class="dn"><b>${esc((d.nom||'').toUpperCase())}</b> ${esc(d.prenom||'')}<br><small>${d.dn ? 'né(e) le ' + esc(d.dn) : 'date de naissance inconnue'}</small></div><button type="button" data-da="edit" aria-label="Modifier">${ICON.edit}</button><button type="button" data-da="del" aria-label="Supprimer">${ICON.trash}</button></div>`).join('') : '<p class="hint" style="color:var(--muted);font-size:14px;margin:10px 0">Aucune personne en diffusion.</p>';
+    diffLoadImgs($('#diffList'));
+  }
+  $('#t_diff')?.addEventListener('click', ()=>{ if (!KEY) return; reset(); list(); sh.classList.remove('hidden'); sh.querySelector('.body').scrollTop = 0; });
+  $('#diffBack').onclick = async ()=>{ await dropNew(); reset(); sh.classList.add('hidden'); render(); };
+  $('#d_nom').addEventListener('input', e=>{ const p = e.target.selectionStart; e.target.value = e.target.value.toUpperCase(); e.target.setSelectionRange(p, p); });
+  $('#d_dn').addEventListener('input', dateMask);
+  $('#d_dn').addEventListener('blur', e=>{ const m = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(e.target.value.trim()); if (m) e.target.value = `${m[1]}/${m[2]}/${fullYear(m[3])}`; });
+  $('#d_photo').onclick = ()=>$('#d_file').click();
+  $('#d_file').onchange = async e=>{
+    const file = e.target.files[0]; e.target.value = ''; if (!file || !KEY) return;
+    try { const id = await savePhoto(await shrink(file, 1200, .82)); await dropNew(); photo = id; photoNew = true; prev(); } catch { toast('La photo n’a pas pu être lue'); }
+  };
+  $('#d_cancel').onclick = async ()=>{ await dropNew(); reset(); };
+  $('#d_save').onclick = async ()=>{
+    const nom = $('#d_nom').value.trim().toUpperCase(), prenom = $('#d_prenom').value.trim(), dn = $('#d_dn').value.trim();
+    if (!nom) return toast('Le nom est obligatoire');
+    const L = LEARN.diff ||= [], old = editId && L.find(x=>x.id===editId);
+    if (old) { if (old.photo && old.photo !== photo) await removePhoto(old.photo).catch(()=>{}); Object.assign(old, {nom, prenom, dn, photo}); }
+    else L.push({id:uid(), nom, prenom, dn, photo, at:Date.now()});
+    photoNew = false;
+    try { await saveLearn(); toast(old ? 'Diffusion modifiée' : 'Ajouté à la diffusion'); } catch { toast('Enregistrement impossible'); }
+    reset(); list();
+  };
+  $('#diffList').addEventListener('click', async e=>{
+    const row = e.target.closest('.drow'); if (!row) return; const d = diffList().find(x=>x.id===row.dataset.id); if (!d) return;
+    const a = e.target.closest('[data-da]')?.dataset.da;
+    if (a === 'del') { if (!await ask(`Retirer ${diffName(d)} de la diffusion ?`, 'Retirer')) return; if (d.photo) await removePhoto(d.photo).catch(()=>{}); LEARN.diff = diffList().filter(x=>x.id!==d.id); await saveLearn().catch(()=>{}); if (editId === d.id) reset(); return list(); }
+    if (a === 'edit') { await dropNew(); editId = d.id; photo = d.photo || null; photoNew = false; $('#d_nom').value = d.nom||''; $('#d_prenom').value = d.prenom||''; $('#d_dn').value = d.dn||''; $('#d_save').textContent = 'Enregistrer'; $('#d_cancel').style.display = ''; prev(); sh.querySelector('.body').scrollTop = 0; return; }
+    if (e.target.closest('img') && d.photo) { $('#viewer img').src = await photoURL(d.photo); $('#viewer').classList.remove('hidden'); }
+  });
+  { const _lk = lock; lock = function(){ sh.classList.add('hidden'); _lk(); }; }
+})();
 
 /* ---------- Démarrage ---------- */
 (async ()=>{
