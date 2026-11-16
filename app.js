@@ -1,6 +1,6 @@
 'use strict';
 /* CIF 2.0 — logique de l'application */
-const APP_VERSION = '1.0.5';
+const APP_VERSION = '1.0.6';
 /* ---------- Utilitaires ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,7 +14,7 @@ const vehIcons = f => vehTypes(f).map(t=>`<span class="vic" title="${esc(t)}">${
 const QUALITES = ['Piéton','Conducteur VL','Passager','2RM','PL','Autre'];
 const FIELDS = ['dateHeure','sexe','nom','prenom','dateNaissance','lieuNaissance','nationalite','profession','adresse','telephone','resultat','filiation','docType','docPays','docNumero','docDate','docLieu','lieuControle','motif','observations','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes','kilometrage','employeur','atCirconstances','atHauteur','atBlessures','ipmHeure','ipmAveu','ipmTemoins','ipmDerniere','adrRue','adrVille','adrPays'];
 const AT_FIELDS = ['atCirconstances','atHauteur','atBlessures'];
-const AT_EPI = [['atChaussures','Chaussures de sécurité','Chaussures'],['atGants','Gants de sécurité','Gants'],['atCasque','Casque','Casque']];
+const AT_EPI = [['atChaussures','Chaussures de sécurité','Chaussures'],['atGants','Gants de sécurité','Gants'],['atCasque','Casque','Casque'],['atPermis','Permis de travail','Permis de travail']];
 const CEEA_BADGE = '<span class="badge acc" style="background:#1f5fa8;color:#fff">CEEA</span>';
 const DEP_FIELDS = ['alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const IPM_FIELDS = ['ipmHeure','ipmAveu','ipmTemoins','ipmDerniere'];
@@ -35,8 +35,8 @@ const IPM_GROUPS = [
 const IPM_BADGE = '<span class="badge acc" style="background:#0f766e;color:#fff">IPM</span>';
 const ipmVal = (f,k) => (f.ipmSel?.[k]||[]).map(x=>x==='Contusions'?'Confusions':x).join(', ');
 const AT_BADGE = '<span class="badge acc" style="background:#5a3a8c;color:#fff">Acc. travail</span>';
-const epiTxt = v => v === 'oui' ? 'porté(s)' : v === 'non' ? 'non porté(s)' : '';
-const epiHTML = v => v === 'oui' ? '<span style="color:#3ccf4e;font-weight:700">✓ Porté</span>' : v === 'non' ? '<span style="color:#ff5a52;font-weight:700">✗ Non porté</span>' : '';
+const epiTxt = (v, k) => k === 'atPermis' ? (v === 'oui' ? 'en règle' : v === 'non' ? 'non en règle' : '') : v === 'oui' ? 'porté(s)' : v === 'non' ? 'non porté(s)' : '';
+const epiHTML = (v, k) => { const ok = k === 'atPermis' ? ['En règle','Non en règle'] : ['Porté','Non porté']; return v === 'oui' ? `<span style="color:#3ccf4e;font-weight:700">✓ ${ok[0]}</span>` : v === 'non' ? `<span style="color:#ff5a52;font-weight:700">✗ ${ok[1]}</span>` : ''; };
 const hautTxt = h => { const v = String(h||'').trim().replace('.',','); return v ? (/m$/i.test(v) ? v : v + ' m') : ''; };
 const ACC_FIELDS = ['kilometrage','employeur','sitFam','email','nbEnfants','nbCharge','alcHeure','alcRes','alcTaux','stupHeure','stupRes'];
 const resTest = r => r ? `<span style="color:${r==='Positif'?'#ff5a52':'#3ccf4e'};font-weight:600">${r}</span>` : '';
@@ -388,7 +388,7 @@ async function openDetail(f){
       ['Enfants',f.nbEnfants],['Dont à charge',f.nbCharge], ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k] ? '<span style="color:#3ccf4e;font-weight:700">✓ Oui</span>' : '<span style="color:#ff5a52;font-weight:700">✗ Non</span>') : ok(f[k]), true])]);
   const dep = !(f.accident||f.ceea) ? '' : panel('Dépistages', [['Alcool — heure',f.alcHeure],['Alcool — résultat',resTest(f.alcRes),true],['Alcool — taux', f.alcTaux ? `<span style="color:${tauxColor(f.alcTaux)||'inherit'};font-weight:700">${esc(taux(f.alcTaux))}</span>` : '', true],
       ['Stupéfiants — heure',f.stupHeure],['Stupéfiants — résultat',resTest(f.stupRes),true]]);
-  const atp = !f.at ? '' : panel('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiHTML(f[k]), true]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
+  const atp = !f.at ? '' : panel('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiHTML(f[k], k), true]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
   const ipmp = !(f.ipm||f.ceea) ? '' : panel('Examen de comportement (fiche A)', [['Heure de l\'examen',f.ipmHeure], ...IPM_GROUPS.filter(g=>g[0]!=='resume').map(([k,l])=>[l, ipmVal(f,k)]),
       ['Alcool (3 h) — aveu de la personne',f.ipmAveu],['Alcool (3 h) — aveu des témoins',f.ipmTemoins],['Dernière absorption d\'alcool',f.ipmDerniere]]);
   const ctx = panel('Contexte', [['Motif',f.motif],['Observations',f.observations]]);
@@ -660,7 +660,7 @@ function ficheSections(f){
     ...MEMO.map(([k,l])=>[l, k==='memoGR' ? (f[k]?'oui':'non') : f[k]?'photographié(e)':'non photographié(e)'])]);
   if (f.accident || f.ceea) add('Dépistages', [['Test alcool',[f.alcHeure && `à ${f.alcHeure}`, f.alcRes, taux(f.alcTaux)].filter(Boolean).join(' — ')],
     ['Test stupéfiants',[f.stupHeure && `à ${f.stupHeure}`, f.stupRes].filter(Boolean).join(' — ')]]);
-  if (f.at) add('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiTxt(f[k])]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
+  if (f.at) add('Accident du travail', [...AT_EPI.map(([k,l])=>[l, epiTxt(f[k], k)]), ['Hauteur de chute',hautTxt(f.atHauteur)], ['Circonstances',f.atCirconstances], ['Nature des blessures',f.atBlessures]]);
   if (f.ipm || f.ceea) add('Examen de comportement (fiche A)', [['Heure de l\'examen',f.ipmHeure], ...IPM_GROUPS.map(([k,l])=>[l, ipmVal(f,k)]),
     ['Absorption d\'alcool (3 dernières heures) — aveu de la personne',f.ipmAveu],['Absorption d\'alcool (3 dernières heures) — aveu des témoins',f.ipmTemoins],['Dernière heure d\'absorption d\'alcool',f.ipmDerniere]]);
   if (cif) add('Document', f.docMode === 'Sur dires' ? [['Identité établie','Sur dires']]
@@ -1131,9 +1131,9 @@ $('#geoBtn').onclick = ()=>geoFill(false);
 /* ---------- Accident du travail : EPI, circonstances, hauteur de chute, blessures ---------- */
 $('#accBlock').insertAdjacentHTML('afterend', `<label class="switch"><input type="checkbox" id="f_at"><span class="sw"></span><span class="swl">Accident du travail</span></label>
   <div id="atBlock" class="accblock hidden">
-    <div class="sect" style="margin-top:6px">Équipements de protection</div>
-    <div id="atEpi" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px"></div>
-    <p class="hint" style="font-size:12px;color:var(--muted);margin:6px 0 0">Touche : vert = porté · rouge = non porté · gris = non renseigné</p>
+    <div class="sect" style="margin-top:6px">Équipements de protection et permis de travail</div>
+    <div id="atEpi" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px"></div>
+    <p class="hint" style="font-size:12px;color:var(--muted);margin:6px 0 0">Touche : vert = porté / en règle · rouge = non porté / non en règle · gris = non renseigné</p>
     <label class="f" for="f_atHauteur">Hauteur de chute (m)</label><input id="f_atHauteur" inputmode="decimal" placeholder="ex. 2,5" autocomplete="off">
     <label class="f" for="f_atCirconstances">Circonstances de l'accident</label><textarea id="f_atCirconstances" rows="3"></textarea>
     <label class="f" for="f_atBlessures">Nature des blessures</label><textarea id="f_atBlessures" rows="2"></textarea>
@@ -1392,6 +1392,7 @@ $('#sexeSeg').addEventListener('click', e=>{ const b = e.target.closest('[data-s
 (()=>{ const b = document.querySelector('#shareSheet [data-sh=outlook] b'); if (b) b.textContent = 'Envoi rapide par e-mail';
   $('#exportOutlook').textContent = 'Envoyer toutes les fiches en cours par e-mail'; })();
 const CHANGELOG = [
+  ['1.0.6', ['Accident du travail : tuile « Permis de travail » (en règle / non en règle), reprise dans la fiche et l\'envoi']],
   ['1.0.5', ['Localisation : lieux connus reconnus automatiquement (entrées de ville Saint-Roman, Jardin Exotique et Wurtemberg dans un rayon de 50 m, Les Poivriers dans un rayon de 15 m)', 'Position détectée en France : le lieu devient l\'entrée de ville de Monaco la plus proche']],
   ['1.0.4', ['Mineur : champ « Responsable légal » affiché automatiquement', 'Case « Sous tutelle » avec le nom du tuteur', 'Badge SDS (sans adresse ni profession) et main courante « sans profession et sans adresse »', 'VERIF : champ du capitaine de permanence et phrase de main courante (antécédents, avis à la permanence judiciaire, conduite en nos locaux)', 'Case « Antécédents judiciaires » : garde à vue, incarcération, condamnation… par année et motif, rédigés dans la main courante']],
   ['1.0.3', ['Écrans verrouillés : plus de zoom (pincement, double tap, zoom automatique sur un champ) ni de glissement de la page vers la gauche ou la droite, le défilement reste vertical', 'Zoom conservé uniquement sur les photos ouvertes en plein écran (fiche et feuille de service)', 'Numérotation des versions : petites mises à jour en 1.0.x']],
