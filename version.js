@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.24',
+  version: '1.0.25',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js'],
-  changelog: [ ['1.0.24',['Véhicule : cases « Carte grise » et « Assurance » (vertes = présentées, un appui = rouge, non présentée)','Main courante du conducteur : « dont le certificat d\'immatriculation n\'était pas présenté », « dont le certificat d\'assurance n\'était pas présenté » ou les deux ; « en règle » si tout est présenté','Fiche et envoi : ligne « Documents » sous chaque véhicule']],
+  changelog: [ ['1.0.25',['Main courante : toujours « dont les documents de bord étaient en règle », propriétaire ou non']],
+    ['1.0.24',['Véhicule : cases « Carte grise » et « Assurance » (vertes = présentées, un appui = rouge, non présentée)','Main courante du conducteur : « dont le certificat d\'immatriculation n\'était pas présenté », « dont le certificat d\'assurance n\'était pas présenté » ou les deux ; « en règle » si tout est présenté','Fiche et envoi : ligne « Documents » sous chaque véhicule']],
     ['1.0.23',['Lieu connu : Place du Casino (rayon de 15 m)']],
     ['1.0.22',['Main courante du conducteur : bloc du véhicule placé après « Identité relevée… » et le résultat du fichier, avant les antécédents et la vérification']],
     ['1.0.21',['Main courante : plaque écrite AB-123-CD(F)','Main courante du conducteur : bloc du véhicule placé juste après l\'identité, avant le fichier, les antécédents et la vérification','Antécédents : « le nommé DUPONT Jean » (pièce officielle) ou « le disant se nommer DUPONT Jean » (sur dires) au lieu de « l\'intéressé »','Écran principal : la page ne défile plus, seule la liste des fiches défile ; en-tête toujours en haut, onglets CIF/CI et Tout/Archiver/Envoyer toujours collés en bas']],
