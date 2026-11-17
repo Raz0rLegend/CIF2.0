@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.13',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js'],
+  version: '1.0.14',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js'],
   changelog: [
+    ['1.0.14', ['Pièce d\'identité : champ « Date d\'expiration », rempli au scan (bande des passeports, cartes et titres de séjour, ligne 4b du permis)', 'Alerte rouge « PIÈCE EXPIRÉE » à la date du contrôle (formulaire, liste, fiche, envoi) et phrase en main courante : « Cette pièce est expirée depuis le … »', 'Carte d\'identité : lecture du verso (ancienne carte : adresse, validité, date de délivrance, autorité ; nouvelle carte : adresse et date de délivrance), à vérifier en orange', 'Cartes d\'identité délivrées entre 2004 et 2013 à un majeur : validité prolongée de 5 ans prise en compte (décret 2013-1188)', 'Bouton « Ajouter une personne au même contrôle » (fiche ouverte, et « Enregistrer et ajouter » dans le formulaire) : heure, lieu, motif et véhicule repris, fiches liées']],
     ['1.0.13', ['Scan de pièce : petit bouton appareil photo au bout de la ligne « Nom »', 'Plus de correction automatique du clavier sur le prénom, l\'adresse, les villes, le pays, la filiation, le responsable légal et le tuteur']],
     ['1.0.12', ['Permis : date de délivrance mieux lue (4a souvent sur la même ligne que 4c), ligne du bas « D1FRA » ou « B1FRA » de longueur variable', 'Carte d\'identité récente : scanner le verso (identité) puis le recto, qui remplit le lieu de naissance (ville reconnue dans la liste des communes, en orange à vérifier)', 'Passeport et ancienne carte d\'identité : lieu de naissance lu sur la même face quand il est lisible']],
     ['1.0.11', ['Scan du permis de conduire : lecture des champs numérotés du modèle européen (1 nom, 2 prénom, 3 date et lieu de naissance, 4a date de délivrance, 4c autorité, 5 numéro), identiques dans tous les pays de l\'UE', 'Champs lus sur le permis surlignés en orange « à vérifier » ; nom et numéro confirmés par la ligne du bas quand elle existe (permis français)', 'Petit module de lecture supplémentaire (≈ 0,7 Mo) téléchargé une seule fois, tout reste sur le téléphone']],
