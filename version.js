@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.20',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js'],
-  changelog: [ ['1.0.20',['Barres du bas (onglets CIF/CI, Tout/Archiver/Envoyer, bouton +) recollées au bas de l\'écran quand iOS les laisse à mi-hauteur après la fermeture du clavier']],
+  version: '1.0.21',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js'],
+  changelog: [ ['1.0.21',['Main courante : plaque écrite AB-123-CD(F)','Main courante du conducteur : bloc du véhicule placé juste après l\'identité, avant le fichier, les antécédents et la vérification','Antécédents : « le nommé DUPONT Jean » (pièce officielle) ou « le disant se nommer DUPONT Jean » (sur dires) au lieu de « l\'intéressé »','Écran principal : la page ne défile plus, seule la liste des fiches défile ; en-tête toujours en haut, onglets CIF/CI et Tout/Archiver/Envoyer toujours collés en bas']],
+    ['1.0.20',['Barres du bas (onglets CIF/CI, Tout/Archiver/Envoyer, bouton +) recollées au bas de l\'écran quand iOS les laisse à mi-hauteur après la fermeture du clavier']],
     ['1.0.19',['Main courante : plaque au format AB123CD(F), pays toujours indiqué','Main courante : chaque bloc (identité, véhicule, passagers) sur sa propre ligne']],
     ['1.0.18', ['Main courante du conducteur : « Il était l\'utilisateur, propriétaire du véhicule particulier de marque …, de type …, de couleur …, immatriculé …, dont les documents étaient en règle » (propriétaire « LM ») ou « Il était l\'utilisateur d\'un véhicule léger de marque … appartenant à …, dont les documents de bord étaient en règle »', 'Phrase adaptée aux informations remplies (marque, type, couleur, plaque, pays si étranger), au sexe (Elle / l\'utilisatrice) et au type de véhicule (deux-roues motorisé, poids lourd, vélo)']],
     ['1.0.17', ['Main courante : une seule phrase pour tous les passagers d\'un même véhicule (« Tous trois étaient passagers du véhicule de marque … immatriculé …, conduit par … »)', 'Main courante du conducteur : ses passagers ajoutés automatiquement à la suite', 'Accord automatique : « Tous deux », « Toutes trois … passagères », passager seul : « L\'intéressé était passager … »']],
