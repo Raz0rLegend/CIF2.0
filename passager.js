@@ -112,7 +112,7 @@
     const F = f.sexe === 'F', own = isLM(v.proprio), nm = VNOM[v.type] || VNOM.VL;
     const bits = [v.marque && `de marque ${v.marque}`, v.modele && `de type ${v.modele}`, v.couleur && `de couleur ${v.couleur.toLowerCase()}`, v.plaque && `immatriculé ${mcPlate(v)}`].filter(Boolean);
     const head = `${F ? 'Elle' : 'Il'} était ${F ? "l'utilisatrice" : "l'utilisateur"}${own ? `, propriétaire ${nm[0]}` : ` ${nm[1]}`}`;
-    const rest = [...bits.slice(1), ...(!own && v.proprio ? [`appartenant à ${v.proprio}`] : []), own ? 'dont les documents étaient en règle' : 'dont les documents de bord étaient en règle'];
+    const rest = [...bits.slice(1), ...(!own && v.proprio ? [`appartenant à ${v.proprio}`] : []), window.vehDocsPhrase ? vehDocsPhrase(v, own) : own ? 'dont les documents étaient en règle' : 'dont les documents de bord étaient en règle'];
     return [head + (bits[0] ? ' ' + bits[0] : ''), ...rest].join(', ') + '.';
   }
   { const _mc0 = mcText; mcText = function(f, i, arr){
