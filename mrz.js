@@ -72,6 +72,8 @@
   }
   function dob(s){ s = dig(s); if (!/^\d{6}$/.test(s)) return ''; const yy = +s.slice(0,2), y = (yy > new Date().getFullYear() % 100 ? 1900 : 2000) + yy; return `${s.slice(4,6)}/${s.slice(2,4)}/${y}`; }
   const sex = c => c === 'M' ? 'H' : c === 'F' ? 'F' : '';
+  /* Date d'expiration AAMMJJ (toujours au XXIe siècle) */
+  const expd = s => { s = dig(s); return /^\d{6}$/.test(s) && +s.slice(2,4) >= 1 && +s.slice(2,4) <= 12 ? `${s.slice(4,6)}/${s.slice(2,4)}/20${s.slice(0,2)}` : ''; };
   function parse(text){
     const L = text.split(/\n/).map(l=>l.toUpperCase().replace(/[^A-Z0-9<]/g,'')).filter(l=>l.length >= 26);
     for (let i = 0; i < L.length; i++) {
@@ -91,17 +93,17 @@
       /* Passeport (2 × 44) */
       if (a[0] === 'P' && a.length >= 40 && b.length >= 40) {
         const l1 = pad(a,44), l2 = pad(b,44);
-        return {kind:'TD3', type:'PS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(10,13)), num:l2.slice(0,9).replace(/</g,''), ...names(l1.slice(5)), dn:dob(l2.slice(13,19)), sexe:sex(l2[20]), ok:chk(l2.slice(0,9), dig(l2[9])) && chk(dig(l2.slice(13,19)), dig(l2[19]))};
+        return {kind:'TD3', type:'PS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(10,13)), num:l2.slice(0,9).replace(/</g,''), ...names(l1.slice(5)), dn:dob(l2.slice(13,19)), sexe:sex(l2[20]), exp:expd(l2.slice(21,27)), ok:chk(l2.slice(0,9), dig(l2[9])) && chk(dig(l2.slice(13,19)), dig(l2[19]))};
       }
       /* Carte d'identité, titre de séjour (3 × 30) */
       if (/^[IAC1]/.test(a) && a.length >= 27 && a.length <= 33 && b.length >= 27 && b.length <= 33 && c.length >= 20) {
         const l1 = pad(a,30), l2 = pad(b,30), t = alpha(l1.slice(0,2));
-        return {kind:'TD1', type:/^I[D<]/.test(t) ? 'CNI' : 'TS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(15,18)), num:l1.slice(5,14).replace(/</g,''), ...names(pad(c,30)), dn:dob(l2.slice(0,6)), sexe:sex(l2[7]), ok:chk(l1.slice(5,14), dig(l1[14])) && chk(dig(l2.slice(0,6)), dig(l2[6]))};
+        return {kind:'TD1', type:/^I[D<]/.test(t) ? 'CNI' : 'TS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(15,18)), num:l1.slice(5,14).replace(/</g,''), ...names(pad(c,30)), dn:dob(l2.slice(0,6)), sexe:sex(l2[7]), exp:expd(l2.slice(8,14)), ok:chk(l1.slice(5,14), dig(l1[14])) && chk(dig(l2.slice(0,6)), dig(l2[6]))};
       }
       /* Format 2 × 36 */
       if (/^[IACV1]/.test(a) && a.length >= 33 && a.length <= 38 && b.length >= 33 && b.length <= 38) {
         const l1 = pad(a,36), l2 = pad(b,36), t = alpha(l1.slice(0,2));
-        return {kind:'TD2', type:/^I[D<]/.test(t) ? 'CNI' : 'TS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(10,13)), num:l2.slice(0,9).replace(/</g,''), ...names(l1.slice(5)), dn:dob(l2.slice(13,19)), sexe:sex(l2[20]), ok:chk(l2.slice(0,9), dig(l2[9])) && chk(dig(l2.slice(13,19)), dig(l2[19]))};
+        return {kind:'TD2', type:/^I[D<]/.test(t) ? 'CNI' : 'TS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(10,13)), num:l2.slice(0,9).replace(/</g,''), ...names(l1.slice(5)), dn:dob(l2.slice(13,19)), sexe:sex(l2[20]), exp:expd(l2.slice(21,27)), ok:chk(l2.slice(0,9), dig(l2[9])) && chk(dig(l2.slice(13,19)), dig(l2[19]))};
       }
     }
     return null;
@@ -132,6 +134,7 @@
       if (k === '1' || k === '2') { const w = word(v).split(' ').filter(x=>x.length > 1 || /[A-Z]/.test(x)).join(' '); if (w.replace(/[^A-Za-zÀ-ÿ]/g,'').length >= 2) F[k] = k === '1' ? w.toUpperCase() : cap(w); }
       else if (k === '3') { const d = dateIn(v); if (d) { F.dn = d.v; let r2 = v.slice(d.end).trim(); const pm = /^\(([^)]*)\)?/.exec(r2); r2 = pm ? pm[1] : r2.replace(/\([^)]*\)\s*$/,''); const lieu = word(r2); if (lieu.length >= 2) F.lieu = cap(lieu); } }
       else if (k === '4a') { const d = dateIn(v); if (d) F.del = d.v; }
+      else if (k === '4b') { const d = dateIn(v); if (d) F.exp = d.v; }
       else if (k === '4c') { const w = v.replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim(); if (w.length >= 3) F.aut = w; }
       else if (k === '5') { const n = v.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); if (n.length >= 5 && n.length <= 16) F.num = n; }
     }
@@ -144,7 +147,7 @@
     /* Dernier recours : les dates du recto autres que la naissance, la plus ancienne passée = délivrance */
     if (!F.del) {
       const ds = []; const re = /[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4}/g;
-      for (const raw of lines) for (const m of raw.matchAll(re)) { const d = dateIn(m[0]); if (d && d.v !== F.dn) ds.push(d.v); }
+      for (const raw of lines) for (const m of raw.matchAll(re)) { const d = dateIn(m[0]); if (d && d.v !== F.dn && d.v !== F.exp) ds.push(d.v); }
       const t = v => { const [d, m, y] = v.split('/'); return new Date(+y, m-1, +d).getTime(); };
       const past = [...new Set(ds)].filter(v => t(v) <= Date.now() && (!F.dn || t(v) > t(F.dn))).sort((a,b)=>t(a)-t(b));
       if (past.length) F.del = past[0];
@@ -185,6 +188,57 @@
     return '';
   }
   window.permisFields = permisFields;
+  /* Verso d'une carte d'identité (ancienne : adresse, validité, délivrance, autorité ; nouvelle : adresse, date de délivrance) */
+  function versoFields(text){
+    const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), F = {};
+    const STOP = /taille|height|carte\s*valable|valable|d[ée]livr|date\s*de|issue|par\s*[:.]|signature|r[ée]publique|<<|nom\s*d|signes/i;
+    for (let i = 0; i < L.length; i++) {
+      const l = L[i];
+      if (!F.exp) { const m = /valable\s*jusqu.{0,4}au\s*[:.]?\s*(.*)$/i.exec(l); if (m) { const d = dateIn(m[1]); if (d) F.exp = d.v; } }
+      if (!F.del) { const m = /(d[ée]livr[ée]e?\s*le|date\s*de\s*d[ée]livrance|date\s*of\s*issue)[^0-9A-Za-z]*(?:[A-Za-z ]*issue)?\s*[:.]?\s*(.*)$/i.exec(l); if (m) { const d = dateIn(m[2]) || (L[i+1] && dateIn(L[i+1])); if (d) F.del = d.v; } }
+      if (!F.aut) { const m = /\bpar\s*[:.]\s*(.{3,})$/i.exec(l); if (m) { const a = m[1].trim(), dep = /pr[ée]fecture.*?\(?\b(\d{2,3}|2[AB])\)?\s*$/i.exec(a); F.aut = dep ? `Préfecture ${dep[1].toUpperCase()}` : a[0].toUpperCase() + a.slice(1).toLowerCase(); } }
+      if (!F.rue && /^\W*adresse|^\W*address/i.test(l)) {
+        const parts = [], first = l.replace(/^\W*adresse\s*(\/\s*address)?\s*[:.]?\s*/i,'').trim();
+        if (first.length > 2) parts.push(first);
+        for (let j = i + 1; j < L.length && parts.length < 4 && !STOP.test(L[j]); j++) parts.push(L[j]);
+        const k = parts.findIndex(x=>/\b\d{5}\b/.test(x));
+        if (k >= 0) {
+          const m = /\b(\d{5})\s+([A-Za-zÀ-ÿ' -]{2,})/.exec(parts[k]);
+          if (m) { F.cp = m[1]; F.ville = m[2].replace(/\s+(cedex.*)$/i,'').trim(); }
+          F.rue = parts.slice(0, k).join(', ');
+          const after = parts.slice(k+1).find(x=>/^[A-Za-zÀ-ÿ -]{3,}$/.test(x)); if (after) F.pays = cap(after);
+        } else if (parts.length) F.rue = parts.join(', ');
+        if (F.rue) F.rue = F.rue.replace(/\s+/g,' ').replace(/^\d+\s*[,.]?\s*/, m=>m.trim() + ' ').trim();
+      }
+    }
+    return F;
+  }
+  window.versoFields = versoFields;
+  /* Ville du code postal : nom officiel pris dans la liste des communes si possible */
+  async function villeOff(cp, ville){
+    try { const C = await loadCities(), n = norm(ville).replace(/[-'’]/g,' ');
+      const idx = C.cps.map((c,i)=>c === cp ? i : -1).filter(i=>i >= 0);
+      const best = idx.find(i=>C.nk[i].trim() === n) ?? idx.find(i=>n.includes(C.nk[i].trim()) || C.nk[i].includes(n)) ?? (idx.length === 1 ? idx[0] : undefined);
+      if (best !== undefined) return C.names[best];
+    } catch {}
+    return cap(ville);
+  }
+  async function fillVerso(V){
+    const got = [];
+    const put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
+    if (V.rue || V.cp) {
+      put('f_adrRue', cap(V.rue || '').replace(/\b(Bis|Ter)\b/g, x=>x.toLowerCase()), 'adresse');
+      if (V.cp) put('f_adrVille', `${V.cp} ${await villeOff(V.cp, V.ville || '')}`, 'ville');
+      const pays = V.pays || (V.cp ? (V.cp === '98000' ? 'Monaco' : 'France') : '');
+      if (pays && !$('#f_adrPays').value.trim()) { $('#f_adrPays').value = pays; mark('f_adrPays'); }
+      if (window.adrJoin) adrJoin();
+    }
+    if (V.del || V.exp || V.aut) setSeg('docSeg', 'Officiel');
+    put('f_docDate', V.del, 'date de délivrance'); put('f_docExp', V.exp, 'date d\'expiration'); put('f_docLieu', V.aut, 'autorité');
+    if (V.del || V.exp || V.aut) { if (!$('#f_docType').value) $('#f_docType').value = 'CNI'; if (!$('#f_docPays').value) { $('#f_docPays').value = 'FR'; syncDocPays(); } }
+    window.syncExp?.(); draftSoon();
+    return got;
+  }
   async function readText(file, psms=['6','4']){
     const w = await getFra(); status('Lecture du texte de la pièce…');
     const c = clean(await toCanvas(file, 2400, ''));
@@ -226,9 +280,9 @@
     const n2 = iso2(r.nat), adj = n2 && PAYS_ADJ[n2];
     if (adj && !/^du /.test(adj)) { const a = adjFem(adj); set('f_nationalite', a[0].toUpperCase() + a.slice(1)); }
     setSeg('docSeg', 'Officiel');
-    set('f_docType', r.type, true); set('f_docNumero', r.num, true);
+    set('f_docType', r.type, true); set('f_docNumero', r.num, true); if (r.exp) set('f_docExp', r.exp, true);
     const p2 = iso2(r.pays); if (p2 && [...$('#f_docPays').options].some(o=>o.value === p2)) $('#f_docPays').value = p2;
-    syncSexe(); syncDocPays(); syncAge();
+    syncSexe(); syncDocPays(); syncAge(); window.syncExp?.();
     $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
     draftSoon();
   }
@@ -240,10 +294,10 @@
     if (F[1] && (!r.nom || F[1].replace(/\s/g,'').startsWith(r.nom.replace(/\s/g,'')))) { if (!r.nom || F[1].length > r.nom.length) put('f_nom', F[1], 'nom'); }
     put('f_prenom', F[2], 'prénom'); put('f_dateNaissance', F.dn, 'date de naissance');
     if (F.lieu && $('#f_naisVille')) { $('#f_naisVille').value = F.lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); got.push('lieu de naissance'); }
-    put('f_docDate', F.del, 'date de délivrance'); put('f_docLieu', F.aut, 'autorité');
+    put('f_docDate', F.del, 'date de délivrance'); put('f_docExp', F.exp, 'date d\'expiration'); put('f_docLieu', F.aut, 'autorité');
     if (!r.num && F.num) put('f_docNumero', F.num, 'numéro');
     setSeg('docSeg', 'Officiel'); if (!$('#f_docType').value) $('#f_docType').value = 'PC';
-    syncAge(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true})); draftSoon();
+    syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true})); draftSoon();
     return got;
   }
   const KIND = {PS:'passeport', CNI:'carte d\'identité', TS:'titre de séjour', PC:'permis de conduire'};
@@ -261,9 +315,17 @@
         try { texts = await readText(file); } catch (e) { if (!r) throw e; }
         const F = merge(texts, permisFields), n = ['1','2','dn'].filter(k=>F[k]).length + (F.num ? 1 : 0);
         if (!r && n < 2) {
+          const V = merge(texts, versoFields);
+          if (V.rue || V.cp || V.del || V.exp) {
+            const got = await fillVerso(V);
+            const ei = window.expForm?.();
+            status(`Verso lu · à vérifier, en orange : ${got.join(', ')}` + (ei ? ` · ${ei.days < 0 ? '⚠ ' : ''}${ei.text}` : ''));
+            if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast('Verso lu : vérifie les champs en orange');
+            return;
+          }
           const lieu = await findLieu(texts);
           if (lieu && $('#f_naisVille')) { $('#f_naisVille').value = lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); draftSoon(); status(`Recto lu : lieu de naissance « ${lieu} » (à vérifier, en orange)`); toast('Lieu de naissance lu'); return; }
-          status('Rien de lisible. Passeport : page photo · carte d\'identité ou titre de séjour : face avec les lignes « <<< » (puis le recto pour le lieu de naissance) · permis : recto. Pièce à plat, nette, sans reflet, cadrée de près.'); return;
+          status('Rien de lisible. Passeport : page photo · carte d\'identité : les deux faces, l\'une après l\'autre · titre de séjour : face avec les lignes « <<< » · permis : recto. Pièce à plat, nette, sans reflet, cadrée de près.'); return;
         }
         if (r) fill(r);
         const got = fillPermis(r || {}, F);
@@ -275,10 +337,16 @@
       /* Lieu de naissance : sur la même face pour le passeport et l'ancienne carte, sinon au recto (2e scan) */
       let lieu = '';
       /* Verso des cartes récentes (3 lignes) : l'adresse y figure, on ne cherche pas le lieu ici pour ne pas la confondre */
-      if (r.kind !== 'TD1') try { texts = await readText(file, ['6']); lieu = merge(texts, lieuFields).lieu || ''; } catch {}
+      let vgot = [];
+      try {
+        texts = await readText(file, ['6']);
+        if (r.kind !== 'TD1') lieu = merge(texts, lieuFields).lieu || '';
+        else { const V = merge(texts, versoFields); delete V.exp; vgot = await fillVerso(V); }
+      } catch {}
       if (lieu && $('#f_naisVille')) { $('#f_naisVille').value = lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); draftSoon(); }
-      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}` + (lieu ? ` · lieu de naissance « ${lieu} » à vérifier (orange)` : ' · lieu de naissance absent de cette face : scanne aussi le recto'));
-      toast(r.ok ? 'Pièce d\'identité lue' : 'Lecture incertaine : vérifie les champs');
+      status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}` + (vgot.length ? ` · à vérifier, en orange : ${vgot.join(', ')}` : '') + (lieu ? ` · lieu de naissance « ${lieu} » à vérifier (orange)` : ' · lieu de naissance absent de cette face : scanne aussi l\'autre face'));
+      const ei = r.exp ? window.expForm?.() : null;
+      if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast(r.ok ? 'Pièce d\'identité lue' : 'Lecture incertaine : vérifie les champs');
     } catch (e) {
       status(e && e.message === 'offline' ? 'Il faut du réseau la première fois pour télécharger le module de lecture.' : 'Lecture impossible sur cet appareil.');
     } finally { btn.disabled = false; btn.style.opacity = ''; }
