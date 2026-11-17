@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.15',
+  version: '1.0.16',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js'],
   changelog: [
+    ['1.0.16', ['Passagers : « Enregistrer + personne » depuis un conducteur avec véhicule crée une fiche PASSAGER (pas de véhicule à elle, renvoi vers celui du conducteur)', 'Propriétaire « LM » = lui-même (elle-même) ; pour les passagers, le propriétaire devient le nom du conducteur', 'Liste : passagers rangés sous leur conducteur, ligne « plaque — 2 passagers » à toucher pour les afficher ou les masquer', 'Main courante du passager : « L\'intéressé se trouvait en qualité de passager à bord du véhicule … immatriculé …, conduit par … »']],
     ['1.0.15', ['Bouton « Enregistrer + personne » déplacé dans le bandeau du bas, entre « Annuler » et « Enregistrer »']],
     ['1.0.14', ['Pièce d\'identité : champ « Date d\'expiration », rempli au scan (bande des passeports, cartes et titres de séjour, ligne 4b du permis)', 'Alerte rouge « PIÈCE EXPIRÉE » à la date du contrôle (formulaire, liste, fiche, envoi) et phrase en main courante : « Cette pièce est expirée depuis le … »', 'Carte d\'identité : lecture du verso (ancienne carte : adresse, validité, date de délivrance, autorité ; nouvelle carte : adresse et date de délivrance), à vérifier en orange', 'Cartes d\'identité délivrées entre 2004 et 2013 à un majeur : validité prolongée de 5 ans prise en compte (décret 2013-1188)', 'Bouton « Ajouter une personne au même contrôle » (fiche ouverte, et « Enregistrer et ajouter » dans le formulaire) : heure, lieu, motif et véhicule repris, fiches liées']],
     ['1.0.13', ['Scan de pièce : petit bouton appareil photo au bout de la ligne « Nom »', 'Plus de correction automatique du clavier sur le prénom, l\'adresse, les villes, le pays, la filiation, le responsable légal et le tuteur']],
