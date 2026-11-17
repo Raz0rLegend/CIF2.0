@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.22',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js'],
-  changelog: [ ['1.0.22',['Main courante du conducteur : bloc du véhicule placé après « Identité relevée… » et le résultat du fichier, avant les antécédents et la vérification']],
+  version: '1.0.23',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js'],
+  changelog: [ ['1.0.23',['Lieu connu : Place du Casino (rayon de 15 m)']],
+    ['1.0.22',['Main courante du conducteur : bloc du véhicule placé après « Identité relevée… » et le résultat du fichier, avant les antécédents et la vérification']],
     ['1.0.21',['Main courante : plaque écrite AB-123-CD(F)','Main courante du conducteur : bloc du véhicule placé juste après l\'identité, avant le fichier, les antécédents et la vérification','Antécédents : « le nommé DUPONT Jean » (pièce officielle) ou « le disant se nommer DUPONT Jean » (sur dires) au lieu de « l\'intéressé »','Écran principal : la page ne défile plus, seule la liste des fiches défile ; en-tête toujours en haut, onglets CIF/CI et Tout/Archiver/Envoyer toujours collés en bas']],
     ['1.0.20',['Barres du bas (onglets CIF/CI, Tout/Archiver/Envoyer, bouton +) recollées au bas de l\'écran quand iOS les laisse à mi-hauteur après la fermeture du clavier']],
     ['1.0.19',['Main courante : plaque au format AB123CD(F), pays toujours indiqué','Main courante : chaque bloc (identité, véhicule, passagers) sur sa propre ligne']],
