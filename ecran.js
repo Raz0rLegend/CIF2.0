@@ -1,37 +1,32 @@
 'use strict';
-/* CIF 2.0 — v1.0.20 : bandeau du bas accroché au bas de l'écran
-   Sur iPhone (appli sur l'écran d'accueil), après la fermeture du clavier, iOS laisse parfois la zone
-   d'affichage décalée : les barres du bas (onglets CIF/CI, Tout/Archiver/Envoyer, bouton +) restent
-   à la hauteur où était le clavier et l'en-tête disparaît en haut.
-   On mesure ce décalage (visualViewport) et on recolle les barres au vrai bas de l'écran (--gb),
-   puis on force iOS à se recaler par un défilement d'un pixel. */
+/* CIF 2.0 — v1.0.21 : barres du bas fixes pendant le défilement
+   Sur iPhone, c'était toute la page qui défilait, et iOS déplaçait les barres « fixes »
+   (onglets CIF/CI, Tout/Archiver/Envoyer, bouton +) avec elle, surtout après le clavier.
+   Désormais la page ne bouge plus : l'écran principal occupe tout l'écran (en-tête en haut,
+   barres en bas) et seule la liste des fiches défile entre les deux. */
 (()=>{
+  document.head.insertAdjacentHTML('beforeend', `<style>
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+#app:not(.hidden){position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
+#app > *:not(#list){flex:none}
+#app > header{position:relative}
+#list{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+</style>`);
+  const list = () => document.getElementById('list');
+  /* Les retours en haut de liste (changement d'onglet, filtre, archives) visent maintenant la liste */
+  const _st = window.scrollTo.bind(window);
+  window.scrollTo = function(a, b){
+    _st.apply(window, arguments);
+    const top = typeof a === 'object' && a ? a.top : b;
+    if (top === 0 && list()) list().scrollTop = 0;
+  };
+  /* Si iOS laisse malgré tout l'écran décalé après le clavier, on le recale */
   const vv = window.visualViewport; if (!vv) return;
-  const root = document.documentElement.style;
-  const typing = () => { const a = document.activeElement; return !!(a && a.matches && a.matches('input,textarea,select,[contenteditable="true"]')); };
-  let gb = 0, nudged = 0;
-  function sync(){
-    let d = 0;
-    /* Clavier réellement ouvert : on ne touche à rien */
-    const kb = typing() && vv.height < window.innerHeight - 100;
-    if (!kb && vv.scale < 1.05) {
-      d = Math.round(vv.offsetTop + vv.height - window.innerHeight);
-      if (d < 3) d = 0;
-      /* Écran décalé vers le haut : on force iOS à se recaler */
-      if (vv.offsetTop > 2 && Date.now() - nudged > 600) {
-        nudged = Date.now(); const y = window.scrollY;
-        window.scrollTo(0, y + 1); window.scrollTo(0, y);
-        requestAnimationFrame(sync);
-      }
-    }
-    if (d !== gb) { gb = d; root.setProperty('--gb', d + 'px'); }
-  }
-  const later = () => { sync(); [120, 400, 900].forEach(t=>setTimeout(sync, t)); };
-  vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync);
-  window.addEventListener('resize', sync); window.addEventListener('scroll', sync, {passive:true});
-  document.addEventListener('focusout', later); document.addEventListener('focusin', later);
+  const typing = () => { const a = document.activeElement; return !!(a && a.matches && a.matches('input,textarea,select')); };
+  const fix = () => { if (!typing() && vv.scale < 1.05 && (vv.offsetTop > 1 || window.scrollY > 1)) _st(0, 0); };
+  const later = () => [150, 500, 1000].forEach(t=>setTimeout(fix, t));
+  vv.addEventListener('resize', fix); vv.addEventListener('scroll', fix);
+  document.addEventListener('focusout', later);
   document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) later(); });
   window.addEventListener('pageshow', later);
-  document.addEventListener('touchend', ()=>{ if (gb || vv.offsetTop > 2) sync(); }, {passive:true});
-  later();
 })();
