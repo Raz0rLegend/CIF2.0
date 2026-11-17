@@ -94,12 +94,39 @@
     const pas = FICHES.filter(x=>x.passager && x.avec === f.id);
     if (pas.length) S.splice(1, 0, ['Passagers', pas.map((m,i)=>[`Passager ${i+1}`, ficheName(m)])]);
     return S; }; }
-  { const _mc = mcText; mcText = function(f){
-    const t = _mc(f); if (!f.passager || !f.vehRef) return t;
-    const v = f.vehRef, F = f.sexe === 'F', parts = t.split('\n\n');
-    const veh = [v.type === '2RM' ? 'du deux-roues' : 'du véhicule', [v.marque, v.modele].filter(Boolean).join(' '), v.couleur ? `de couleur ${v.couleur.toLowerCase()}` : '', v.plaque ? `immatriculé ${v.plaque}` : ''].filter(Boolean).join(' ');
-    parts[0] += ` ${F ? "L'intéressée" : "L'intéressé"} se trouvait en qualité de passag${F ? 'ère' : 'er'} à bord ${veh}${f.conducteur ? `, conduit par ${f.conducteur}` : ''}.`;
-    return parts.join('\n\n'); }; }
+  /* Main courante : phrase commune « Tous trois étaient passagers du véhicule … conduit par … ».
+     mcText est appelé par l'envoi via list.map(mcText) : le 3e argument est la liste envoyée. */
+  const NB = ['','','deux','trois','quatre','cinq','six','sept','huit','neuf','dix'];
+  const vehPhrase = (v, cond) => [v.type === '2RM' ? 'du deux-roues' : 'du véhicule', v.marque ? `de marque ${[v.marque, v.modele].filter(Boolean).join(' ')}` : v.modele, v.couleur ? `de couleur ${v.couleur.toLowerCase()}` : '', v.plaque ? `immatriculé ${v.plaque}` : ''].filter(Boolean).join(' ') + (cond ? `, conduit par ${cond}` : '');
+  const groupPhrase = (pas, v, cond) => {
+    if (pas.length === 1) { const F = pas[0].sexe === 'F'; return `${F ? "L'intéressée" : "L'intéressé"} était passag${F ? 'ère' : 'er'} ${vehPhrase(v, cond)}.`; }
+    const allF = pas.every(p=>p.sexe === 'F'), n = NB[pas.length] || String(pas.length);
+    return `${allF ? 'Toutes' : 'Tous'} ${n} étaient passag${allF ? 'ères' : 'ers'} ${vehPhrase(v, cond)}.`;
+  };
+  const passOf = drvId => FICHES.filter(x=>x.passager && x.avec === drvId && x.vehRef).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  { const _mc = mcText; mcText = function(f, i, arr){
+    const t = _mc(f), sent = Array.isArray(arr) ? arr : [f];
+    /* Conducteur : ses passagers absents de l'envoi sont ajoutés à la suite, avec la phrase commune */
+    if (!f.passager) {
+      const pas = passOf(f.id); if (!pas.length) return t;
+      const missing = pas.filter(p=>!sent.some(x=>x.id === p.id));
+      if (!missing.length) return t;
+      if (missing.length < pas.length) return t + '\n\n' + missing.map(p=>_mc(p)).join('\n\n');
+      return t + '\n\n' + pas.map(p=>_mc(p)).join('\n\n') + '\n\n' + groupPhrase(pas, vehOf(f) || pas[0].vehRef, ficheName(f));
+    }
+    if (!f.vehRef) return t;
+    const drvSent = sent.find(x=>x.id === f.avec);
+    const mates = sent.filter(x=>x.passager && x.avec === f.avec && x.vehRef);
+    /* Conducteur dans l'envoi : c'est lui qui porte la phrase commune, après le dernier passager */
+    if (drvSent) {
+      const pas = passOf(f.avec).filter(p=>sent.some(x=>x.id === p.id));
+      return pas.length && pas[pas.length-1].id === f.id ? t + '\n\n' + groupPhrase(passOf(f.avec), f.vehRef, f.conducteur) : t;
+    }
+    /* Passager seul */
+    if (mates.length <= 1) { const parts = t.split('\n\n'); parts[0] += ' ' + groupPhrase([f], f.vehRef, f.conducteur); return parts.join('\n\n'); }
+    /* Plusieurs passagers envoyés ensemble : phrase commune après le dernier */
+    return mates[mates.length-1].id === f.id ? t + '\n\n' + groupPhrase(mates, f.vehRef, f.conducteur) : t;
+  }; }
 
   /* ----- Liste : passagers rangés sous leur conducteur ----- */
   const OPEN = new Set();
