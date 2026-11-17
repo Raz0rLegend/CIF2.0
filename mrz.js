@@ -283,10 +283,13 @@
       status(e && e.message === 'offline' ? 'Il faut du réseau la première fois pour télécharger le module de lecture.' : 'Lecture impossible sur cet appareil.');
     } finally { btn.disabled = false; btn.style.opacity = ''; }
   }
-  const anchor = $('#f_sexe')?.previousElementSibling;
-  if (!anchor) return;
-  anchor.insertAdjacentHTML('beforebegin', `<button type="button" class="addveh" id="mrzBtn" style="margin-top:14px">📷 Scanner une pièce d'identité</button>
-    <div id="mrzInfo" style="font-size:13px;color:#9cc0ff;margin-top:6px"></div><input type="file" id="mrzFile" accept="image/*" capture="environment" hidden>`);
+  /* Petit bouton appareil photo au bout de la ligne « Nom » */
+  const nomInp = $('#f_nom');
+  if (!nomInp) return;
+  const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:8px;align-items:stretch';
+  nomInp.replaceWith(row); row.appendChild(nomInp); nomInp.style.flex = '1'; nomInp.style.minWidth = '0';
+  row.insertAdjacentHTML('beforeend', `<button type="button" id="mrzBtn" aria-label="Scanner une pièce d'identité" title="Scanner une pièce d'identité" style="flex:0 0 48px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:#7fb3ff;display:flex;align-items:center;justify-content:center;padding:0">${ICON.cam.replace('<svg ', '<svg width="22" height="22" ')}</button>`);
+  row.insertAdjacentHTML('afterend', `<div id="mrzInfo" style="font-size:13px;color:#9cc0ff;margin-top:6px"></div><input type="file" id="mrzFile" accept="image/*" capture="environment" hidden>`);
   $('#mrzBtn').onclick = ()=>$('#mrzFile').click();
   $('#mrzFile').onchange = e=>{ const f = e.target.files[0]; e.target.value = ''; if (f) scan(f); };
   { const _of = openForm; openForm = function(f, d){ _of(f, d); status(''); document.querySelectorAll('[data-chk]').forEach(el=>{ el.style.outline = ''; delete el.dataset.chk; }); }; }
