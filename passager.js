@@ -118,9 +118,9 @@
   { const _mc0 = mcText; mcText = function(f, i, arr){
     const t = _mc0(f, i, arr); if (f.passager || !(f.vehicules||[]).length) return t;
     const u = f.vehicules.filter(v=>v.plaque || v.marque).map(v=>userPhrase(f, v)); if (!u.length) return t;
-    /* Après l'identité et la pièce relevée, avant le fichier, les antécédents et la vérification */
+    /* Après l'identité, la pièce relevée et le résultat du fichier, avant les antécédents et la vérification */
     const parts = t.split('\n\n'); let at = 1;
-    while (at < parts.length && /^Identité relevée/.test(parts[at])) at++;
+    while (at < parts.length && /^(Identité relevée|Non défavorablement noté|Défavorablement noté|Inconnu à notre fichier)/.test(parts[at])) at++;
     parts.splice(at, 0, ...u);
     return parts.join('\n\n');
   }; }
