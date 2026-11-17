@@ -1,9 +1,9 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.0.18',
+  version: '1.0.19',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js'],
-  changelog: [
+  changelog: [ ['1.0.19',['Main courante : plaque au format AB123CD(F), pays toujours indiqué','Main courante : chaque bloc (identité, véhicule, passagers) sur sa propre ligne']],
     ['1.0.18', ['Main courante du conducteur : « Il était l\'utilisateur, propriétaire du véhicule particulier de marque …, de type …, de couleur …, immatriculé …, dont les documents étaient en règle » (propriétaire « LM ») ou « Il était l\'utilisateur d\'un véhicule léger de marque … appartenant à …, dont les documents de bord étaient en règle »', 'Phrase adaptée aux informations remplies (marque, type, couleur, plaque, pays si étranger), au sexe (Elle / l\'utilisatrice) et au type de véhicule (deux-roues motorisé, poids lourd, vélo)']],
     ['1.0.17', ['Main courante : une seule phrase pour tous les passagers d\'un même véhicule (« Tous trois étaient passagers du véhicule de marque … immatriculé …, conduit par … »)', 'Main courante du conducteur : ses passagers ajoutés automatiquement à la suite', 'Accord automatique : « Tous deux », « Toutes trois … passagères », passager seul : « L\'intéressé était passager … »']],
     ['1.0.16', ['Passagers : « Enregistrer + personne » depuis un conducteur avec véhicule crée une fiche PASSAGER (pas de véhicule à elle, renvoi vers celui du conducteur)', 'Propriétaire « LM » = lui-même (elle-même) ; pour les passagers, le propriétaire devient le nom du conducteur', 'Liste : passagers rangés sous leur conducteur, ligne « plaque — 2 passagers » à toucher pour les afficher ou les masquer', 'Main courante du passager : « L\'intéressé se trouvait en qualité de passager à bord du véhicule … immatriculé …, conduit par … »']],
