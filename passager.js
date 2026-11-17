@@ -96,8 +96,8 @@
     return S; }; }
   /* Main courante : phrase commune « Tous trois étaient passagers du véhicule … conduit par … ».
      mcText est appelé par l'envoi via list.map(mcText) : le 3e argument est la liste envoyée. */
-  /* Plaque en main courante : AB123CD(F) — sans tirets ni espaces, pays toujours indiqué */
-  const mcPlate = v => `${String(v.plaque).replace(/[\s\-.]/g,'').toUpperCase()}(${v.pays||'F'})`;
+  /* Plaque en main courante : AB-123-CD(F) — telle que saisie, en majuscules, pays toujours indiqué */
+  const mcPlate = v => `${String(v.plaque).trim().toUpperCase()}(${v.pays||'F'})`;
   const NB = ['','','deux','trois','quatre','cinq','six','sept','huit','neuf','dix'];
   const vehPhrase = (v, cond) => [v.type === '2RM' ? 'du deux-roues' : 'du véhicule', v.marque ? `de marque ${[v.marque, v.modele].filter(Boolean).join(' ')}` : v.modele, v.couleur ? `de couleur ${v.couleur.toLowerCase()}` : '', v.plaque ? `immatriculé ${mcPlate(v)}` : ''].filter(Boolean).join(' ') + (cond ? `, conduit par ${cond}` : '');
   const groupPhrase = (pas, v, cond) => {
@@ -118,7 +118,10 @@
   { const _mc0 = mcText; mcText = function(f, i, arr){
     const t = _mc0(f, i, arr); if (f.passager || !(f.vehicules||[]).length) return t;
     const u = f.vehicules.filter(v=>v.plaque || v.marque).map(v=>userPhrase(f, v)); if (!u.length) return t;
-    const parts = t.split('\n\n'); parts.splice(1, 0, ...u);
+    /* Après l'identité et la pièce relevée, avant le fichier, les antécédents et la vérification */
+    const parts = t.split('\n\n'); let at = 1;
+    while (at < parts.length && /^Identité relevée/.test(parts[at])) at++;
+    parts.splice(at, 0, ...u);
     return parts.join('\n\n');
   }; }
   window.userPhrase = userPhrase;
