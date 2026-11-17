@@ -96,8 +96,10 @@
     return S; }; }
   /* Main courante : phrase commune « Tous trois étaient passagers du véhicule … conduit par … ».
      mcText est appelé par l'envoi via list.map(mcText) : le 3e argument est la liste envoyée. */
+  /* Plaque en main courante : AB123CD(F) — sans tirets ni espaces, pays toujours indiqué */
+  const mcPlate = v => `${String(v.plaque).replace(/[\s\-.]/g,'').toUpperCase()}(${v.pays||'F'})`;
   const NB = ['','','deux','trois','quatre','cinq','six','sept','huit','neuf','dix'];
-  const vehPhrase = (v, cond) => [v.type === '2RM' ? 'du deux-roues' : 'du véhicule', v.marque ? `de marque ${[v.marque, v.modele].filter(Boolean).join(' ')}` : v.modele, v.couleur ? `de couleur ${v.couleur.toLowerCase()}` : '', v.plaque ? `immatriculé ${v.plaque}` : ''].filter(Boolean).join(' ') + (cond ? `, conduit par ${cond}` : '');
+  const vehPhrase = (v, cond) => [v.type === '2RM' ? 'du deux-roues' : 'du véhicule', v.marque ? `de marque ${[v.marque, v.modele].filter(Boolean).join(' ')}` : v.modele, v.couleur ? `de couleur ${v.couleur.toLowerCase()}` : '', v.plaque ? `immatriculé ${mcPlate(v)}` : ''].filter(Boolean).join(' ') + (cond ? `, conduit par ${cond}` : '');
   const groupPhrase = (pas, v, cond) => {
     if (pas.length === 1) { const F = pas[0].sexe === 'F'; return `${F ? "L'intéressée" : "L'intéressé"} était passag${F ? 'ère' : 'er'} ${vehPhrase(v, cond)}.`; }
     const allF = pas.every(p=>p.sexe === 'F'), n = NB[pas.length] || String(pas.length);
@@ -108,15 +110,15 @@
   const VNOM = {VL:['du véhicule particulier',"d'un véhicule léger"], '2RM':['du deux-roues motorisé',"d'un deux-roues motorisé"], Camion:['du poids lourd',"d'un poids lourd"], 'Vélo':['du vélo',"d'un vélo"], Autre:['du véhicule',"d'un véhicule"]};
   function userPhrase(f, v){
     const F = f.sexe === 'F', own = isLM(v.proprio), nm = VNOM[v.type] || VNOM.VL;
-    const bits = [v.marque && `de marque ${v.marque}`, v.modele && `de type ${v.modele}`, v.couleur && `de couleur ${v.couleur.toLowerCase()}`, v.plaque && `immatriculé ${v.plaque}${v.pays && v.pays !== 'F' ? ` (${v.pays})` : ''}`].filter(Boolean);
+    const bits = [v.marque && `de marque ${v.marque}`, v.modele && `de type ${v.modele}`, v.couleur && `de couleur ${v.couleur.toLowerCase()}`, v.plaque && `immatriculé ${mcPlate(v)}`].filter(Boolean);
     const head = `${F ? 'Elle' : 'Il'} était ${F ? "l'utilisatrice" : "l'utilisateur"}${own ? `, propriétaire ${nm[0]}` : ` ${nm[1]}`}`;
     const rest = [...bits.slice(1), ...(!own && v.proprio ? [`appartenant à ${v.proprio}`] : []), own ? 'dont les documents étaient en règle' : 'dont les documents de bord étaient en règle'];
     return [head + (bits[0] ? ' ' + bits[0] : ''), ...rest].join(', ') + '.';
   }
   { const _mc0 = mcText; mcText = function(f, i, arr){
     const t = _mc0(f, i, arr); if (f.passager || !(f.vehicules||[]).length) return t;
-    const u = f.vehicules.filter(v=>v.plaque || v.marque).map(v=>userPhrase(f, v)).join(' '); if (!u) return t;
-    const parts = t.split('\n\n'); parts[0] += ' ' + u;
+    const u = f.vehicules.filter(v=>v.plaque || v.marque).map(v=>userPhrase(f, v)); if (!u.length) return t;
+    const parts = t.split('\n\n'); parts.splice(1, 0, ...u);
     return parts.join('\n\n');
   }; }
   window.userPhrase = userPhrase;
@@ -139,7 +141,7 @@
       return pas.length && pas[pas.length-1].id === f.id ? t + '\n\n' + groupPhrase(passOf(f.avec), f.vehRef, f.conducteur) : t;
     }
     /* Passager seul */
-    if (mates.length <= 1) { const parts = t.split('\n\n'); parts[0] += ' ' + groupPhrase([f], f.vehRef, f.conducteur); return parts.join('\n\n'); }
+    if (mates.length <= 1) { const parts = t.split('\n\n'); parts.splice(1, 0, groupPhrase([f], f.vehRef, f.conducteur)); return parts.join('\n\n'); }
     /* Plusieurs passagers envoyés ensemble : phrase commune après le dernier */
     return mates[mates.length-1].id === f.id ? t + '\n\n' + groupPhrase(mates, f.vehRef, f.conducteur) : t;
   }; }
