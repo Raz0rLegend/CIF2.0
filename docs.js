@@ -30,7 +30,7 @@
   /* Phrase de fin pour la main courante */
   window.vehDocsPhrase = (v, own) => {
     const miss = DOCS.filter(([k])=>!ok(v, k)).map(d=>d[2]);
-    if (!miss.length) return own ? 'dont les documents étaient en règle' : 'dont les documents de bord étaient en règle';
+    if (!miss.length) return 'dont les documents de bord étaient en règle';
     return miss.length === 1 ? `dont ${miss[0]} n'était pas présenté` : `dont ${miss.join(' et ')} n'étaient pas présentés`;
   };
   const docsTxt = v => DOCS.every(([k])=>ok(v, k)) ? 'Présentés (carte grise et assurance)' : DOCS.map(([k, l])=>`${l} ${ok(v, k) ? 'présentée' : 'NON présentée'}`).join(' · ');
