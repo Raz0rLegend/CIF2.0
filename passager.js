@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.0.14 : ajouter une personne au même contrôle (passager, accompagnant)
+/* CIF 2.0 — v1.0.14 / 1.0.15 : ajouter une personne au même contrôle (passager, accompagnant)
    Nouvelle fiche avec la même heure, le même lieu, le même motif et le même véhicule : il ne reste que l'identité. */
 (()=>{
   function openPassenger(src){
@@ -23,7 +23,8 @@
     $('#detBody .hero')?.insertAdjacentHTML('afterend', `<button type="button" class="addveh" id="detPass" style="margin:10px 0 0">👥 Ajouter une personne au même contrôle</button>`);
     $('#detPass').onclick = ()=>openPassenger(f); }; }
   /* Formulaire : enregistrer puis enchaîner sur la personne suivante */
-  $('#formErr').insertAdjacentHTML('beforebegin', `<button type="button" class="addveh" id="formNext" style="margin-top:18px">💾 Enregistrer et ajouter une personne au même contrôle</button>`);
+  /* Dans le bandeau du bas, entre « Annuler » et « Enregistrer » */
+  $('#formSave').insertAdjacentHTML('beforebegin', `<button type="button" id="formNext" aria-label="Enregistrer et ajouter une personne au même contrôle" style="font-size:14px;line-height:1.15;font-weight:600;color:#7fb3ff">Enregistrer<br>+ personne</button>`);
   $('#formNext').onclick = async ()=>{
     if (!EDIT) return; const id = EDIT.f.id;
     await closeForm(true);
