@@ -104,6 +104,22 @@
     return `${allF ? 'Toutes' : 'Tous'} ${n} étaient passag${allF ? 'ères' : 'ers'} ${vehPhrase(v, cond)}.`;
   };
   const passOf = drvId => FICHES.filter(x=>x.passager && x.avec === drvId && x.vehRef).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  /* Conducteur : phrase « utilisateur / propriétaire » pour chaque véhicule */
+  const VNOM = {VL:['du véhicule particulier',"d'un véhicule léger"], '2RM':['du deux-roues motorisé',"d'un deux-roues motorisé"], Camion:['du poids lourd',"d'un poids lourd"], 'Vélo':['du vélo',"d'un vélo"], Autre:['du véhicule',"d'un véhicule"]};
+  function userPhrase(f, v){
+    const F = f.sexe === 'F', own = isLM(v.proprio), nm = VNOM[v.type] || VNOM.VL;
+    const bits = [v.marque && `de marque ${v.marque}`, v.modele && `de type ${v.modele}`, v.couleur && `de couleur ${v.couleur.toLowerCase()}`, v.plaque && `immatriculé ${v.plaque}${v.pays && v.pays !== 'F' ? ` (${v.pays})` : ''}`].filter(Boolean);
+    const head = `${F ? 'Elle' : 'Il'} était ${F ? "l'utilisatrice" : "l'utilisateur"}${own ? `, propriétaire ${nm[0]}` : ` ${nm[1]}`}`;
+    const rest = [...bits.slice(1), ...(!own && v.proprio ? [`appartenant à ${v.proprio}`] : []), own ? 'dont les documents étaient en règle' : 'dont les documents de bord étaient en règle'];
+    return [head + (bits[0] ? ' ' + bits[0] : ''), ...rest].join(', ') + '.';
+  }
+  { const _mc0 = mcText; mcText = function(f, i, arr){
+    const t = _mc0(f, i, arr); if (f.passager || !(f.vehicules||[]).length) return t;
+    const u = f.vehicules.filter(v=>v.plaque || v.marque).map(v=>userPhrase(f, v)).join(' '); if (!u) return t;
+    const parts = t.split('\n\n'); parts[0] += ' ' + u;
+    return parts.join('\n\n');
+  }; }
+  window.userPhrase = userPhrase;
   { const _mc = mcText; mcText = function(f, i, arr){
     const t = _mc(f), sent = Array.isArray(arr) ? arr : [f];
     /* Conducteur : ses passagers absents de l'envoi sont ajoutés à la suite, avec la phrase commune */
