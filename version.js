@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.0',
+  version: '1.1.1',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js'],
-  changelog: [ ['1.1.0',['Version 1.1 : scan des pièces d\'identité et du permis, passagers d\'un même véhicule, main courante complète du conducteur (véhicule, carte grise, assurance), alerte de pièce expirée, lieux connus, écran principal stabilisé']],
+  changelog: [ ['1.1.1',['Lieu connu : Place d\'Armes (rayon de 20 m)']],
+    ['1.1.0',['Version 1.1 : scan des pièces d\'identité et du permis, passagers d\'un même véhicule, main courante complète du conducteur (véhicule, carte grise, assurance), alerte de pièce expirée, lieux connus, écran principal stabilisé']],
     ['1.0.25',['Main courante : toujours « dont les documents de bord étaient en règle », propriétaire ou non']],
     ['1.0.24',['Véhicule : cases « Carte grise » et « Assurance » (vertes = présentées, un appui = rouge, non présentée)','Main courante du conducteur : « dont le certificat d\'immatriculation n\'était pas présenté », « dont le certificat d\'assurance n\'était pas présenté » ou les deux ; « en règle » si tout est présenté','Fiche et envoi : ligne « Documents » sous chaque véhicule']],
     ['1.0.23',['Lieu connu : Place du Casino (rayon de 15 m)']],
