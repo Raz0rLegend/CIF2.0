@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.18',
+  version: '1.1.19',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js', 'compact.js', 'focus.js', 'couleur.js'],
-  changelog: [ ['1.1.18',['Champ touché : centré dans la partie visible entre l\'en-tête et le bandeau Annuler / Enregistrer (au-dessus du clavier), et plus au milieu de l\'écran entier ; recalé après le défilement automatique d\'iOS à l\'ouverture du clavier']],
+  changelog: [ ['1.1.19',['Clavier ouvert : la fiche se cale exactement sur la partie visible de l\'écran (titre en haut, Annuler / Enregistrer juste au-dessus du clavier) et le champ en cours se place au milieu de cette zone']],
+    ['1.1.18',['Champ touché : centré dans la partie visible entre l\'en-tête et le bandeau Annuler / Enregistrer (au-dessus du clavier), et plus au milieu de l\'écran entier ; recalé après le défilement automatique d\'iOS à l\'ouverture du clavier']],
     ['1.1.17',['Main courante : couleur du véhicule accordée au féminin (« de couleur blanche », « grise métallisée ») ; couleurs composées ou invariables inchangées (gris foncé, bleu marine, marron…)','Champ touché ou « Suivant » du clavier : le champ se place au centre de la partie visible de l\'écran','Champs à suggestions (villes, pays, marque, couleur, motif…) : placés en haut pour que la liste des choix s\'ouvre en entier au-dessus du clavier']],
     ['1.1.16',['Véhicule, propriétaire : taper « lm » écrit « Lui-même » ou « Elle-même » selon le sexe coché (et s\'adapte si le sexe change)']],
     ['1.1.15',['Identité sur deux colonnes : Nom | Sexe (♂ M / ♀ F), puis Prénom | Date de naissance']],
