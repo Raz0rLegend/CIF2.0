@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.7',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js'],
-  changelog: [ ['1.1.7',['Case Homme / Femme cochée automatiquement d\'après le prénom (« deviné d\'après le prénom »), seulement si elle est vide ; prénoms mixtes ou inconnus (Camille, Dominique, Claude…) : rien n\'est coché','Un choix fait à la main n\'est jamais modifié']],
+  version: '1.1.8',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js'],
+  changelog: [ ['1.1.8',['Champ « Employeur » (société, commerce, restaurant…) toujours disponible, sous la profession','Main courante : « maçon, employé chez … » ; fiche et envoi : ligne « Employeur »']],
+    ['1.1.7',['Case Homme / Femme cochée automatiquement d\'après le prénom (« deviné d\'après le prénom »), seulement si elle est vide ; prénoms mixtes ou inconnus (Camille, Dominique, Claude…) : rien n\'est coché','Un choix fait à la main n\'est jamais modifié']],
     ['1.1.6',['Écran du code : toucher le champ ouvre le clavier, toucher « Face ID » lance la biométrie (plus de lancement automatique)','Fiche d\'intervention : l\'heure de l\'appel du PC (verrouillée, « Modifier » si besoin) est distincte de la date et l\'heure d\'ouverture de la fiche','Liste, fiche et envoi : « Appel PC à … · fiche ouverte à … »']],
     ['1.1.5',['Fiche d\'intervention : le motif (avec ses choix rapides) est placé tout en haut, juste sous la date et l\'heure de l\'appel','Suggestions (ville, nationalité, lieu…) affichées sous le champ : le formulaire défile pour leur faire de la place, la liste se raccourcit si besoin, et ne passe au-dessus qu\'en dernier recours']],
     ['1.1.4',['Bouton rouge « INTER » remis aussi sur la liste des fiches (en bas à gauche), en plus de celui de l\'écran du code']],
