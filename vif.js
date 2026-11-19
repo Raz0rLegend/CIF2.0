@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.9 / 1.1.10 : intervention VIF (violences intrafamiliales)
+/* CIF 2.0 — v1.1.9 à 1.1.12 : intervention VIF (violences intrafamiliales)
    Tuile « VIF » avec les autres types (Accident, IPM…) : elle ouvre un bloc rapide à cocher
    (lien entre les personnes, enfants, mesures du juge, signes d'ivresse, mémento grille d'évaluation du danger / feuillet AVIP, circonstances).
    Repris dans le mail d'envoi et signalé par une balise VIF ; rien dans la main courante (rédigée à la main). */
@@ -37,8 +37,9 @@
 #vifBlock .ich button.on{background:#9d174d;border-color:#db2777;color:#fff;font-weight:700}
 #vifNote{margin-top:8px;padding:8px 10px;border-radius:10px;background:#3b0d22;color:#fbcfe8;font-size:13px}
 #vifMem{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-#vifMem button{border:1px solid #7a1d45;border-radius:10px;background:none;color:#e9a6c4;font-size:14px;font-weight:600;padding:10px 6px;line-height:1.2}
-#vifMem button.on{background:#9d174d;border-color:#db2777;color:#fff}
+#vifMem button{border:1px solid var(--line);border-radius:10px;background:none;color:var(--muted);font-size:14px;font-weight:600;padding:10px 6px;line-height:1.2}
+#vifMem button.on{background:#173a26;border-color:#2e7d4f;color:#bff0d2}
+#vifMem button.on::before{content:'✓ '}
 </style>`);
   $('#accGrid').insertAdjacentHTML('beforeend', `<label class="switch vif"><input type="checkbox" id="f_vif"><span class="sw"></span><span class="swl">VIF</span></label>`);
   const grp = ([k, l, opts, one, dep]) => `<div class="ig" data-ig="${k}"${dep ? ` data-dep="${dep}"` : ''}><b>${esc(l)}${one ? '' : ' <small style="font-weight:400">(plusieurs choix possibles)</small>'}</b><div class="ich" data-g="${k}">${opts.map(o=>`<button type="button" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div></div>`;
