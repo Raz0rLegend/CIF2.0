@@ -1,10 +1,12 @@
 'use strict';
-/* CIF 2.0 — v1.1.17 / 1.1.18 : champ touché (ou « Suivant » du clavier) recentré dans la partie visible de l'écran.
+/* CIF 2.0 — v1.1.17 à 1.1.19 : champ touché (ou « Suivant » du clavier) recentré dans la partie visible de l'écran.
    Champ à suggestions (ville, pays, marque, couleur, motif…) : placé en haut de la zone visible pour que
    la liste des choix s'ouvre en entier entre le champ et le clavier. Une marge sous le formulaire
-   permet de remonter même les derniers champs. */
+   permet de remonter même les derniers champs.
+   1.1.19 : clavier ouvert, la fiche est ajustée exactement à la partie visible de l'écran (en-tête en haut,
+   bandeau Annuler / Enregistrer juste au-dessus du clavier) : iOS n'a plus besoin de décaler la page. */
 (()=>{
-  document.head.insertAdjacentHTML('beforeend', '<style>#form .body.kb{padding-bottom:62vh!important}</style>');
+  document.head.insertAdjacentHTML('beforeend', '<style>#form .body.kb{padding-bottom:62vh!important}#form.kbfit footer{padding-bottom:0!important}</style>');
   const SG = new Set(['f_adrVille','f_naisVille','f_lieuControle','f_nationalite']);
   const ok = el => el?.matches?.('#form .body input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=button]):not([type=file]):not([type=range]), #form .body textarea, #form .body select');
   let cur = null, t = null, off = null, ts = [];
@@ -16,7 +18,19 @@
     const vv = window.visualViewport, hr = host.getBoundingClientRect(), sa = probe.offsetHeight || 0;
     return [Math.max(hr.top, (vv ? vv.offsetTop : 0) + sa), Math.min(vv ? vv.offsetTop + vv.height : innerHeight, hr.bottom)];
   }
+  /* la fiche suit la partie visible (visualViewport) tant qu'un champ est en cours de saisie */
+  const form = document.getElementById('form'), vv = window.visualViewport;
+  function fit(){
+    if (!form || !vv) return;
+    if (cur && !form.classList.contains('hidden')) {
+      form.classList.add('kbfit');
+      form.style.top = Math.max(0, vv.offsetTop) + 'px'; form.style.height = vv.height + 'px'; form.style.bottom = 'auto';
+    } else if (form.classList.contains('kbfit')) {
+      form.classList.remove('kbfit'); form.style.top = form.style.height = form.style.bottom = '';
+    }
+  }
   function place(){
+    fit();
     const el = cur; if (!el || document.activeElement !== el) return;
     const host = el.closest('.body'); if (!host) return;
     const [top, bot] = zone(host), r = el.getBoundingClientRect();
@@ -25,24 +39,31 @@
     const sg = !!el.dataset.sg || SG.has(el.id);
     const target = sg || r.height > (bot - top) / 2 ? top + 8 + head : top + (bot - top - r.height) / 2;
     const d = Math.round(r.top - target);
-    if (Math.abs(d) > 6) host.scrollTo({top: host.scrollTop + d, behavior: 'instant'});
+    if (Math.abs(d) > 6) host.scrollTop = host.scrollTop + d;
     /* la liste de suggestions se recale sous le champ, avec toute la place jusqu'au clavier */
+    if (dbg) dbg.textContent = `v${APP_VERSION} vv ${Math.round(vv?.offsetTop||0)}+${Math.round(vv?.height||0)} ih ${innerHeight} zone ${Math.round(top)}-${Math.round(bot)} champ ${Math.round(r.top)}→${Math.round(target)} st ${Math.round(host.scrollTop)}`;
     if (sg) setTimeout(()=>{ try { if (sgInput === el && !sgBox.classList.contains('hidden')) sgPlace(el); } catch(e){} }, 40);
   }
+  /* diagnostic : 5 appuis rapides sur le titre de la fiche affichent les mesures (pour régler le placement) */
+  let dbg = null, taps = [];
+  form?.querySelector('.top h2')?.addEventListener('click', ()=>{
+    const n = Date.now(); taps = taps.filter(x=>n - x < 1500).concat(n);
+    if (taps.length >= 5) { taps = []; if (dbg) { dbg.remove(); dbg = null; } else { dbg = document.createElement('div'); dbg.style.cssText = 'position:absolute;left:4px;right:4px;top:calc(env(safe-area-inset-top) + 2px);z-index:99;background:#ff0;color:#000;font:12px monospace;padding:3px;pointer-events:none'; dbg.textContent = 'diagnostic actif'; form.appendChild(dbg); } }
+  });
   const later = ms => { clearTimeout(t); t = setTimeout(place, ms); };
   document.addEventListener('focusin', e=>{
     if (!ok(e.target)) return;
-    clearTimeout(off); cur = e.target; cur.closest('.body')?.classList.add('kb');
+    clearTimeout(off); cur = e.target; cur.closest('.body')?.classList.add('kb'); fit();
     /* iOS fait défiler lui-même le formulaire pendant l'ouverture du clavier (juste au-dessus du clavier,
        donc souvent derrière le bandeau du bas) : on repasse derrière lui plusieurs fois */
     ts.forEach(clearTimeout); ts = [120, 380, 700, 1050, 1500].map(ms=>setTimeout(place, ms));
   });
   document.addEventListener('focusout', ()=>{
     clearTimeout(off);
-    off = setTimeout(()=>{ if (!ok(document.activeElement)) { document.querySelectorAll('#form .body.kb').forEach(b=>b.classList.remove('kb')); cur = null; } }, 300);
+    off = setTimeout(()=>{ if (!ok(document.activeElement)) { document.querySelectorAll('#form .body.kb').forEach(b=>b.classList.remove('kb')); cur = null; fit(); } }, 300);
   });
   /* le clavier s'ouvre ou change de taille : on recale */
-  const vvChange = ()=>{ if (cur && document.activeElement === cur) later(60); };
+  const vvChange = ()=>{ fit(); if (cur && document.activeElement === cur) later(60); };
   window.visualViewport?.addEventListener('resize', vvChange); window.visualViewport?.addEventListener('scroll', vvChange);
   /* en tapant dans un champ à suggestions, la liste apparaît : on remonte le champ si besoin */
   document.addEventListener('input', e=>{ if (e.target === cur && (cur.dataset.sg || SG.has(cur.id))) later(30); });
