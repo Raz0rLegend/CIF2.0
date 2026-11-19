@@ -1,7 +1,7 @@
 'use strict';
-/* CIF 2.0 — v1.1.13 : formulaire de contrôle compact
+/* CIF 2.0 — v1.1.14 : formulaire de contrôle compact
    Champs plus bas, libellés plus petits, espacements réduits, et champs courts côte à côte :
-   résultat + antécédents, nom + prénom, sexe + date de naissance, lieu de naissance + nationalité,
+   résultat + antécédents, sexe (M/F) + date de naissance, nom + prénom, lieu de naissance + nationalité,
    profession + employeur, ville + pays, téléphone + identité établie, numéro + expiration…
    Les champs restent en 16 px pour que l'iPhone ne zoome pas en les touchant. */
 (()=>{
@@ -30,7 +30,8 @@
 #form .cr>.cc>label.f{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #form .cr #sexeSeg{margin:0}
 #form .cr #sexeSeg{gap:6px!important}
-#form .cr #sexeSeg button{height:40px!important;min-height:40px!important;padding:0 4px!important;font-size:15px!important;display:block!important;white-space:nowrap}
+#form .cr #sexeSeg button{height:40px!important;min-height:40px!important;padding:0 2px!important;font-size:16px!important;display:block!important;white-space:nowrap}
+#form .cr .cc.sx>label.f{overflow:visible}
 #form .cr .seg{min-height:40px}
 #form #mrzBtn{flex:0 0 40px!important;height:40px!important;width:40px}
 #form #f_verif{height:40px;min-height:40px}
@@ -64,12 +65,21 @@
   if (antSw) { antSw.style.margin = '0'; antSw.style.minHeight = '40px'; const t = antSw.querySelector('.swl'); if (t) t.textContent = 'Antécédents'; }
   row([{n:[lab('f_resultat'), resBox], w:1.15}, {n:[antSw], w:1}]);
   const sexLbl = [...document.querySelectorAll('#form label.f')].find(l=>/^Sexe/.test(l.textContent.trim()));
+  /* Sexe en premier, réduit à ♂ M / ♀ F, à côté de la date de naissance ; nom et prénom en dessous */
+  document.querySelectorAll('#sexeSeg [data-sx]').forEach(b=>{ b.textContent = b.dataset.sx === 'H' ? '♂ M' : '♀ F'; b.title = b.dataset.sx === 'H' ? 'Masculin' : 'Féminin'; });
   const nomBox = $f('f_nom')?.parentElement;
+  const rSexe = row([{n:[sexLbl, $f('f_sexe'), $f('sexeSeg')], w:.62}, {n:[lab('f_dateNaissance'), $f('f_dateNaissance')]}]);
+  rSexe?.firstElementChild.classList.add('sx');
   const rNom = row([{n:[lab('f_nom'), nomBox]}, {n:[lab('f_prenom'), $f('f_prenom')]}]);
-  const rSexe = row([{n:[sexLbl, $f('f_sexe'), $f('sexeSeg')]}, {n:[lab('f_dateNaissance'), $f('f_dateNaissance')]}]);
-  /* nom et prénom d'abord, puis sexe et date de naissance (les aides : scan, âge… restent en dessous) */
-  if (rNom && rSexe) { rNom.after(rSexe); const hints = ['mrzInfo','idSug','diffAlert'].map($f).filter(Boolean); rNom.after(...hints); }
+  if (rNom && rSexe) { rSexe.after(rNom); const hints = ['mrzInfo','idSug','diffAlert'].map($f).filter(Boolean); rNom.after(...hints); }
   row([{n:[lab('f_naisVille'), $f('f_lieuNaissance'), $f('f_naisVille'), $f('f_naisPays')]}, {n:[lab('f_nationalite'), $f('f_nationalite')]}]);
+  /* Filiation remontée dans l'identité, juste après la naissance (toujours réservée au CIF) */
+  const rNais = $f('f_nationalite')?.closest('.cr'), fil = $f('f_filiation');
+  if (rNais && fil) {
+    const w = document.createElement('div'); w.id = 'filWrap'; w.append(lab('f_filiation'), fil); rNais.after(w);
+    const cb = $f('cifBlock'), sync = () => w.classList.toggle('hidden', cb.classList.contains('hidden'));
+    new MutationObserver(sync).observe(cb, {attributes:true, attributeFilter:['class']}); sync();
+  }
   row([{n:[lab('f_profession'), $f('f_profession')]}, {n:[lab('f_employeur'), $f('f_employeur')]}]);
   row([{n:[$f('f_adrVille')?.parentElement]}, {n:[$f('f_adrPays')], w:.6}]);
   const idLbl = [...document.querySelectorAll('#form label.f')].find(l=>l.textContent.trim() === 'Identité établie');
@@ -87,5 +97,5 @@
   { const _rv = renderVehicles; renderVehicles = function(){ _rv(); pairVeh(); }; }
   pairVeh();
   /* Le sexe deviné : mention plus discrète */
-  const sx = $f('sxAuto'); if (sx) { sx.textContent = '(deviné)'; }
+  const sx = $f('sxAuto'); if (sx) { sx.textContent = '(deviné)'; sx.style.fontSize = '11px'; }
 })();
