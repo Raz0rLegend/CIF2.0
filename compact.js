@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.15 : formulaire de contrôle compact
+/* CIF 2.0 — v1.1.16 : formulaire de contrôle compact
    Champs plus bas, libellés plus petits, espacements réduits, et champs courts côte à côte :
    résultat + antécédents, nom + sexe (M/F), prénom + date de naissance, lieu de naissance + nationalité,
    profession + employeur, ville + pays, téléphone + identité établie, numéro + expiration…
@@ -96,6 +96,12 @@
   });
   { const _rv = renderVehicles; renderVehicles = function(){ _rv(); pairVeh(); }; }
   pairVeh();
+  /* Propriétaire : « lm » devient « Lui-même » ou « Elle-même » selon le sexe (et suit le sexe s'il change) */
+  const meme = () => $f('f_sexe')?.value === 'F' ? 'Elle-même' : 'Lui-même';
+  const setV = (i, v) => { if (i.value !== v) { i.value = v; i.dispatchEvent(new Event('input', {bubbles:true})); } };
+  document.addEventListener('input', e=>{ const i = e.target; if (i.matches?.('#vehicles input[data-k=proprio]') && /^lm\.?$/i.test(i.value.trim())) setV(i, meme()); });
+  const fixLM = () => setTimeout(()=>document.querySelectorAll('#vehicles input[data-k=proprio]').forEach(i=>{ if (/^(lui|elle)-même$/i.test(i.value.trim())) setV(i, meme()); }), 50);
+  $f('sexeSeg')?.addEventListener('click', fixLM); $f('f_prenom')?.addEventListener('input', fixLM);
   /* Le sexe deviné : mention plus discrète */
   const sx = $f('sxAuto'); if (sx) { sx.textContent = '(deviné)'; sx.style.fontSize = '11px'; }
 })();
