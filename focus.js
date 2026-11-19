@@ -1,10 +1,10 @@
 'use strict';
-/* CIF 2.0 — v1.1.17 à 1.1.19 : champ touché (ou « Suivant » du clavier) recentré dans la partie visible de l'écran.
+/* CIF 2.0 — v1.1.17 à 1.1.20 : champ touché (ou « Suivant » du clavier) recentré dans la partie visible de l'écran.
    Champ à suggestions (ville, pays, marque, couleur, motif…) : placé en haut de la zone visible pour que
    la liste des choix s'ouvre en entier entre le champ et le clavier. Une marge sous le formulaire
    permet de remonter même les derniers champs.
-   1.1.19 : clavier ouvert, la fiche est ajustée exactement à la partie visible de l'écran (en-tête en haut,
-   bandeau Annuler / Enregistrer juste au-dessus du clavier) : iOS n'a plus besoin de décaler la page. */
+   1.1.19 / 1.1.20 : clavier ouvert, la fiche prend exactement la hauteur visible au-dessus du clavier (en-tête en haut,
+   Annuler / Enregistrer juste au-dessus du clavier) et le décalage de page qu'iOS ajoute est annulé. */
 (()=>{
   document.head.insertAdjacentHTML('beforeend', '<style>#form .body.kb{padding-bottom:62vh!important}#form.kbfit footer{padding-bottom:0!important}</style>');
   const SG = new Set(['f_adrVille','f_naisVille','f_lieuControle','f_nationalite']);
@@ -24,13 +24,19 @@
     if (!form || !vv) return;
     if (cur && !form.classList.contains('hidden')) {
       form.classList.add('kbfit');
-      form.style.top = Math.max(0, vv.offsetTop) + 'px'; form.style.height = vv.height + 'px'; form.style.bottom = 'auto';
+      form.style.top = '0px'; form.style.height = Math.round(vv.height) + 'px'; form.style.bottom = 'auto';
     } else if (form.classList.contains('kbfit')) {
       form.classList.remove('kbfit'); form.style.top = form.style.height = form.style.bottom = '';
     }
   }
+  /* iOS « pousse » toute la page vers le haut pour montrer le champ : on la remet en place (la fiche tient déjà dans la zone visible) */
+  function unpan(){
+    if (!vv || (vv.offsetTop < 1 && scrollY < 1)) return;
+    const L = document.getElementById('list'), s = L ? L.scrollTop : 0;
+    window.scrollTo(0, 0); if (L) L.scrollTop = s;
+  }
   function place(){
-    fit();
+    fit(); unpan();
     const el = cur; if (!el || document.activeElement !== el) return;
     const host = el.closest('.body'); if (!host) return;
     const [top, bot] = zone(host), r = el.getBoundingClientRect();
@@ -41,7 +47,7 @@
     const d = Math.round(r.top - target);
     if (Math.abs(d) > 6) host.scrollTop = host.scrollTop + d;
     /* la liste de suggestions se recale sous le champ, avec toute la place jusqu'au clavier */
-    if (dbg) dbg.textContent = `v${APP_VERSION} vv ${Math.round(vv?.offsetTop||0)}+${Math.round(vv?.height||0)} ih ${innerHeight} zone ${Math.round(top)}-${Math.round(bot)} champ ${Math.round(r.top)}→${Math.round(target)} st ${Math.round(host.scrollTop)}`;
+    if (dbg) dbg.textContent = `v${APP_VERSION} vv ${Math.round(vv?.offsetTop||0)}+${Math.round(vv?.height||0)} ih ${innerHeight} sy ${Math.round(scrollY)} zone ${Math.round(top)}-${Math.round(bot)} champ ${Math.round(r.top)}→${Math.round(target)} st ${Math.round(host.scrollTop)}`;
     if (sg) setTimeout(()=>{ try { if (sgInput === el && !sgBox.classList.contains('hidden')) sgPlace(el); } catch(e){} }, 40);
   }
   /* diagnostic : 5 appuis rapides sur le titre de la fiche affichent les mesures (pour régler le placement) */
