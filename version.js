@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.12',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js'],
-  changelog: [ ['1.1.12',['VIF, mémento : cases neutres par défaut, vertes (✓) une fois validées']],
+  version: '1.1.13',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js', 'compact.js'],
+  changelog: [ ['1.1.13',['Fiche de contrôle plus compacte : champs moins hauts, espacements réduits, types d\'intervention sur 3 colonnes','Champs côte à côte : résultat + antécédents, nom + prénom, sexe + date de naissance, lieu de naissance + nationalité, profession + employeur, ville + pays, téléphone + identité établie, numéro + expiration, marque + modèle et couleur + propriétaire du véhicule']],
+    ['1.1.12',['VIF, mémento : cases neutres par défaut, vertes (✓) une fois validées']],
     ['1.1.11',['Face ID ne se lance plus du tout à l\'ouverture de l\'appli : uniquement en touchant le bouton « Face ID »']],
     ['1.1.10',['VIF, mémento : « Grille d\'évaluation du danger renseignée » et « Feuillet AVIP remis »']],
     ['1.1.9',['Nouvelle tuile « VIF » (violences intrafamiliales) avec les types d\'intervention : qualité, lien et situation familiale (en couple / séparés depuis…), enfants en commun (à la charge de, présents), antécédents et mesures du juge, signes extérieurs d\'ivresse avec dépistage sur instruction de l\'OPJ, mémento fiche VIF / feuillet remis, circonstances','Balise « VIF » sur la fiche et dans la liste ; tout est repris dans le mail d\'envoi (pas dans la main courante)']],
