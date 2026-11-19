@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.9',
+  version: '1.1.10',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js'],
-  changelog: [ ['1.1.9',['Nouvelle tuile « VIF » (violences intrafamiliales) avec les types d\'intervention : qualité, lien et situation familiale (en couple / séparés depuis…), enfants en commun (à la charge de, présents), antécédents et mesures du juge, signes extérieurs d\'ivresse avec dépistage sur instruction de l\'OPJ, mémento fiche VIF / feuillet remis, circonstances','Balise « VIF » sur la fiche et dans la liste ; tout est repris dans le mail d\'envoi (pas dans la main courante)']],
+  changelog: [ ['1.1.10',['VIF, mémento : « Grille d\'évaluation du danger renseignée » et « Feuillet AVIP remis »']],
+    ['1.1.9',['Nouvelle tuile « VIF » (violences intrafamiliales) avec les types d\'intervention : qualité, lien et situation familiale (en couple / séparés depuis…), enfants en commun (à la charge de, présents), antécédents et mesures du juge, signes extérieurs d\'ivresse avec dépistage sur instruction de l\'OPJ, mémento fiche VIF / feuillet remis, circonstances','Balise « VIF » sur la fiche et dans la liste ; tout est repris dans le mail d\'envoi (pas dans la main courante)']],
     ['1.1.8',['Champ « Employeur » (société, commerce, restaurant…) toujours disponible, sous la profession','Main courante : « maçon, employé chez … » ; fiche et envoi : ligne « Employeur »']],
     ['1.1.7',['Case Homme / Femme cochée automatiquement d\'après le prénom (« deviné d\'après le prénom »), seulement si elle est vide ; prénoms mixtes ou inconnus (Camille, Dominique, Claude…) : rien n\'est coché','Un choix fait à la main n\'est jamais modifié']],
     ['1.1.6',['Écran du code : toucher le champ ouvre le clavier, toucher « Face ID » lance la biométrie (plus de lancement automatique)','Fiche d\'intervention : l\'heure de l\'appel du PC (verrouillée, « Modifier » si besoin) est distincte de la date et l\'heure d\'ouverture de la fiche','Liste, fiche et envoi : « Appel PC à … · fiche ouverte à … »']],
