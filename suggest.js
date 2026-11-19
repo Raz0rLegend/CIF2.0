@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.5 : suggestions (ville, nationalité, lieu…) affichées de préférence SOUS le champ.
+/* CIF 2.0 — v1.1.5 / 1.1.19 : suggestions (ville, nationalité, lieu…) affichées de préférence SOUS le champ.
    Si la place manque sous le champ (clavier ouvert), le formulaire défile pour faire de la place ;
    sinon la liste est raccourcie ; elle ne passe au-dessus du champ qu'en dernier recours. */
 (()=>{
@@ -22,7 +22,7 @@
       const room = host.scrollHeight - host.clientHeight - host.scrollTop;          /* défilement encore possible */
       const keep = r.top - visTop - 8;                                              /* le champ reste visible en haut */
       const d = Math.max(0, Math.min(need - below + 2, room, keep));
-      if (d > 0) { host.scrollTo({top: host.scrollTop + d, behavior: 'instant'}); hr = host.getBoundingClientRect(); r = inp.getBoundingClientRect(); below = visBottom - r.bottom; }
+      if (d > 0) { host.scrollTop = host.scrollTop + d; hr = host.getBoundingClientRect(); r = inp.getBoundingClientRect(); below = visBottom - r.bottom; }
     }
     let up = false;
     if (below < need) {
