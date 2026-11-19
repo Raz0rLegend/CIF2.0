@@ -1,8 +1,9 @@
 'use strict';
-/* CIF 2.0 — v1.1.2 à 1.1.5 : bouton rouge « Intervention », sur l'écran du code (sans déverrouiller) et sur la liste
+/* CIF 2.0 — v1.1.2 à 1.1.6 : bouton rouge « Intervention », sur l'écran du code (sans déverrouiller) et sur la liste
    Un appui au moment de l'appel du PC fige la date et l'heure de l'appel. Un bandeau rouge
    (même format que « Reprendre le contrôle précédent ») permet ensuite d'ouvrir la fiche :
-   sa date et son heure sont celles de l'appel, verrouillées. Le bandeau disparaît une fois la fiche enregistrée. */
+   l'heure de l'appel y est gardée à part (verrouillée), la date et l'heure de la fiche sont celles de son ouverture.
+   Le bandeau disparaît une fois la fiche enregistrée. */
 (()=>{
   let INTERV = [];
   const load = async () => { try { INTERV = (await dbGet('meta','interv')) || []; } catch { INTERV = []; } };
@@ -26,7 +27,7 @@
 .ivBan small{color:#e7a49e}
 .ivBan .ivDrop{color:#e7a49e;font-size:14px;padding:6px}
 #intHint{font-size:13px;color:#ff8a80;margin-top:6px}
-#intHint button{border:0;background:none;color:#7fb3ff;font-size:13px;padding:0 0 0 6px;text-decoration:underline}
+#ivAppel.hidden,#intUnlock.hidden{display:none}
 </style>`);
   $('#forgot').insertAdjacentHTML('beforebegin', `<button id="interBtn" type="button" aria-label="Intervention : figer l'heure de l'appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg><span>INTERVENTION<small>figer l'heure de l'appel du PC</small></span></button><div id="ivLock" class="hidden"></div>`);
   /* Doublon sur la liste des fiches, en bas à gauche face au bouton + */
@@ -64,21 +65,25 @@
       return;
     }
     openForm(null);
-    EDIT.f.intervId = s.id; EDIT.f.appelPC = s.at; EDIT.f.dateHeure = s.at;
-    $('#f_dateHeure').value = s.at; window.syncAge?.(); lockTime(); placeMotif();
+    EDIT.f.intervId = s.id; EDIT.f.appelPC = s.at;   /* date & heure de la fiche = maintenant (ouverture) */
+    lockTime(); placeMotif();
     draftSoon();
   });
 
-  /* Formulaire : date et heure verrouillées sur l'appel du PC */
+  /* Formulaire : heure de l'appel du PC (verrouillée) au-dessus de la date et l'heure d'ouverture de la fiche */
+  const dhLabel = $('label[for=f_dateHeure]');
+  dhLabel.insertAdjacentHTML('beforebegin', `<div id="ivAppel" class="hidden"><label class="f" for="f_appelPC" style="color:#ff8a80">🚨 Appel du PC</label><div style="display:flex;gap:8px;align-items:center"><input id="f_appelPC" type="datetime-local" readonly style="flex:1;border-color:#8a1f1f"><button type="button" id="intUnlock" style="border:0;background:none;color:#7fb3ff;font-size:14px;text-decoration:underline;padding:6px 0">Modifier</button></div></div>`);
   $('#f_dateHeure').insertAdjacentHTML('afterend', '<div id="intHint" class="hidden"></div>');
+  $('#f_appelPC').addEventListener('input', e=>{ if (EDIT?.f && e.target.value) { EDIT.f.appelPC = e.target.value; draftSoon(); } });
+  $('#intUnlock').addEventListener('click', ()=>{ const i = $('#f_appelPC'); i.readOnly = false; $('#intUnlock').classList.add('hidden'); i.focus(); });
   function lockTime(){
-    const f = EDIT?.f, h = $('#intHint'), inp = $('#f_dateHeure');
-    if (!f || !f.appelPC) { h.classList.add('hidden'); inp.readOnly = false; inp.style.opacity = ''; return; }
-    const locked = inp.value === f.appelPC && !f.intervUnlock;
-    inp.readOnly = locked; inp.style.opacity = locked ? '.75' : '';
-    h.innerHTML = `🚨 Intervention : appel du PC à ${esc(hm(f.appelPC))}${locked ? ' — date et heure verrouillées<button type="button" id="intUnlock">Modifier</button>' : ''}`;
-    h.classList.remove('hidden');
-    $('#intUnlock')?.addEventListener('click', ()=>{ f.intervUnlock = true; lockTime(); inp.focus(); });
+    const f = EDIT?.f, iv = !!(f && f.appelPC);
+    $('#ivAppel').classList.toggle('hidden', !iv);
+    dhLabel.textContent = iv ? 'Ouverture de la fiche' : 'Date & heure';
+    $('#f_dateHeure').readOnly = false; $('#f_dateHeure').style.opacity = '';
+    if (!iv) { $('#intHint').classList.add('hidden'); return; }
+    const a = $('#f_appelPC'); a.value = f.appelPC; a.readOnly = true; $('#intUnlock').classList.remove('hidden');
+    $('#intHint').classList.add('hidden');
   }
   /* Fiche d'intervention : le motif remonte juste sous la date et l'heure */
   const motifNodes = [$('label[for=f_motif]'), $('#f_motif'), $('#motifChips')];
@@ -99,8 +104,18 @@
   /* Fiche et envoi : heure de l'appel du PC */
   { const _fs = ficheSections; ficheSections = function(f){
     const S = _fs(f);
-    if (f.appelPC && S[0]) S[0][1].splice(1, 0, ['Appel du PC', fmtDT(f.appelPC)]);
+    if (f.appelPC && S[0]) { const r = S[0][1].find(x=>x[0] === 'Date & heure'); if (r) r[0] = 'Ouverture de la fiche'; S[0][1].unshift(['Appel du PC', fmtDT(f.appelPC)]); }
     return S; }; }
+
+  /* Fiche ouverte et liste : heure de l'appel du PC en plus de l'heure de la fiche */
+  { const _od = openDetail; openDetail = async function(f){ await _od(f); if (DETAIL !== f.id || !f.appelPC) return;
+    const clock = [...$('#detBody').querySelectorAll('.hero .chip')].find(c=>c.querySelector('svg') && c.textContent.trim() === fmtDT(f.dateHeure));
+    const html = `<span class="chip" style="color:#ff8a80;border:1px solid #8a1f1f">🚨 Appel PC ${esc(fmtDT(f.appelPC))}</span>`;
+    clock ? clock.insertAdjacentHTML('beforebegin', html) : $('#detBody .hero .chips2')?.insertAdjacentHTML('afterbegin', html);
+  }; }
+  { const _r2 = render; render = function(){ _r2();
+    document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id === c.dataset.id); if (f?.appelPC && f.appelPC !== f.dateHeure) (c.querySelector('.sub') || c.querySelector('.r1'))?.insertAdjacentHTML('afterend', `<div class="note" style="color:#ff8a80">🚨 Appel PC à ${esc(hm(f.appelPC))} · fiche ouverte à ${esc(hm(f.dateHeure||''))}</div>`); });
+  }; }
 
   load().then(()=>{ lockInfo(); if (KEY && !EDIT) render(); });
 })();
