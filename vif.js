@@ -1,7 +1,7 @@
 'use strict';
-/* CIF 2.0 — v1.1.9 : intervention VIF (violences intrafamiliales)
+/* CIF 2.0 — v1.1.9 / 1.1.10 : intervention VIF (violences intrafamiliales)
    Tuile « VIF » avec les autres types (Accident, IPM…) : elle ouvre un bloc rapide à cocher
-   (lien entre les personnes, enfants, mesures du juge, signes d'ivresse, mémento fiche / feuillet VIF, circonstances).
+   (lien entre les personnes, enfants, mesures du juge, signes d'ivresse, mémento grille d'évaluation du danger / feuillet AVIP, circonstances).
    Repris dans le mail d'envoi et signalé par une balise VIF ; rien dans la main courante (rédigée à la main). */
 (()=>{
   const G = [
@@ -22,7 +22,7 @@
     ['mesTxt', 'Précisions (date, juridiction…)', 'mesures', ''],
     ['etho', 'Éthylomètre (mg/L d\'air expiré)', 'dep', 'ex. 0,45'],
   ];
-  const MEM = [['fiche', 'Fiche VIF renseignée'], ['feuillet', 'Feuillet d\'information VIF remis']];
+  const MEM = [['fiche', 'Grille d\'évaluation du danger renseignée'], ['feuillet', 'Feuillet AVIP remis']];
   const BADGE = '<span class="badge acc" style="background:#9d174d;color:#fff">VIF</span>';
   document.head.insertAdjacentHTML('beforeend', `<style>
 #accGrid .switch.vif{grid-column:1/-1}
@@ -98,7 +98,7 @@
       ['Qualité', d.qual], ['Lien', d.lien], ['En couple depuis', d.depuis], ['Séparés / en instance depuis', d.sepDepuis],
       ['Enfants en commun', enf], ['Antécédents / mesures', [j(d.mesures), d.mesTxt].filter(Boolean).join(' — ')],
       ['Signes extérieurs d\'ivresse', sei],
-      ['Fiche VIF renseignée', d.fiche ? 'Oui' : 'Non'], ['Feuillet VIF remis', d.feuillet ? 'Oui' : 'Non'],
+      ['Grille d\'évaluation du danger renseignée', d.fiche ? 'Oui' : 'Non'], ['Feuillet AVIP remis', d.feuillet ? 'Oui' : 'Non'],
       ['Circonstances', d.circ],
     ].filter(r=>r[1]);
   }
