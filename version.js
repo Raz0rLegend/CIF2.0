@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.15',
+  version: '1.1.16',
   modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js', 'compact.js'],
-  changelog: [ ['1.1.15',['Identité sur deux colonnes : Nom | Sexe (♂ M / ♀ F), puis Prénom | Date de naissance']],
+  changelog: [ ['1.1.16',['Véhicule, propriétaire : taper « lm » écrit « Lui-même » ou « Elle-même » selon le sexe coché (et s\'adapte si le sexe change)']],
+    ['1.1.15',['Identité sur deux colonnes : Nom | Sexe (♂ M / ♀ F), puis Prénom | Date de naissance']],
     ['1.1.14',['Sexe réduit à « ♂ M » / « ♀ F » et remis en tête de l\'identité, à côté de la date de naissance ; nom et prénom juste en dessous','Filiation remontée dans l\'identité, juste après le lieu de naissance et la nationalité (CIF)']],
     ['1.1.13',['Fiche de contrôle plus compacte : champs moins hauts, espacements réduits, types d\'intervention sur 3 colonnes','Champs côte à côte : résultat + antécédents, nom + prénom, sexe + date de naissance, lieu de naissance + nationalité, profession + employeur, ville + pays, téléphone + identité établie, numéro + expiration, marque + modèle et couleur + propriétaire du véhicule']],
     ['1.1.12',['VIF, mémento : cases neutres par défaut, vertes (✓) une fois validées']],
