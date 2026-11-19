@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.2 à 1.1.4 : bouton rouge « Intervention », sur l'écran du code (sans déverrouiller) et sur la liste
+/* CIF 2.0 — v1.1.2 à 1.1.5 : bouton rouge « Intervention », sur l'écran du code (sans déverrouiller) et sur la liste
    Un appui au moment de l'appel du PC fige la date et l'heure de l'appel. Un bandeau rouge
    (même format que « Reprendre le contrôle précédent ») permet ensuite d'ouvrir la fiche :
    sa date et son heure sont celles de l'appel, verrouillées. Le bandeau disparaît une fois la fiche enregistrée. */
@@ -65,7 +65,7 @@
     }
     openForm(null);
     EDIT.f.intervId = s.id; EDIT.f.appelPC = s.at; EDIT.f.dateHeure = s.at;
-    $('#f_dateHeure').value = s.at; window.syncAge?.(); lockTime();
+    $('#f_dateHeure').value = s.at; window.syncAge?.(); lockTime(); placeMotif();
     draftSoon();
   });
 
@@ -80,7 +80,17 @@
     h.classList.remove('hidden');
     $('#intUnlock')?.addEventListener('click', ()=>{ f.intervUnlock = true; lockTime(); inp.focus(); });
   }
-  { const _of = openForm; openForm = function(f, d){ _of(f, d); lockTime(); }; }
+  /* Fiche d'intervention : le motif remonte juste sous la date et l'heure */
+  const motifNodes = [$('label[for=f_motif]'), $('#f_motif'), $('#motifChips')];
+  const motifHome = document.createComment('motif'); motifNodes[0].before(motifHome);
+  $('#intHint').insertAdjacentHTML('afterend', '<div id="ivMotif"></div>');
+  function placeMotif(){
+    const iv = !!EDIT?.f?.appelPC;
+    if (iv && motifNodes[0].parentNode.id !== 'ivMotif') $('#ivMotif').append(...motifNodes);
+    if (!iv && motifNodes[0].parentNode.id === 'ivMotif') motifHome.after(...motifNodes);
+    motifNodes[0].textContent = iv ? 'Motif de l\'intervention' : 'Motif';
+  }
+  { const _of = openForm; openForm = function(f, d){ _of(f, d); lockTime(); placeMotif(); }; }
   { const _cf = closeForm; closeForm = async function(saveIt){
     const id = EDIT?.f?.intervId;
     await _cf(saveIt);
