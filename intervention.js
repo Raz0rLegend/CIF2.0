@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.2 / 1.1.3 : bouton rouge « Intervention », sur l'écran du code (sans déverrouiller)
+/* CIF 2.0 — v1.1.2 à 1.1.4 : bouton rouge « Intervention », sur l'écran du code (sans déverrouiller) et sur la liste
    Un appui au moment de l'appel du PC fige la date et l'heure de l'appel. Un bandeau rouge
    (même format que « Reprendre le contrôle précédent ») permet ensuite d'ouvrir la fiche :
    sa date et son heure sont celles de l'appel, verrouillées. Le bandeau disparaît une fois la fiche enregistrée. */
@@ -16,6 +16,10 @@
 @keyframes interPulse{0%{box-shadow:0 0 0 0 rgba(211,47,47,.65)}70%{box-shadow:0 0 0 14px rgba(211,47,47,0)}100%{box-shadow:0 0 0 0 rgba(211,47,47,0)}}
 #interBtn.hidden,#ivLock.hidden{display:none}
 #ivLock{margin-top:8px;font-size:14px;color:#ff8a80}
+#interFab{position:fixed;left:20px;bottom:calc(84px + env(safe-area-inset-bottom) - var(--gb,0px));width:62px;height:62px;border-radius:50%;background:#d32f2f;color:#fff;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;z-index:6;font-size:9.5px;font-weight:800;letter-spacing:.4px;animation:interPulse 1.6s ease-out infinite}
+#interFab svg{width:26px;height:26px}
+#interFab:active{transform:scale(.94)}
+#interFab.hidden{display:none}
 .ivBan{display:flex;align-items:center;gap:10px;margin:10px 12px 4px;padding:11px 14px;border:1px solid #8a1f1f;border-radius:12px;background:#3a1212;color:#ffd0cc;font-size:15px;position:relative;z-index:2}
 .ivBan button{border:0;background:none;color:inherit;padding:0;font-size:15px}
 .ivBan .ivOpen{flex:1;text-align:left}
@@ -25,6 +29,8 @@
 #intHint button{border:0;background:none;color:#7fb3ff;font-size:13px;padding:0 0 0 6px;text-decoration:underline}
 </style>`);
   $('#forgot').insertAdjacentHTML('beforebegin', `<button id="interBtn" type="button" aria-label="Intervention : figer l'heure de l'appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg><span>INTERVENTION<small>figer l'heure de l'appel du PC</small></span></button><div id="ivLock" class="hidden"></div>`);
+  /* Doublon sur la liste des fiches, en bas à gauche face au bouton + */
+  $('#fab').insertAdjacentHTML('afterend', `<button id="interFab" type="button" aria-label="Intervention : figer l'heure de l'appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg>INTER</button>`);
   /* Écran du code : bouton visible au déverrouillage (pas à la création du code), rappel des appels figés */
   const lockInfo = () => { const el = $('#ivLock'); el.textContent = INTERV.length ? `🚨 Appel${INTERV.length>1?'s':''} PC figé${INTERV.length>1?'s':''} : ${INTERV.map(x=>hm(x.at)).join(', ')}` : ''; el.classList.toggle('hidden', !INTERV.length || lockMode !== 'unlock'); };
   $('#interBtn').classList.toggle('hidden', lockMode === 'setup');
@@ -39,10 +45,11 @@
   }).join('');
   { const _r = render; render = function(){
     _r();
+    $('#interFab').classList.toggle('hidden', $('#fab').classList.contains('hidden'));
     if (INTERV.length && !EDIT) $('#list').insertAdjacentHTML('afterbegin', banner());
   }; }
 
-  $('#interBtn').onclick = async ()=>{
+  $('#interBtn').onclick = $('#interFab').onclick = async ()=>{
     const s = {id: uid(), at: nowLocal(), ts: Date.now()};
     INTERV.push(s); await save();
     navigator.vibrate?.(80);
