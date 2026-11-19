@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.1.1',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js'],
-  changelog: [ ['1.1.1',['Lieu connu : Place d\'Armes (rayon de 20 m)']],
+  version: '1.1.2',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js'],
+  changelog: [ ['1.1.2',['Face ID : lancé au toucher du champ du code, plus automatiquement à l\'ouverture (s\'il est annulé, le toucher suivant ouvre le clavier)','Bouton rouge « INTER » sur l\'accueil : un appui fige la date et l\'heure de l\'appel du PC','Bandeau rouge « Intervention — appel PC à … » pour ouvrir la fiche, avec la date et l\'heure de l\'appel verrouillées (bouton « Modifier » si besoin) ; il disparaît une fois la fiche enregistrée','Fiche et envoi : ligne « Appel du PC »']],
+    ['1.1.1',['Lieu connu : Place d\'Armes (rayon de 20 m)']],
     ['1.1.0',['Version 1.1 : scan des pièces d\'identité et du permis, passagers d\'un même véhicule, main courante complète du conducteur (véhicule, carte grise, assurance), alerte de pièce expirée, lieux connus, écran principal stabilisé']],
     ['1.0.25',['Main courante : toujours « dont les documents de bord étaient en règle », propriétaire ou non']],
     ['1.0.24',['Véhicule : cases « Carte grise » et « Assurance » (vertes = présentées, un appui = rouge, non présentée)','Main courante du conducteur : « dont le certificat d\'immatriculation n\'était pas présenté », « dont le certificat d\'assurance n\'était pas présenté » ou les deux ; « en règle » si tout est présenté','Fiche et envoi : ligne « Documents » sous chaque véhicule']],
