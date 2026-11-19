@@ -1,9 +1,10 @@
 /* CIF 2.0 — version, nouveautés récentes et modules.
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié). */
 window.CIF = {
-  version: '1.2.0',
-  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js', 'compact.js', 'focus.js', 'couleur.js'],
-  changelog: [ ['1.2.0',['Version 1.2 : nouvelle fiche de contrôle compacte (champs côte à côte, sexe ♂ M / ♀ F, filiation dans l\'identité), champ en cours toujours visible au-dessus du clavier, bouton INTER et heure d\'appel du PC figée, tuile VIF, employeur, sexe deviné d\'après le prénom, « lm » → Lui-même / Elle-même, couleurs au féminin dans la main courante, Face ID uniquement sur le bouton']],
+  version: '1.2.1',
+  modules: ['mrz.js', 'naissance.js', 'saisie.js', 'expiration.js', 'passager.js', 'ecran.js', 'mc.js', 'lieux.js', 'docs.js', 'verrou.js', 'intervention.js', 'suggest.js', 'genre.js', 'employeur.js', 'vif.js', 'compact.js', 'focus.js', 'couleur.js', 'accomp.js'],
+  changelog: [ ['1.2.1',['Véhicule ajouté après coup à une fiche (contrôle piéton devenu routier) : les personnes du même contrôle deviennent automatiquement passagères de ce véhicule (sauf si elles ont leur propre véhicule ou sont marquées « Ce n\'est pas un passager »)','Véhicule du conducteur modifié (plaque, couleur…) : ses passagers sont mis à jour']],
+    ['1.2.0',['Version 1.2 : nouvelle fiche de contrôle compacte (champs côte à côte, sexe ♂ M / ♀ F, filiation dans l\'identité), champ en cours toujours visible au-dessus du clavier, bouton INTER et heure d\'appel du PC figée, tuile VIF, employeur, sexe deviné d\'après le prénom, « lm » → Lui-même / Elle-même, couleurs au féminin dans la main courante, Face ID uniquement sur le bouton']],
     ['1.1.20',['Clavier ouvert : la fiche prend la hauteur visible au-dessus du clavier et n\'est plus poussée vers le haut par iOS ; le champ en cours se place au milieu de cette zone']],
     ['1.1.19',['Clavier ouvert : la fiche se cale exactement sur la partie visible de l\'écran (titre en haut, Annuler / Enregistrer juste au-dessus du clavier) et le champ en cours se place au milieu de cette zone']],
     ['1.1.18',['Champ touché : centré dans la partie visible entre l\'en-tête et le bandeau Annuler / Enregistrer (au-dessus du clavier), et plus au milieu de l\'écran entier ; recalé après le défilement automatique d\'iOS à l\'ouverture du clavier']],
