@@ -74,8 +74,24 @@
   const sex = c => c === 'M' ? 'H' : c === 'F' ? 'F' : '';
   /* Date d'expiration AAMMJJ (toujours au XXIe siècle) */
   const expd = s => { s = dig(s); return /^\d{6}$/.test(s) && +s.slice(2,4) >= 1 && +s.slice(2,4) <= 12 ? `${s.slice(4,6)}/${s.slice(2,4)}/20${s.slice(0,2)}` : ''; };
+  /* Correction par les chiffres de contrôle (v1.2.3) : si un champ ne « tombe » pas juste, on essaie les confusions
+     lettre / chiffre du moteur (0/O/D/Q, 1/I/L, 2/Z, 5/S, 6/G, 8/B…) sur UN caractère, et on ne corrige que si une seule
+     version est valide (sinon la lecture reste « incertaine », en orange). */
+  const AMB = {'0':'OQD','O':'0QD','Q':'0O','D':'0O','1':'IL','I':'1L','L':'1I','2':'Z','Z':'2','5':'S','S':'5','6':'G','G':'6','8':'B','B':'8','7':'T','T':'7','4':'A','A':'4'};
+  function fixChk(f, d, digits, ok = ()=>true){
+    d = dig(d || ''); if (!/^\d$/.test(d) || chk(f, d)) return f;
+    const found = new Set();
+    for (let i = 0; i < f.length; i++) for (const a of (AMB[f[i]] || '')) {
+      if (digits && !/[0-9]/.test(a)) continue;
+      const g = f.slice(0,i) + a + f.slice(i+1); if (chk(g, d) && ok(g)) found.add(g);
+    }
+    return found.size === 1 ? [...found][0] : f;
+  }
+  function fixDate(f){ return dig(f); }   /* dates : lettres lues à la place des chiffres seulement */
   function parse(text){
-    const L = text.split(/\n/).map(l=>l.toUpperCase().replace(/[^A-Z0-9<]/g,'')).filter(l=>l.length >= 26);
+    /* une lettre parasite (bord de la carte) devant la bande est retirée : « IIDFRA… » → « IDFRA… » */
+    const head = l => { const i = l.search(/[I1]DFRA|D1FRA|P<[A-Z]{3}|I<[A-Z]{3}|ID[A-Z]{3}[A-Z0-9<]/); return i > 0 && i <= 3 ? l.slice(i) : l; };
+    const L = text.split(/\n/).map(l=>head(l.toUpperCase().replace(/[^A-Z0-9<]/g,''))).filter(l=>l.length >= 26);
     for (let i = 0; i < L.length; i++) {
       const a = L[i], b = L[i+1] || '', c = L[i+2] || '';
       /* Permis de conduire européen (1 ligne de 30 : D1FRA + numéro + … + 8 premières lettres du nom + clé) */
@@ -83,26 +99,32 @@
         /* Le nom suit la dernière date (6 chiffres) ; longueur de la ligne variable selon les permis */
         const m = /(\d{6})([A-Z][A-Z<]*)[0-9A-Z]?$/.exec(a.slice(14)), nf = m ? alpha(m[2]) : alpha(pad(a,30).slice(21,29));
         const nom = nf.split('<')[0], cut = !/</.test(nf) && nom.length >= 8;
-        return {kind:'DL', type:'PC', pays:'FRA', nat:'', num:a.slice(5,14).replace(/</g,''), nom, prenom:'', dn:'', sexe:'', cut, ok:a.length === 30 && chk(a.slice(0,29), dig(a[29]))};
+        return {kind:'DL', type:'PC', pays:'FRA', nat:'', num:a.slice(5,14).replace(/</g,''), nom, prenom:'', dn:'', sexe:'', cut, exp:m ? expd(m[1]) : '', ok:a.length === 30 && chk(a.slice(0,29), dig(a[29]))};
       }
       /* Ancienne carte d'identité française (2 × 36) */
       if (/^[I1]DFRA/.test(a) && a.length >= 34 && a.length <= 38 && b.length >= 33 && b.length <= 38) {
-        const l1 = pad(a,36), l2 = pad(b,36), txt = f => alpha(f).replace(/[^A-Z<]/g,'').replace(/<+$/,'').replace(/<+/g,' ').trim();
+        const l1 = pad(a,36); let l2 = pad(b,36);
+        l2 = fixChk(dig(l2.slice(0,12)), l2[12], true) + l2.slice(12,27) + fixDate(l2.slice(27,33), l2[33]) + l2.slice(33);
+        const txt = f => alpha(f).replace(/[^A-Z<]/g,'').replace(/<+$/,'').replace(/<+/g,' ').trim();
         return {kind:'FR', type:'CNI', pays:'FRA', nat:'FRA', num:dig(l2.slice(0,12)).replace(/</g,''), nom:txt(l1.slice(5,30)), prenom:cap(txt(l2.slice(13,27))), dn:dob(l2.slice(27,33)), sexe:sex(l2[34]), ok:chk(dig(l2.slice(0,12)), dig(l2[12])) && chk(dig(l2.slice(27,33)), dig(l2[33]))};
       }
       /* Passeport (2 × 44) */
       if (a[0] === 'P' && a.length >= 40 && b.length >= 40) {
-        const l1 = pad(a,44), l2 = pad(b,44);
+        const l1 = pad(a,44); let l2 = pad(b,44);
+        l2 = fixChk(l2.slice(0,9), l2[9]) + l2.slice(9,13) + fixDate(l2.slice(13,19), l2[19]) + l2.slice(19,21) + fixDate(l2.slice(21,27), l2[27]) + l2.slice(27);
         return {kind:'TD3', type:'PS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(10,13)), num:l2.slice(0,9).replace(/</g,''), ...names(l1.slice(5)), dn:dob(l2.slice(13,19)), sexe:sex(l2[20]), exp:expd(l2.slice(21,27)), ok:chk(l2.slice(0,9), dig(l2[9])) && chk(dig(l2.slice(13,19)), dig(l2[19]))};
       }
       /* Carte d'identité, titre de séjour (3 × 30) */
       if (/^[IAC1]/.test(a) && a.length >= 27 && a.length <= 33 && b.length >= 27 && b.length <= 33 && c.length >= 20) {
-        const l1 = pad(a,30), l2 = pad(b,30), t = alpha(l1.slice(0,2));
+        let l1 = pad(a,30), l2 = pad(b,30); const t = alpha(l1.slice(0,2));
+        l1 = l1.slice(0,5) + fixChk(l1.slice(5,14), l1[14]) + l1.slice(14);
+        l2 = fixDate(l2.slice(0,6), l2[6]) + l2.slice(6,8) + fixDate(l2.slice(8,14), l2[14]) + l2.slice(14);
         return {kind:'TD1', type:/^I[D<]/.test(t) ? 'CNI' : 'TS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(15,18)), num:l1.slice(5,14).replace(/</g,''), ...names(pad(c,30)), dn:dob(l2.slice(0,6)), sexe:sex(l2[7]), exp:expd(l2.slice(8,14)), ok:chk(l1.slice(5,14), dig(l1[14])) && chk(dig(l2.slice(0,6)), dig(l2[6]))};
       }
       /* Format 2 × 36 */
       if (/^[IACV1]/.test(a) && a.length >= 33 && a.length <= 38 && b.length >= 33 && b.length <= 38) {
-        const l1 = pad(a,36), l2 = pad(b,36), t = alpha(l1.slice(0,2));
+        const l1 = pad(a,36), t = alpha(l1.slice(0,2)); let l2 = pad(b,36);
+        l2 = fixChk(l2.slice(0,9), l2[9]) + l2.slice(9,13) + fixDate(l2.slice(13,19), l2[19]) + l2.slice(19,21) + fixDate(l2.slice(21,27), l2[27]) + l2.slice(27);
         return {kind:'TD2', type:/^I[D<]/.test(t) ? 'CNI' : 'TS', pays:alpha(l1.slice(2,5)), nat:alpha(l2.slice(10,13)), num:l2.slice(0,9).replace(/</g,''), ...names(l1.slice(5)), dn:dob(l2.slice(13,19)), sexe:sex(l2[20]), exp:expd(l2.slice(21,27)), ok:chk(l2.slice(0,9), dig(l2[9])) && chk(dig(l2.slice(13,19)), dig(l2[19]))};
       }
     }
@@ -128,10 +150,19 @@
   function permisFields(text){
     const F = {};
     for (const raw of text.split(/\n/)) {
-      const m = /^[^A-Za-z0-9]{0,4}(4\s?[aAbBcCdD]|[1-5lIz|])\s?[.,:;]?\s+(.+)$/.exec(raw.trim()); if (!m) continue;
-      let k = m[1].replace(/\s/g,'').toLowerCase().replace(/^[li|]$/,'1').replace(/^z$/,'2'); const v = m[2].trim();
+      const t = raw.trim();
+      /* numéro de rubrique en début de ligne, parfois précédé de quelques signes parasites (« (ss 3. », « = a 4a ») */
+      const m = /^[^A-Za-z0-9]{0,4}(4\s?[aAbBcCdD]|[1-5lIz|])\s?[.,:;]?\s+(.+)$/.exec(t)
+        || /^.{0,8}?(?<![A-Za-z0-9])(4\s?[a-eA-E])[.,:;]?\s*(\S.*)$/.exec(t)
+        || /^.{0,8}?(?<![A-Za-z0-9])([1-5])\s?[.,:;]\s*(\S.*)$/.exec(t);
+      if (!m) continue;
+      let k = m[1].replace(/\s/g,'').toLowerCase().replace(/^[li|]$/,'1').replace(/^z$/,'2').replace(/^4e$/,'4c'); const v = m[2].trim();
       if (F[k]) continue;
-      if (k === '1' || k === '2') { const w = word(v).split(' ').filter(x=>x.length > 1 || /[A-Z]/.test(x)).join(' '); if (w.replace(/[^A-Za-zÀ-ÿ]/g,'').length >= 2) F[k] = k === '1' ? w.toUpperCase() : cap(w); }
+      if (k === '1' || k === '2') {
+        let ws = word(v).split(' ').filter(x=>x.length > 1 || /[A-Z]/.test(x));
+        /* prénom : seulement les mots qui commencent par une majuscule (« Paul des 22 » → « Paul ») */
+        if (k === '2') { const i = ws.findIndex(x=>!/^[A-ZÀ-Ý]/.test(x)); if (i > 0) ws = ws.slice(0, i); else if (i === 0) ws = []; }
+        const w = ws.join(' '); if (w.replace(/[^A-Za-zÀ-ÿ]/g,'').length >= 2) F[k] = k === '1' ? w.toUpperCase() : cap(w); }
       else if (k === '3') { const d = dateIn(v); if (d) { F.dn = d.v; let r2 = v.slice(d.end).trim(); const pm = /^\(([^)]*)\)?/.exec(r2); r2 = pm ? pm[1] : r2.replace(/\([^)]*\)\s*$/,''); const lieu = word(r2); if (lieu.length >= 2) F.lieu = cap(lieu); } }
       else if (k === '4a') { const d = dateIn(v); if (d) F.del = d.v; }
       else if (k === '4b') { const d = dateIn(v); if (d) F.exp = d.v; }
@@ -141,8 +172,15 @@
     const lines = text.split(/\n/);
     /* 4c souvent sur la même ligne que 4a ; 4a parfois mal lu (« sa », « Aa », « da ») */
     for (const raw of lines) {
-      const c4 = /4\s?[cC]\s?[.,:;]?\s+(.{3,})$/.exec(raw); if (c4 && !F.aut) F.aut = c4[1].replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim();
+      const c4 = /(?<![A-Za-z0-9])4\s?[cCeE]\s?[.,:;]?\s*([A-Za-zÀ-ÿ0-9].{2,})$/.exec(raw); if (c4 && !F.aut) F.aut = c4[1].replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim();
       if (!F.del) { const a4 = /^[^A-Za-z0-9]{0,3}[4AaSsdy]\s?[aàâ]\s?[.,:;]?\s+(.+)$/.exec(raw.trim()); if (a4) { const d = dateIn(a4[1]); if (d) F.del = d.v; } }
+    }
+    /* Date de naissance introuvable : date suivie du lieu entre parenthèses, sinon la plus ancienne d'au moins 14 ans */
+    if (!F.dn) {
+      for (const raw of lines) { const d = dateIn(raw); if (d && /^\s*\(/.test(raw.slice(d.end))) { F.dn = d.v; const pm = /^\s*\(([^)]*)\)?/.exec(raw.slice(d.end)); const lieu = pm ? word(pm[1]) : ''; if (lieu.length >= 2 && !F.lieu) F.lieu = cap(lieu); break; } }
+      if (!F.dn) { const y14 = new Date().getFullYear() - 14, all = [];
+        for (const raw of lines) for (const mm of raw.matchAll(/[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4}/g)) { const d = dateIn(mm[0]); if (d && +d.v.slice(6) <= y14) all.push(d.v); }
+        all.sort((a,b)=>a.split('/').reverse().join('').localeCompare(b.split('/').reverse().join(''))); if (all.length) F.dn = all[0]; }
     }
     /* Dernier recours : les dates du recto autres que la naissance, la plus ancienne passée = délivrance */
     if (!F.del) {
@@ -161,6 +199,9 @@
     for (let i = 0; i < L.length; i++) {
       const m = /(lieu\s*de\s*naissance|place\s*of\s*birth|luogo\s*di\s*nascita|lugar\s*de\s*nacimiento|geburtsort)[^A-Za-zÀ-ÿ]*(.*)$/i.exec(L[i]);
       if (m) { let v = clean(m[2].replace(/^.*birth/i,'')); if (!v && L[i+1]) v = clean(L[i+1]); if (v) { out.lieu = v; break; } }
+      /* ancienne carte d'identité : ligne « à : PARIS 1ER (75) » */
+      const a = /(?:^|[^A-Za-zÀ-ÿ])[àÀ]\s*:\s*([A-ZÀ-Ý][A-ZÀ-Ý0-9' -]{1,})/.exec(L[i]);
+      if (a) { const v = a[1].replace(/\s+\d{1,3}\s*$/,'').trim(); if (v.replace(/[^A-ZÀ-Ý]/g,'').length >= 2) { out.lieu = cap(v.toLowerCase()); break; } }
       const o = /[nN][ée]e?\s*\(?e?\)?\s*le\b.*?(?:^|\s)[àa]\s*[:.]?\s+([A-ZÀ-Ý][A-ZÀ-Ý' -]{1,})/.exec(L[i]);
       if (o) { const v = clean(o[1]); if (v) { out.lieu = v; break; } }
     }
@@ -297,7 +338,9 @@
     put('f_docDate', F.del, 'date de délivrance'); put('f_docExp', F.exp, 'date d\'expiration'); put('f_docLieu', F.aut, 'autorité');
     if (!r.num && F.num) put('f_docNumero', F.num, 'numéro');
     setSeg('docSeg', 'Officiel'); if (!$('#f_docType').value) $('#f_docType').value = 'PC';
-    syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true})); draftSoon();
+    syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
+    if (F[2] && !$('#f_sexe').value) $('#f_prenom').dispatchEvent(new Event('change', {bubbles:true}));   /* sexe deviné d'après le prénom */
+    draftSoon();
     return got;
   }
   const KIND = {PS:'passeport', CNI:'carte d\'identité', TS:'titre de séjour', PC:'permis de conduire'};
