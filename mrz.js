@@ -241,6 +241,41 @@
     if (!F.exp) for (const t of L.slice(0, 3)) { const x = dateIn(t); if (x && +x.v.slice(6) >= new Date().getFullYear() - 1) { F.exp = x.v; break; } }
     return F;
   }
+  /* Recto d'une carte d'identité étrangère sans bande (Portugal, Italie, Espagne…) : pas d'intitulés fiables,
+     on s'appuie sur la ligne « sexe · nationalité (3 lettres) · date de naissance » (v1.2.8) */
+  const HEAD = /^(CART[AÃEO]O?|CARTE|CARD|CITIZEN|CIDAD[AÃ]O|IDENTIT\w*|IDENTIDAD|IDENTIDADE|DOCUMENTO|NACIONAL|NATIONAL|NAZIONALE|REP[UÚ]BLI\w*|REPUBBLICA|PORTUGAL|PORTUGUESA|ITALIANA|ESPA[NÑ]A|BELGI\w*|ROYAUME|KINGDOM|PERSONALAUSWEIS|BUNDESREPUBLIK|DEUTSCHLAND|IDENTITY|DE|DA|DO|DI|DEL|SPECIMEN|ESPECIMEN|SPECIMEN)$/;
+  function genericFields(text){
+    const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), F = {};
+    const DT = /([0-3][0-9])[\s.\/-]?([01][0-9])[\s.\/-]?([0-9]{4})/g;
+    /* année mal lue (« 1081 », « 1681 ») : on garde les deux derniers chiffres */
+    const yfix = y => /^(19|20)\d\d$/.test(y) ? y : (+y.slice(2) > new Date().getFullYear() % 100 ? '19' : '20') + y.slice(2);
+    const iso = l => [...l.matchAll(/\b([A-Z]{3})\b/g)].find(m=>ISO3[m[1]]);
+    const di = L.findIndex(l=>iso(l) && /\d{2}[\s.\/-]?\d{2}[\s.\/-]?\d{4}/.test(l.replace(/[Oo]/g,'0')));
+    if (di < 0) return F;
+    const dl = L[di], n = iso(dl);
+    F.nat = n[1];
+    const sx = /(?:^|[^A-Za-z])([MF])(?![A-Za-z])/.exec(dl.slice(0, n.index)); if (sx) F.sexe = sx[1] === 'M' ? 'H' : 'F';
+    const d0 = [...dl.slice(n.index).replace(/[Oo]/g,'0').matchAll(DT)][0]; if (d0) { const x = dateIn(`${d0[1]}.${d0[2]}.${yfix(d0[3])}`); if (x) F.dn = x.v; }
+    /* noms : lignes en MAJUSCULES au-dessus (hors en-tête du document) ; la première = nom, la suivante = prénoms */
+    const caps = [];
+    for (const l of L.slice(0, di)) {
+      const w = l.replace(/[^A-Za-zÀ-ÿ' -]/g,' ').split(/\s+/).filter(x=>x.length >= 2 && x === x.toUpperCase() && /[A-ZÀ-Ý]/.test(x));
+      const good = w.filter(x=>!HEAD.test(x.normalize('NFD').replace(/[̀-ͯ]/g,'')));
+      if (good.some(x=>x.replace(/[^A-ZÀ-Ý]/g,'').length >= 3) && good.join('').length >= 4 && good.length >= w.length - 1 && !w.every(x=>HEAD.test(x.normalize('NFD').replace(/[̀-ͯ]/g,'')))) caps.push(w.filter((x,i)=>!(i === 0 && HEAD.test(x) && !/^(DA|DE|DO|DI|DEL)$/.test(x))).join(' '));
+    }
+    if (caps.length >= 2) { F.nom = caps[caps.length - 2]; F.prenom = cap(caps[caps.length - 1]); } else if (caps.length) F.nom = caps[0];
+    /* numéro et date d'expiration : ligne(s) sous la ligne des données */
+    for (const l of L.slice(di + 1, di + 3)) {
+      const c = l.replace(/[Oo](?=\d)|(?<=\d)[Oo]/g,'0');
+      const ds = [...c.matchAll(DT)]; const last = ds[ds.length - 1];
+      if (last && !F.exp) { const x = dateIn(`${last[1]}.${last[2]}.${yfix(last[3])}`); if (x) F.exp = x.v; }
+      const tok = (last ? c.slice(0, last.index) : c).toUpperCase().split(/\s+/).map(x=>x.replace(/[^A-Z0-9]/g,'')).filter(x=>x.length >= 6 && /\d/.test(x));
+      if (tok.length && !F.num) F.num = tok[0];
+      if (F.num || F.exp) break;
+    }
+    return F;
+  }
+  window.genericFields = (...a) => genericFields(...a);
   const isRecto = t => /IDENTIT/i.test(t) && /Surname|Given\s*names|NOM\s*D.?\s*USAGE|Pr[ée]noms/i.test(t);
   window.lieuFields = lieuFields;
   /* Intitulé illisible (trop petit) : on cherche une commune connue parmi les lignes en majuscules, près de « NOM D'USAGE » d'abord */
@@ -425,6 +460,24 @@
             const ei = window.expForm?.();
             status(`Verso lu · à vérifier, en orange : ${got.join(', ')}` + (ei ? ` · ${ei.days < 0 ? '⚠ ' : ''}${ei.text}` : ''));
             if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast('Verso lu : vérifie les champs en orange');
+            return;
+          }
+          /* carte d'identité étrangère (recto sans bande) */
+          const G = merge(texts, genericFields);
+          if (G.nat && (G.nom || G.dn)) {
+            const got = [], put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
+            put('f_nom', G.nom, 'nom'); put('f_prenom', G.prenom, 'prénom'); put('f_dateNaissance', G.dn, 'date de naissance');
+            if (G.sexe) { $('#f_sexe').value = G.sexe; syncSexe(); }
+            const n2 = iso2(G.nat), adj = n2 && PAYS_ADJ[n2]; if (adj && !/^du /.test(adj)) { const a = adjFem(adj); put('f_nationalite', a[0].toUpperCase() + a.slice(1), 'nationalité'); }
+            put('f_docNumero', G.num, 'numéro'); put('f_docExp', G.exp, 'date d\'expiration');
+            setSeg('docSeg', 'Officiel'); if (!$('#f_docType').value) $('#f_docType').value = 'CNI';
+            if (n2 && [...$('#f_docPays').options].some(o=>o.value === n2)) $('#f_docPays').value = n2;
+            syncDocPays(); syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
+            if (G.prenom && !G.sexe) $('#f_prenom').dispatchEvent(new Event('change', {bubbles:true}));
+            draftSoon();
+            const ei = window.expForm?.();
+            status(`Pièce étrangère lue (${G.nat}) · à vérifier, en orange : ${got.join(', ')} · s'il y a des lignes « <<< » au verso, scanne-le pour confirmer` + (ei && ei.days < 0 ? ` · ⚠ ${ei.text}` : ''));
+            if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast('Pièce lue : vérifie les champs en orange');
             return;
           }
           const lieu = await findLieu(texts);
