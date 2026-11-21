@@ -114,3 +114,19 @@ html.jour .vgrp b{color:#000000}
   document.getElementById('btnSettings')?.addEventListener('click', ()=>{ if (sel) sel.value = mode(); apply(); });
   apply();
 })();
+/* v1.2.13 : mode jour plus contrasté (bordures, textes et icônes des boutons plus foncés) ; bouton Face ID en bleu
+   (dans les deux modes) pour ne plus le confondre avec « Valider » ni avec le bouton rouge INTERVENTION */
+(()=>{
+  document.head.insertAdjacentHTML('beforeend', `<style>
+.btn.bio,html.jour .btn.bio{background:#1a73e8!important;color:#fff!important}
+html.jour{--line:#a9a9b2;--border:#8f8f98;--muted:#4c4c53}
+html.jour #form button:not(.on):not(.ib):not(#formCancel):not(#formNext):not(#formSave):not(#f_verif),html.jour .chips span{box-shadow:0 1px 2px rgba(0,0,0,.16)}
+html.jour #mrzBtn,html.jour #evAdd,html.jour #geoBtn,html.jour #formNext{color:#0b62d6!important}
+html.jour #f_verif{color:#2e2e33!important;border-color:#55555c!important}
+html.jour .seg button:not(.on){color:#26262b}
+html.jour #sexeSeg button:not(.on){color:#1d1d22}
+html.jour #lsvc .sq,html.jour #lsvc .ms{background:#fff!important;border:1px solid #9a9aa2!important;color:#222;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+html.jour #lsvc .mh button{color:#0b62d6!important;font-weight:600}
+html.jour .addveh,html.jour .addph{border-color:#6f6f78!important;color:#1d1d22}
+</style>`);
+})();
