@@ -1,10 +1,10 @@
 'use strict';
-/* CIF 2.0 — v1.2.2 : mode test de lecture (Réglages › Lecture des pièces).
+/* CIF 2.0 — v1.2.2 / 1.2.4 : mode test de lecture (Réglages › Zone sensible › Mode développeur).
    Activé : le bouton appareil photo propose la photothèque au lieu de l'appareil, et un panneau jaune
    affiche le texte brut lu par le moteur à chaque passage (pour comprendre les erreurs de lecture).
    Rien n'est envoyé : tout reste sur le téléphone. */
 (()=>{
-  const KEY = 'cifScanDbg', on = () => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
+  const KEY = 'cifScanDbg', on = () => { try { return localStorage.getItem('cifDev') === '1' && localStorage.getItem(KEY) === '1'; } catch { return false; } };
   const log = [];
   function panel(){
     let p = document.getElementById('scanDbg');
@@ -45,13 +45,6 @@
   }
   document.addEventListener('change', e=>{ if (e.target?.id === 'mrzFile' && on()) { log.length = 0; show(); } }, true);
   const _of = openForm; openForm = function(...a){ const r = _of.apply(this, a); log.length = 0; document.getElementById('scanDbg')?.remove(); sync(); return r; };
-  /* Réglages */
-  const sec = [...document.querySelectorAll('#settings h3')].find(x=>x.textContent === 'Sécurité');
-  sec?.insertAdjacentHTML('beforebegin', `<h3>Lecture des pièces</h3>
-    <label class="switch" style="margin-top:6px"><input type="checkbox" id="s_scanDbg"><span class="sw"></span><span class="swl">Mode test (photothèque + texte lu)</span></label>
-    <p class="hint">Le bouton appareil photo de la fiche ouvre la photothèque et un panneau jaune montre ce que le moteur a lu. Tout reste sur le téléphone.</p>`);
-  const cb = document.getElementById('s_scanDbg');
-  if (cb) { cb.checked = on(); cb.onchange = e=>{ try { localStorage.setItem(KEY, e.target.checked ? '1' : '0'); } catch {} sync(); }; }
-  document.getElementById('btnSettings')?.addEventListener('click', ()=>{ if (cb) cb.checked = on(); });
+  window.cifScanSync = sync;
   sync();
 })();
