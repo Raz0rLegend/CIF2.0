@@ -280,7 +280,7 @@
     const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), F = {};
     const after = re => { const i = L.findIndex(x=>re.test(x)); return i >= 0 ? L.slice(i + 1, i + 3) : []; };
     const BAD = /USAGE|SURNAME|PR[ÉE]NOM|NAISSANCE|DOCUMENT|NATIONALIT|SEXE|IDENTIT/;
-    const upper = t => { const m = t.match(/[A-ZÀ-Ý][A-ZÀ-Ý'’ -]*[A-ZÀ-Ý]/g) || []; return m.map(x=>x.trim()).filter(x=>x.replace(/[^A-ZÀ-Ý]/g,'').length >= 2 && !BAD.test(x)).sort((a,b)=>b.length - a.length)[0] || ''; };
+    const upper = t => { const m = t.match(/[A-ZÀ-Ý][A-ZÀ-Ý'’ -]*[A-ZÀ-Ý]/g) || []; return m.map(x=>x.trim().replace(/\s+[A-ZÀ-Ý]$/,'')).filter(x=>x.replace(/[^A-ZÀ-Ý]/g,'').length >= 2 && !BAD.test(x)).sort((a,b)=>b.length - a.length)[0] || ''; };
     for (const t of after(/\bNOM\b(?!\s*D.?\s*USAGE)\s*\/?\s*Su[rmn]/i).slice(0,1)) { const u = upper(t); if (u) F.nom = u; }
     /* prénoms : la plus longue suite de mots à majuscule (« Maëlys-Gaëlle, Marie ») sur les deux lignes sous l'intitulé */
     const pre = [];
@@ -296,11 +296,11 @@
     if (lc.length) { F.lieuC = lc.sort((a,b)=>b.length - a.length); F.lieu = F.lieuC[0]; }
     for (const t of after(/DU\s*DOCUMENT|Document\s*No/i)) {
       const c = t.replace(/VV/g,'W').replace(/[^A-Za-z0-9 ]/g,' ').trim();
-      const d = /([0-9OoDIl]{2})\s?([0-9OoDIl]{2})\s?([0-9OoDIl]{4})\s*\S{0,3}$/.exec(c);
+      const d = /(?<![0-9A-Za-z])([0-9OoDIl]{2})\s?([0-9OoDIl]{2})\s?([0-9OoDIl]{4})\s*\S{0,3}$/.exec(c);   /* date collée au numéro (« …Z79 27012031 ») : pas confondue */
       if (d) { const x = dateIn(`${d[1]}.${d[2]}.${d[3]}`); if (x) F.exp = x.v; }
       /* numéro : 9 caractères (lettres et chiffres), parfois coupé en morceaux par le moteur (« X4 RTBPFW4 ») */
       const tok = (d ? c.slice(0, d.index) : c).toUpperCase().split(/\s+/).filter(Boolean);
-      for (let i = 0; i < tok.length && !F.num; i++) { let acc = ''; for (let j = i; j < tok.length && acc.length < 9; j++) { acc += tok[j]; if (acc.length === 9 && /\d/.test(acc) && /[A-Z]/.test(acc)) F.num = acc; } }
+      for (let i = 0; i < tok.length && !F.num; i++) { let acc = ''; for (let j = i; j < tok.length && acc.length < 9; j++) { acc += tok[j]; if (acc.length === 9 && /\d.*\d/.test(acc) && /[A-Z]/.test(acc)) { if (j === i) F.num = acc; else F.numJ ||= acc; } } }
       if (F.num || F.exp) break;
     }
     /* date d'expiration aussi imprimée en petit en haut à droite de la carte */
@@ -501,6 +501,8 @@
         /* Recto de la carte d'identité récente (format carte bancaire) */
         if (!r && texts.some(isRecto)) {
           const R = merge(texts, rectoFields), got = [];
+          if (!R.num && R.numJ) R.num = R.numJ;   /* numéro d'un seul tenant prioritaire, sinon recollé */
+          if (!R.nat) R.nat = 'FRA';              /* la carte nationale d'identité n'est délivrée qu'aux Français */
           const put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
           put('f_nom', R.nom, 'nom'); put('f_prenom', R.prenom, 'prénom'); put('f_dateNaissance', R.dn, 'date de naissance');
           if (R.sexe) { $('#f_sexe').value = R.sexe; syncSexe(); }
