@@ -158,6 +158,7 @@
         || /^.{0,8}?(?<![A-Za-z0-9])([1-5])\s?[.,:;]\s*(\S.*)$/.exec(t);
       if (!m) continue;
       let k = m[1].replace(/\s/g,'').toLowerCase().replace(/^[li|]$/,'1').replace(/^z$/,'2').replace(/^4e$/,'4c'); const v = m[2].trim();
+      if (k === '5' && /^[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]/.test(v)) k = '3';   /* « 3 » lu « 5 » (permis italien) */
       if (F[k]) continue;
       if (k === '1' || k === '2') {
         let ws = word(v).split(' ').filter(x=>x.length > 1 || /[A-Z]/.test(x));
@@ -174,6 +175,7 @@
     /* 4c souvent sur la même ligne que 4a ; 4a parfois mal lu (« sa », « Aa », « da ») */
     for (const raw of lines) {
       const c4 = /(?<![A-Za-z0-9])4\s?[cCeE]\s?[.,:;]?\s*([A-Za-zÀ-ÿ0-9].{2,})$/.exec(raw); if (c4 && !F.aut) F.aut = c4[1].replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim();
+      if (!F.exp) { const b4 = /^[^A-Za-z0-9]{0,4}(?:[4AaSsdy]\s?)?[bB]\s?[.,:;]\s*(.+)$/.exec(raw.trim()); if (b4) { const d = dateIn(b4[1]); if (d) F.exp = d.v; } }
       if (!F.del) { const a4 = /^[^A-Za-z0-9]{0,3}[4AaSsdy]\s?[aàâ]\s?[.,:;]?\s+(.+)$/.exec(raw.trim()); if (a4) { const d = dateIn(a4[1]); if (d) F.del = d.v; } }
     }
     /* Date de naissance introuvable : date suivie du lieu entre parenthèses, sinon la plus ancienne d'au moins 14 ans */
@@ -191,8 +193,68 @@
       const past = [...new Set(ds)].filter(v => t(v) <= Date.now() && (!F.dn || t(v) > t(F.dn))).sort((a,b)=>t(a)-t(b));
       if (past.length) F.del = past[0];
     }
+    /* expiration introuvable : la date future la plus lointaine */
+    if (!F.exp) { const t = v => { const [d, m, y] = v.split('/'); return new Date(+y, m-1, +d).getTime(); }, fut = [];
+      for (const raw of lines) for (const m of raw.matchAll(/[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4}/g)) { const d = dateIn(m[0]); if (d && t(d.v) > Date.now()) fut.push(d.v); }
+      if (fut.length) F.exp = fut.sort((a,b)=>t(b)-t(a))[0]; }
+    F.pays = paysDoc(text);
     return F;
   }
+  /* Pays de délivrance d'après l'en-tête imprimé (permis et cartes sans bande) */
+  function paysDoc(text){
+    const u = text.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z]/g,'');
+    if (/PATENTEDIGUIDA|REPUBBLICAITALIANA|REPUBBLICA|CARTADIIDENTITA/.test(u)) return 'IT';
+    if (/MONACO/.test(u)) return 'MC';
+    if (/OSTERREICH|OESTERREICH/.test(u)) return 'AT';
+    if (/SCHWEIZ|SUISSE|SVIZZERA/.test(u)) return 'CH';
+    if (/FUHRERSCHEIN|FUEHRERSCHEIN|DEUTSCHLAND|BUNDESREPUBLIK/.test(u)) return 'DE';
+    if (/PERMISODECONDUC|ESPANA|REINODE/.test(u)) return 'ES';
+    if (/CARTADECONDUC|PORTUGUESA|PORTUGAL/.test(u)) return 'PT';
+    if (/BELGIQUE|BELGIE|BELGIEN|BELGIUM/.test(u)) return 'BE';
+    if (/LUXEMBOURG/.test(u)) return 'LU';
+    if (/NEDERLAND/.test(u)) return 'NL';
+    if (/PERMISDECONDUIRE|REPUBLIQUEFRANCAISE/.test(u)) return 'FR';
+    return '';
+  }
+  /* Carte d'identité étrangère à intitulés bilingues (« COGNOME / SURNAME » au-dessus de la valeur) : Italie (CIE)… (v1.2.9) */
+  function labelFields(text){
+    const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), F = {};
+    const PART = /^(DI|DE|DA|DO|DEL|DELLA|DEGLI|DOS|DAS|LA|LE|LO|VAN|VON|DER|EL|AL)$/;
+    const LBL = /SUR[NM]A[MN]E|COGNOME|GIVEN|\b[NM][AO][MN]E\b|BIRTH|NASCITA|\bSEX\b|SESSO|NATIONAL|CITTADIN|ISSU|EMISSION|EXPIR|SCADENZA|HEIGHT|STATURA|SIGNATURE|FIRMA|MUNICIPAL|COMUNE/i;
+    const run = t => {
+      const tok = t.replace(/[^A-Za-zÀ-ÿ'’ -]/g,' ').split(/\s+/).filter(Boolean), runs = []; let cur = [];
+      const ok = w => w === w.toUpperCase() && /[A-ZÀ-Ý]/.test(w) && (w.replace(/[^A-ZÀ-Ý]/g,'').length >= 3 || PART.test(w));
+      for (const w of [...tok, '·']) { if (w !== '·' && ok(w)) cur.push(w); else { while (cur.length && PART.test(cur[0])) cur.shift(); while (cur.length > 1 && (PART.test(cur[cur.length-1]) || cur[cur.length-1].length <= 3)) cur.pop(); if (cur.length) runs.push(cur.join(' ')); cur = []; } }
+      return runs.sort((a,b)=>b.length - a.length)[0] || '';
+    };
+    const vals = (i, n = 3) => L.slice(i + 1, i + 1 + n).filter(x=>!LBL.test(x));
+    const DR = /[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4}/g;
+    L.forEach((l, i) => {
+      if (!F.nom && /SUR[NM]A[MN]E|COGNOME/i.test(l)) { const v = vals(i, 2)[0]; const u = v && run(v); if (u) F.nom = u; }
+      else if (!F.prenom && /GIVEN|\b[NM][AO][MN]E\b/i.test(l) && !/SUR|COGNOME/i.test(l)) { const v = vals(i, 2)[0]; const u = v && run(v); if (u) F.prenom = cap(u.toLowerCase()); }
+      if (!F.dn && /BIRTH|NASCITA/i.test(l)) for (const v of vals(i)) { const d = dateIn(v); if (d) { F.dn = d.v; const u = run(v.slice(0, v.search(/[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}/)).replace(/[({][^)}]*[)}]/g,'')); if (u) F.lieu = cap(u.toLowerCase()); break; } }
+      if (/\bSEX\b|SESSO|NATIONAL|CITTADIN/i.test(l)) for (const v of vals(i)) {
+        if (!F.nat) { const n = [...v.matchAll(/\b([A-Z]{3})\b/g)].find(m=>ISO3[m[1]]); if (n) F.nat = n[1]; }
+        if (!F.sexe) { const sx = /(?:^|[^A-Za-z])([MF])\1?(?![A-Za-z])/.exec(v); if (sx) F.sexe = sx[1] === 'M' ? 'H' : 'F'; }
+      }
+      if (!F.exp && /EXPIR|SCADENZA/i.test(l)) for (const v of vals(i)) {
+        const ds = [...v.matchAll(DR)].map(m=>dateIn(m[0])).filter(Boolean).map(d=>d.v);
+        if (ds.length >= 2) { F.del = ds[0]; F.exp = ds[ds.length - 1]; break; }
+        if (ds.length === 1) { const both = /ISSU|EMISSION/i.test(l); if (!both || v.search(DR) > v.length / 3) F.exp = ds[0]; else F.del = ds[0]; break; }
+      }
+      if (!F.aut && /MUNICIPAL|COMUNE/i.test(l)) { const v = vals(i, 1)[0]; const u = v && run(v); if (u) F.aut = 'Comune di ' + cap(u.toLowerCase()); }
+    });
+    /* lieu et date de naissance sans intitulé lisible : « … MAGGIORE (VA) 30.12.1964 » */
+    if (!F.dn) for (const l of L) { const m = /([A-ZÀ-Ý][A-ZÀ-Ý' -]{2,}?)\s*[({]\s*[A-Z]{2}\s*[)}]\s*([0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4})/.exec(l); if (m) { const d = dateIn(m[2]); if (d) { F.dn = d.v; const u = run(m[1]); if (u && !F.lieu) F.lieu = cap(u.toLowerCase()); break; } } }
+    /* numéro de la carte italienne : 2 lettres, 5 chiffres, 2 lettres (CA00000AA), en haut à droite ; ancien modèle papier : AX1234567 */
+    F.pays = paysDoc(text);
+    if (F.pays === 'IT') for (const l of L) {
+      const m = /(?<![A-Z0-9])([A-Z]{2})\s?([0-9OoQD]{5})\s?([A-Z]{2})(?![A-Z0-9])/.exec(l) || /(?<![A-Z0-9])(A[A-Z])\s?([0-9OoQD]{7})()(?![A-Z0-9])/.exec(l);
+      if (m && /\d{3}/.test(m[2])) { F.num = m[1] + m[2].replace(/[OoQD]/g,'0') + m[3]; break; }
+    }
+    return F;
+  }
+  window.labelFields = (...a) => labelFields(...a);
   /* Recto d'une carte d'identité, d'un passeport ou d'un titre de séjour : lieu de naissance (absent de la bande) */
   function lieuFields(text){
     const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), out = {};
@@ -276,7 +338,7 @@
     return F;
   }
   window.genericFields = (...a) => genericFields(...a);
-  const isRecto = t => /IDENTIT/i.test(t) && /Surname|Given\s*names|NOM\s*D.?\s*USAGE|Pr[ée]noms/i.test(t);
+  const isRecto = t => /IDENTIT/i.test(t) && /Surname|Given\s*names|NOM\s*D.?\s*USAGE|Pr[ée]noms/i.test(t) && !/COGNOME|REPUBBLICA|ITALIANA|APELLIDO|NAZIONALIT|CITTADIN/i.test(t);
   window.lieuFields = lieuFields;
   /* Intitulé illisible (trop petit) : on cherche une commune connue parmi les lignes en majuscules, près de « NOM D'USAGE » d'abord */
   async function findLieu(texts){
@@ -376,11 +438,12 @@
     const k = c.width < 1600 ? 2 : 1, o = document.createElement('canvas'); o.width = c.width*k; o.height = c.height*k;
     const g = o.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height);
     const im = g.getImageData(0, 0, o.width, o.height), d = im.data, h = new Uint32Array(256), n = d.length/4;
+    /* 'bin' : noir et blanc strict, efface les guillochis gris (carte italienne) */
     const px = mode === 'min' ? i => Math.min(d[i], d[i+1], d[i+2]) : i => Math.max(d[i], d[i+1], d[i+2]);   /* permis rose : canal le plus sombre */
     for (let i = 0; i < d.length; i += 4) h[px(i)]++;
     const pct = q => { let a = 0; for (let v = 0; v < 256; v++) { a += h[v]; if (a >= n*q) return v; } return 255; };
     const lo = pct(.02), hi = Math.max(lo + 1, pct(.6));
-    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, (px(i) - lo) * 255 / (hi - lo))); d[i] = d[i+1] = d[i+2] = v; }
+    for (let i = 0; i < d.length; i += 4) { let v = Math.max(0, Math.min(255, (px(i) - lo) * 255 / (hi - lo))); if (mode === 'bin') v = v < 70 ? 0 : 255; d[i] = d[i+1] = d[i+2] = v; }
     g.putImageData(im, 0, 0); return o;
   }
   function crop(c, y0, y1){ const o = document.createElement('canvas'); o.width = c.width; o.height = Math.round(c.height*(y1-y0)); o.getContext('2d').drawImage(c, 0, c.height*y0, c.width, o.height, 0, 0, o.width, o.height); return o; }
@@ -410,6 +473,7 @@
     put('f_docDate', F.del, 'date de délivrance'); put('f_docExp', F.exp, 'date d\'expiration'); put('f_docLieu', F.aut, 'autorité');
     if (!r.num && F.num) put('f_docNumero', F.num, 'numéro');
     setSeg('docSeg', 'Officiel'); if (!$('#f_docType').value) $('#f_docType').value = 'PC';
+    if (F.pays && !(r && r.pays) && [...$('#f_docPays').options].some(o=>o.value === F.pays)) { $('#f_docPays').value = F.pays; syncDocPays(); }
     syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
     if (F[2] && !$('#f_sexe').value) $('#f_prenom').dispatchEvent(new Event('change', {bubbles:true}));   /* sexe deviné d'après le prénom */
     draftSoon();
@@ -460,6 +524,27 @@
             const ei = window.expForm?.();
             status(`Verso lu · à vérifier, en orange : ${got.join(', ')}` + (ei ? ` · ${ei.days < 0 ? '⚠ ' : ''}${ei.text}` : ''));
             if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast('Verso lu : vérifie les champs en orange');
+            return;
+          }
+          /* carte étrangère à intitulés bilingues (Italie…) : fond guilloché → 2e lecture en noir et blanc strict */
+          const HINT = /COGNOME|SUR[NM]AME|IDENTITY|NATIONALITY|CITTADINANZA|REPUBBLICA/i;
+          let B = merge(texts, labelFields);
+          if (texts.some(t=>HINT.test(t)) && !(B.nom && B.prenom && B.dn)) { try { const bw = await readText(file, ['6'], 'bin'); texts = texts.concat(bw); B = merge(bw.concat(texts), labelFields); } catch {} }
+          if (B.nom && (B.dn || B.prenom)) {
+            const got = [], put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
+            put('f_nom', B.nom, 'nom'); put('f_prenom', B.prenom, 'prénom'); put('f_dateNaissance', B.dn, 'date de naissance');
+            if (B.lieu && $('#f_naisVille')) { $('#f_naisVille').value = B.lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); got.push('lieu de naissance'); }
+            if (B.sexe) { $('#f_sexe').value = B.sexe; syncSexe(); }
+            const n2 = iso2(B.nat), adj = n2 && PAYS_ADJ[n2]; if (adj && !/^du /.test(adj)) { const a = adjFem(adj); put('f_nationalite', a[0].toUpperCase() + a.slice(1), 'nationalité'); }
+            put('f_docNumero', B.num, 'numéro'); put('f_docDate', B.del, 'date de délivrance'); put('f_docExp', B.exp, 'date d\'expiration'); put('f_docLieu', B.aut, 'autorité');
+            setSeg('docSeg', 'Officiel'); $('#f_docType').value = 'CNI';
+            const p2 = B.pays || n2; if (p2 && [...$('#f_docPays').options].some(o=>o.value === p2)) $('#f_docPays').value = p2;
+            syncDocPays(); syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
+            if (B.prenom && !B.sexe) $('#f_prenom').dispatchEvent(new Event('change', {bubbles:true}));
+            draftSoon();
+            const ei = window.expForm?.();
+            status(`Carte d'identité étrangère lue${p2 ? ' (' + p2 + ')' : ''} · à vérifier, en orange : ${got.join(', ')}` + (ei && ei.days < 0 ? ` · ⚠ ${ei.text}` : ''));
+            if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast('Pièce lue : vérifie les champs en orange');
             return;
           }
           /* carte d'identité étrangère (recto sans bande) */
