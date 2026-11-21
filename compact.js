@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.16 : formulaire de contrôle compact
+/* CIF 2.0 — v1.1.16 / 1.2.6 : formulaire de contrôle compact
    Champs plus bas, libellés plus petits, espacements réduits, et champs courts côte à côte :
    résultat + antécédents, nom + sexe (M/F), prénom + date de naissance, lieu de naissance + nationalité,
    profession + employeur, ville + pays, téléphone + identité établie, numéro + expiration…
@@ -30,7 +30,8 @@
 #form .cr>.cc>label.f{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #form .cr #sexeSeg{margin:0}
 #form .cr #sexeSeg{gap:6px!important}
-#form .cr #sexeSeg button{height:40px!important;min-height:40px!important;padding:0 2px!important;font-size:16px!important;display:block!important;white-space:nowrap}
+#form .cr #sexeSeg button{height:40px!important;min-height:40px!important;padding:0 2px!important;font-size:16px!important;display:flex!important;align-items:center;justify-content:center;gap:5px;white-space:nowrap}
+#form #sexeSeg .sxi{width:17px;height:17px;flex:0 0 17px;display:block}
 #form .cr .cc.sx>label.f{overflow:visible}
 #form .cr .seg{min-height:40px}
 #form #mrzBtn{flex:0 0 40px!important;height:40px!important;width:40px}
@@ -66,7 +67,10 @@
   row([{n:[lab('f_resultat'), resBox], w:1.15}, {n:[antSw], w:1}]);
   const sexLbl = [...document.querySelectorAll('#form label.f')].find(l=>/^Sexe/.test(l.textContent.trim()));
   /* Nom | Sexe (♂ M / ♀ F), puis Prénom | Date de naissance : deux colonnes alignées */
-  document.querySelectorAll('#sexeSeg [data-sx]').forEach(b=>{ b.textContent = b.dataset.sx === 'H' ? '♂ M' : '♀ F'; b.title = b.dataset.sx === 'H' ? 'Masculin' : 'Féminin'; });
+  /* symboles ♂ / ♀ dessinés (alignés sur la lettre, quelle que soit la police de l'iPhone) */
+  const SX_M = '<svg class="sxi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="14" r="6"/><path d="M14.5 9.5 20 4M15 4h5v5"/></svg>';
+  const SX_F = '<svg class="sxi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="9" r="6"/><path d="M12 15v7M8.5 19h7"/></svg>';
+  document.querySelectorAll('#sexeSeg [data-sx]').forEach(b=>{ b.innerHTML = b.dataset.sx === 'H' ? `${SX_M}<span>M</span>` : `${SX_F}<span>F</span>`; b.title = b.dataset.sx === 'H' ? 'Masculin' : 'Féminin'; });
   const nomBox = $f('f_nom')?.parentElement;
   const rNom = row([{n:[lab('f_nom'), nomBox]}, {n:[sexLbl, $f('f_sexe'), $f('sexeSeg')], w:.72}]);
   rNom?.lastElementChild.classList.add('sx');
