@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.1.17 à 1.1.20 : champ touché (ou « Suivant » du clavier) recentré dans la partie visible de l'écran.
+/* CIF 2.0 — v1.1.17 à 1.2.4 : champ touché (ou « Suivant » du clavier) recentré dans la partie visible de l'écran.
    Champ à suggestions (ville, pays, marque, couleur, motif…) : placé en haut de la zone visible pour que
    la liste des choix s'ouvre en entier entre le champ et le clavier. Une marge sous le formulaire
    permet de remonter même les derniers champs.
@@ -50,12 +50,14 @@
     if (dbg) dbg.textContent = `v${APP_VERSION} vv ${Math.round(vv?.offsetTop||0)}+${Math.round(vv?.height||0)} ih ${innerHeight} sy ${Math.round(scrollY)} zone ${Math.round(top)}-${Math.round(bot)} champ ${Math.round(r.top)}→${Math.round(target)} st ${Math.round(host.scrollTop)}`;
     if (sg) setTimeout(()=>{ try { if (sgInput === el && !sgBox.classList.contains('hidden')) sgPlace(el); } catch(e){} }, 40);
   }
-  /* diagnostic : 5 appuis rapides sur le titre de la fiche affichent les mesures (pour régler le placement) */
-  let dbg = null, taps = [];
-  form?.querySelector('.top h2')?.addEventListener('click', ()=>{
-    const n = Date.now(); taps = taps.filter(x=>n - x < 1500).concat(n);
-    if (taps.length >= 5) { taps = []; if (dbg) { dbg.remove(); dbg = null; } else { dbg = document.createElement('div'); dbg.style.cssText = 'position:absolute;left:4px;right:4px;top:calc(env(safe-area-inset-top) + 2px);z-index:99;background:#ff0;color:#000;font:12px monospace;padding:3px;pointer-events:none'; dbg.textContent = 'diagnostic actif'; form.appendChild(dbg); } }
-  });
+  /* diagnostic (mode développeur) : bandeau jaune avec les mesures du clavier et du champ */
+  let dbg = null;
+  const kbDbg = () => { try { return localStorage.getItem('cifDev') === '1' && localStorage.getItem('cifKbDbg') === '1'; } catch { return false; } };
+  window.cifKbSync = () => {
+    if (kbDbg() && !dbg && form) { dbg = document.createElement('div'); dbg.style.cssText = 'position:absolute;left:4px;right:4px;top:calc(env(safe-area-inset-top) + 2px);z-index:99;background:#ff0;color:#000;font:12px monospace;padding:3px;pointer-events:none'; dbg.setAttribute('data-noinv',''); dbg.textContent = 'diagnostic clavier actif : touche un champ'; form.appendChild(dbg); }
+    else if (!kbDbg() && dbg) { dbg.remove(); dbg = null; }
+  };
+  window.cifKbSync();
   const later = ms => { clearTimeout(t); t = setTimeout(place, ms); };
   document.addEventListener('focusin', e=>{
     if (!ok(e.target)) return;
