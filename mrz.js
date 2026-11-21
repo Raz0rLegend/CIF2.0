@@ -169,7 +169,7 @@
       else if (k === '4a') { const d = dateIn(v); if (d) F.del = d.v; }
       else if (k === '4b') { const d = dateIn(v); if (d) F.exp = d.v; }
       else if (k === '4c') { const w = v.replace(/^[^A-Za-zÀ-ÿ0-9]+/,'').trim(); if (w.length >= 3) F.aut = w; }
-      else if (k === '5') { const n = v.replace(/[^A-Za-z0-9]/g,'').toUpperCase(); if (n.length >= 5 && n.length <= 16) F.num = n; }
+      else if (k === '5') { const n = v.replace(/[^A-Za-z0-9]/g,'').toUpperCase().replace(/^([A-Z]{0,3}\d{5,})[A-Z]{2,}$/,'$1'), nd = n.replace(/\D/g,'').length; if (n.length >= 5 && n.length <= 16 && nd >= 3 && nd >= n.length / 2) F.num = n; }   /* numéro : surtout des chiffres, sinon c'est une lecture ratée */
     }
     const lines = text.split(/\n/);
     /* 4c souvent sur la même ligne que 4a ; 4a parfois mal lu (« sa », « Aa », « da ») */
@@ -198,6 +198,10 @@
       for (const raw of lines) for (const m of raw.matchAll(/[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{2}\s?[.\/,-]\s?[0-9OoDIl]{4}/g)) { const d = dateIn(m[0]); if (d && t(d.v) > Date.now()) fut.push(d.v); }
       if (fut.length) F.exp = fut.sort((a,b)=>t(b)-t(a))[0]; }
     F.pays = paysDoc(text);
+    /* autorité : signes et bouts de mots parasites en fin de ligne retirés (« Entidade Emissora- | Si ») */
+    if (F.aut) { let w = F.aut.split(/\s+/); while (w.length > 1 && /^([A-Za-zÀ-ÿ]{1,2}|[^A-Za-zÀ-ÿ0-9]+)$/.test(w[w.length-1])) w.pop(); F.aut = w.join(' ').replace(/[^A-Za-zÀ-ÿ0-9)]+$/,''); }
+    /* accents lus par le modèle français : ã, õ lus ä, ö ; ï, ü n'existent pas en portugais, espagnol ou italien */
+    if (/^(PT|ES|IT)$/.test(F.pays)) { const fx = x => x && x.replace(/ä/g,'ã').replace(/Ä/g,'Ã').replace(/ö/g,'õ').replace(/Ö/g,'Õ').replace(/[ïî]/g,'i').replace(/[ÏÎ]/g,'I').replace(/ü/g,'u').replace(/Ü/g,'U').replace(/ë/g,'e').replace(/Ë/g,'E'); F[1] = fx(F[1]); F[2] = fx(F[2]); F.lieu = fx(F.lieu); }
     return F;
   }
   /* Pays de délivrance d'après l'en-tête imprimé (permis et cartes sans bande) */
