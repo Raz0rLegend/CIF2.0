@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v1.2.5 : chronologie de l'intervention.
+/* CIF 2.0 — v1.2.5 / 1.2.6 : chronologie de l'intervention (CHRONUS).
    Bouton horloge « + » à côté de « Date & heure » : chaque appui ajoute une ligne avec l'heure de l'appui
    (modifiable) et l'événement : choix rapide (SMUR, officier, permanence, levée du corps, pompiers…) ou texte libre
    avec correction orthographique. Main courante : lignes recopiées telles quelles, tout en bas. */
@@ -66,6 +66,44 @@
   /* À l'enregistrement : lignes vides retirées, indicateur de saisie libre effacé */
   { const _sf = saveFiche; saveFiche = async function(f){ if (f && f.evts) { f.evts = f.evts.filter(x=>(x.t || '').trim()).map(x=>({h:x.h || '', t:x.t.trim()})); if (!f.evts.length) delete f.evts; } return _sf(f); }; }
 
+
+  /* ----- Fiche enregistrée : barre « CHRONUS » repliable, tout en bas, avec ajout à l'heure actuelle (v1.2.6) ----- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+#chronus{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden}
+#chronus>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px 14px;font-weight:700;letter-spacing:.12em;font-size:13px;color:var(--muted);cursor:pointer}
+#chronus>summary::-webkit-details-marker{display:none}
+#chronus>summary svg{color:#7fb3ff;flex:0 0 auto}
+#chronus>summary .n{margin-left:auto;letter-spacing:0;font-weight:600;font-size:12px;background:var(--line);color:var(--fg,#ddd);border-radius:10px;padding:2px 8px}
+#chronus>summary .chev{transition:transform .2s;font-size:12px;letter-spacing:0}
+#chronus[open]>summary .chev{transform:rotate(90deg)}
+#chronus .cl{border-top:1px solid var(--line)}
+#chronus .ce{display:flex;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:16px}
+#chronus .ce b{flex:0 0 52px;font-variant-numeric:tabular-nums}
+#chronus .cadd{display:flex;gap:6px;padding:10px 14px;align-items:center}
+#chronus .cadd select,#chronus .cadd input{flex:1;min-width:0}
+#chronus .cadd .btn{width:auto;margin:0;padding:0 14px;height:40px}
+#chronus .empty{padding:10px 14px;color:var(--muted);font-size:14px}
+</style>`);
+  const CLK = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+  let chrOpen = false;
+  function chronus(f){
+    document.getElementById('chronus')?.remove();
+    const body = document.getElementById('detBody'); if (!body) return;
+    const L = (f.evts || []).filter(x=>(x.t || '').trim());
+    body.insertAdjacentHTML('beforeend', `<details id="chronus"${chrOpen ? ' open' : ''}><summary>${CLK}CHRONUS<span class="n">${L.length}</span><span class="chev">▶</span></summary>
+      <div class="cl">${L.length ? L.map(x=>`<div class="ce"><b>${esc(x.h || '—')}</b><span>${esc(x.t)}</span></div>`).join('') : '<div class="empty">Aucun événement noté.</div>'}</div>
+      <div class="cadd"><select id="chrSel">${opts('')}</select><input id="chrTxt" type="text" class="hidden" placeholder="Événement" spellcheck="true" autocorrect="on" autocapitalize="sentences" autocomplete="off"><button type="button" class="btn" id="chrAdd">+ ${now()}</button></div></details>`);
+    const d = document.getElementById('chronus'), sel = document.getElementById('chrSel'), txt = document.getElementById('chrTxt'), add = document.getElementById('chrAdd');
+    d.addEventListener('toggle', ()=>{ chrOpen = d.open; });
+    const tick = setInterval(()=>{ if (!document.body.contains(add)) return clearInterval(tick); add.textContent = '+ ' + now(); }, 15000);
+    sel.onchange = ()=>{ if (sel.value === '__autre') { sel.classList.add('hidden'); txt.classList.remove('hidden'); txt.focus(); } };
+    add.onclick = async ()=>{
+      const t = (sel.value && sel.value !== '__autre' ? sel.value : txt.value).trim();
+      if (!t) { toast('Choisis ou écris l\'événement'); return; }
+      (f.evts ||= []).push({h: now(), t}); await saveFiche(f); chrOpen = true; chronus(f); toast('Événement ajouté');
+    };
+  }
+  { const _od = openDetail; openDetail = async function(f, ...a){ const r = await _od(f, ...a); if (DETAIL === f.id) chronus(f); return r; }; }
   /* ----- Main courante : tout en bas, brut ----- */
   const lines = f => (f.evts || []).filter(x=>(x.t || '').trim()).map(x=>`${x.h ? x.h + ' ' : ''}${x.t.trim()}`);
   { const _mc = mcText; mcText = function(f, ...a){ const t = _mc(f, ...a), L = lines(f); return typeof t === 'string' && L.length ? `${t.replace(/\s+$/,'')}\n\n${L.join('\n')}` : t; }; }

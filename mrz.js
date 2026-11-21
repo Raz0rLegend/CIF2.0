@@ -133,6 +133,7 @@
   const ISO3 = {FRA:'FR',MCO:'MC',ITA:'IT',DEU:'DE',D:'DE',CHE:'CH',BEL:'BE',NLD:'NL',LUX:'LU',GBR:'GB',ESP:'ES',PRT:'PT',MAR:'MA',DZA:'DZ',TUN:'TN',ROU:'RO',POL:'PL',RUS:'RU',UKR:'UA',USA:'US',SEN:'SN',CIV:'CI',TUR:'TR',AUT:'AT',GRC:'GR',SWE:'SE',NOR:'NO',DNK:'DK',CHN:'CN',JPN:'JP',BRA:'BR',ALB:'AL',BGR:'BG',HRV:'HR',SRB:'RS',MDA:'MD',IRL:'IE',CAN:'CA',AUS:'AU',IND:'IN',LBN:'LB',EGY:'EG',CMR:'CM',MLI:'ML',HUN:'HU',CZE:'CZ',SVK:'SK',SVN:'SI',LTU:'LT',LVA:'LV',EST:'EE',FIN:'FI',ISL:'IS',ISR:'IL',ARG:'AR',COL:'CO',MEX:'MX',GEO:'GE',ARM:'AM',BIH:'BA',MKD:'MK',MNE:'ME',RKS:'XK',AND:'AD',SMR:'SM',LIE:'LI',MLT:'MT',CYP:'CY',QAT:'QA',ARE:'AE',SAU:'SA',ZAF:'ZA',BLR:'BY',AZE:'AZ'};
   const iso2 = c => ISO3[String(c||'').replace(/</g,'')] || '';
   window.mrzParse = parse;
+  window.rectoFields = (...a) => rectoFields(...a);
 
   /* ----- Permis de conduire européen : champs numérotés (directive 2006/126/CE, identiques dans toute l'UE) -----
      1 nom · 2 prénom · 3 date et lieu de naissance · 4a délivrance · 4b expiration · 4c autorité · 5 numéro */
@@ -207,6 +208,36 @@
     }
     return out;
   }
+  /* Recto de la carte d'identité au format carte bancaire (depuis 2021) : pas de bande « <<< » sur cette face,
+     on lit les rubriques imprimées (v1.2.6) */
+  function rectoFields(text){
+    const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), F = {};
+    const after = re => { const i = L.findIndex(x=>re.test(x)); return i >= 0 ? L.slice(i + 1, i + 3) : []; };
+    const BAD = /USAGE|SURNAME|PR[ÉE]NOM|NAISSANCE|DOCUMENT|NATIONALIT|SEXE|IDENTIT/;
+    const upper = t => { const m = t.match(/[A-ZÀ-Ý][A-ZÀ-Ý'’ -]*[A-ZÀ-Ý]/g) || []; return m.map(x=>x.trim()).filter(x=>x.replace(/[^A-ZÀ-Ý]/g,'').length >= 2 && !BAD.test(x)).sort((a,b)=>b.length - a.length)[0] || ''; };
+    for (const t of after(/\bNOM\b(?!\s*D.?\s*USAGE).{0,6}Sur/i).slice(0,1)) { const u = upper(t); if (u) F.nom = u; }
+    /* prénoms : la plus longue suite de mots à majuscule (« Maëlys-Gaëlle, Marie ») sur les deux lignes sous l'intitulé */
+    const pre = [];
+    for (const t of after(/Pr[ée]noms|Given\s*names/i)) for (const m of t.matchAll(/[A-ZÀ-Ý][a-zà-ÿ]+(?:\s*-\s*[A-ZÀ-Ý][a-zà-ÿ]+)*(?:\s*,\s*[A-ZÀ-Ý][a-zà-ÿ]+(?:\s*-\s*[A-ZÀ-Ý][a-zà-ÿ]+)*)*/g)) if (m[0].replace(/[^A-Za-zÀ-ÿ]/g,'').length >= 3) pre.push(m[0]);
+    if (pre.length) F.prenom = pre.sort((a,b)=>b.length - a.length)[0].replace(/\s*-\s*/g,'-').replace(/\s*,\s*/g,', ');
+    for (const t of after(/SEXE|Date\s*of\s*birth|NATIONALIT/i)) {
+      const d = /([0-9OoDIl]{2})\s?[.\/ ]?\s?([0-9OoDIl]{2})\s?[.\/ ]?\s?([0-9OoDIl]{4})(?![0-9])/.exec(t); if (d && !F.dn) { const x = dateIn(`${d[1]}.${d[2]}.${d[3]}`); if (x) F.dn = x.v; }
+      if (!F.nat) { const n = [...t.matchAll(/\b([A-Z]{3})\b/g)].find(m=>ISO3[m[1]]); if (n) { F.nat = n[1]; const sx = /\b([MF])\b[^A-Z]*$/.exec(t.slice(0, n.index)); if (sx) F.sexe = sx[1] === 'M' ? 'H' : 'F'; } }
+      if (F.dn) break;
+    }
+    for (const t of after(/LIEU\s*DE\s*NAISSANCE|Place\s*of\s*birth/i).slice(0,1)) { const u = upper(t.replace(/\([^)]*\)/g,'')); if (u.replace(/[^A-ZÀ-Ý]/g,'').length >= 2) F.lieu = cap(u); }
+    for (const t of after(/DU\s*DOCUMENT|Document\s*No/i)) {
+      const c = t.replace(/VV/g,'W').replace(/[^A-Za-z0-9 ]/g,' ').trim();
+      const d = /([0-9OoDIl]{2})\s?([0-9OoDIl]{2})\s?([0-9OoDIl]{4})\s*\S{0,3}$/.exec(c);
+      if (d) { const x = dateIn(`${d[1]}.${d[2]}.${d[3]}`); if (x) F.exp = x.v; }
+      /* numéro : 9 caractères (lettres et chiffres), parfois coupé en morceaux par le moteur (« X4 RTBPFW4 ») */
+      const tok = (d ? c.slice(0, d.index) : c).toUpperCase().split(/\s+/).filter(Boolean);
+      for (let i = 0; i < tok.length && !F.num; i++) { let acc = ''; for (let j = i; j < tok.length && acc.length < 9; j++) { acc += tok[j]; if (acc.length === 9 && /\d/.test(acc) && /[A-Z]/.test(acc)) F.num = acc; } }
+      if (F.num || F.exp) break;
+    }
+    return F;
+  }
+  const isRecto = t => /IDENTIT/i.test(t) && /Surname|Given\s*names|NOM\s*D.?\s*USAGE|Pr[ée]noms/i.test(t);
   window.lieuFields = lieuFields;
   /* Intitulé illisible (trop petit) : on cherche une commune connue parmi les lignes en majuscules, près de « NOM D'USAGE » d'abord */
   async function findLieu(texts){
@@ -280,9 +311,9 @@
     window.syncExp?.(); draftSoon();
     return got;
   }
-  async function readText(file, psms=['6','4']){
+  async function readText(file, psms=['6','4'], mode){
     const w = await getFra(); status('Lecture du texte de la pièce…');
-    const c = clean(await toCanvas(file, 2400, ''));
+    const c = clean(await toCanvas(file, 2400, ''), mode);
     const out = [];
     for (const psm of psms) { await w.setParameters({tessedit_pageseg_mode:psm}); out.push((await w.recognize(c)).data.text || ''); }
     return out;
@@ -300,15 +331,17 @@
       return c;
     } finally { URL.revokeObjectURL(url); }
   }
-  /* Fond rose de sécurité effacé : on garde le canal le plus sombre, contraste étiré, image agrandie si petite */
-  function clean(c){
+  /* Fonds de sécurité colorés effacés (rose du permis, bleu des cartes) : on garde le canal le plus CLAIR de chaque point
+     (une encre noire reste noire, un fond coloré devient blanc), contraste étiré, image agrandie si petite (v1.2.6) */
+  function clean(c, mode = 'max'){
     const k = c.width < 1600 ? 2 : 1, o = document.createElement('canvas'); o.width = c.width*k; o.height = c.height*k;
     const g = o.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(c, 0, 0, o.width, o.height);
     const im = g.getImageData(0, 0, o.width, o.height), d = im.data, h = new Uint32Array(256), n = d.length/4;
-    for (let i = 0; i < d.length; i += 4) h[Math.min(d[i], d[i+1], d[i+2])]++;
+    const px = mode === 'min' ? i => Math.min(d[i], d[i+1], d[i+2]) : i => Math.max(d[i], d[i+1], d[i+2]);   /* permis rose : canal le plus sombre */
+    for (let i = 0; i < d.length; i += 4) h[px(i)]++;
     const pct = q => { let a = 0; for (let v = 0; v < 256; v++) { a += h[v]; if (a >= n*q) return v; } return 255; };
     const lo = pct(.02), hi = Math.max(lo + 1, pct(.6));
-    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, (Math.min(d[i], d[i+1], d[i+2]) - lo) * 255 / (hi - lo))); d[i] = d[i+1] = d[i+2] = v; }
+    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, (px(i) - lo) * 255 / (hi - lo))); d[i] = d[i+1] = d[i+2] = v; }
     g.putImageData(im, 0, 0); return o;
   }
   function crop(c, y0, y1){ const o = document.createElement('canvas'); o.width = c.width; o.height = Math.round(c.height*(y1-y0)); o.getContext('2d').drawImage(c, 0, c.height*y0, c.width, o.height, 0, 0, o.width, o.height); return o; }
@@ -355,7 +388,27 @@
       for (const part of [c, crop(c, .5, 1), crop(c, .25, .8)]) { const {data} = await w.recognize(part), x = parse(data.text || ''); if (x && x.nom && (!r || x.ok)) r = x; if (r && r.ok) break; }
       let texts = [];
       if (!r || r.type === 'PC') {
-        try { texts = await readText(file); } catch (e) { if (!r) throw e; }
+        try { texts = await readText(file, ['6','4'], r ? 'min' : 'max'); } catch (e) { if (!r) throw e; }
+        /* Recto de la carte d'identité récente (format carte bancaire) */
+        if (!r && texts.some(isRecto)) {
+          const R = merge(texts, rectoFields), got = [];
+          const put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
+          put('f_nom', R.nom, 'nom'); put('f_prenom', R.prenom, 'prénom'); put('f_dateNaissance', R.dn, 'date de naissance');
+          if (R.sexe) { $('#f_sexe').value = R.sexe; syncSexe(); }
+          if (R.nat) { const n2 = iso2(R.nat), adj = n2 && PAYS_ADJ[n2]; if (adj && !/^du /.test(adj)) { const a = adjFem(adj); put('f_nationalite', a[0].toUpperCase() + a.slice(1), 'nationalité'); } }
+          if (R.lieu && $('#f_naisVille')) { $('#f_naisVille').value = R.lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); got.push('lieu de naissance'); }
+          put('f_docNumero', R.num, 'numéro'); put('f_docExp', R.exp, 'date d\'expiration');
+          if (R.nom || R.num) {
+            setSeg('docSeg', 'Officiel'); $('#f_docType').value = 'CNI'; if ([...$('#f_docPays').options].some(o=>o.value === 'FR')) $('#f_docPays').value = 'FR';
+            syncDocPays(); syncAge(); window.syncExp?.(); $('#f_nom').dispatchEvent(new Event('change', {bubbles:true}));
+            if (R.prenom && !R.sexe) $('#f_prenom').dispatchEvent(new Event('change', {bubbles:true}));
+            draftSoon();
+            const ei = window.expForm?.();
+            status(`Recto de la carte d'identité lu · à vérifier, en orange : ${got.join(', ')} · scanne le verso (lignes « <<< ») pour confirmer nom et numéro` + (ei && ei.days < 0 ? ` · ⚠ ${ei.text}` : ''));
+            if (ei && ei.days < 0) { toast('⚠ PIÈCE EXPIRÉE'); navigator.vibrate?.([200,100,200]); } else toast('Recto lu : vérifie les champs en orange');
+            return;
+          }
+        }
         const F = merge(texts, permisFields), n = ['1','2','dn'].filter(k=>F[k]).length + (F.num ? 1 : 0);
         if (!r && n < 2) {
           const V = merge(texts, versoFields);
