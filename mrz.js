@@ -215,7 +215,7 @@
     const after = re => { const i = L.findIndex(x=>re.test(x)); return i >= 0 ? L.slice(i + 1, i + 3) : []; };
     const BAD = /USAGE|SURNAME|PR[ÉE]NOM|NAISSANCE|DOCUMENT|NATIONALIT|SEXE|IDENTIT/;
     const upper = t => { const m = t.match(/[A-ZÀ-Ý][A-ZÀ-Ý'’ -]*[A-ZÀ-Ý]/g) || []; return m.map(x=>x.trim()).filter(x=>x.replace(/[^A-ZÀ-Ý]/g,'').length >= 2 && !BAD.test(x)).sort((a,b)=>b.length - a.length)[0] || ''; };
-    for (const t of after(/\bNOM\b(?!\s*D.?\s*USAGE).{0,6}Sur/i).slice(0,1)) { const u = upper(t); if (u) F.nom = u; }
+    for (const t of after(/\bNOM\b(?!\s*D.?\s*USAGE)\s*\/?\s*Su[rmn]/i).slice(0,1)) { const u = upper(t); if (u) F.nom = u; }
     /* prénoms : la plus longue suite de mots à majuscule (« Maëlys-Gaëlle, Marie ») sur les deux lignes sous l'intitulé */
     const pre = [];
     for (const t of after(/Pr[ée]noms|Given\s*names/i)) for (const m of t.matchAll(/[A-ZÀ-Ý][a-zà-ÿ]+(?:\s*-\s*[A-ZÀ-Ý][a-zà-ÿ]+)*(?:\s*,\s*[A-ZÀ-Ý][a-zà-ÿ]+(?:\s*-\s*[A-ZÀ-Ý][a-zà-ÿ]+)*)*/g)) if (m[0].replace(/[^A-Za-zÀ-ÿ]/g,'').length >= 3) pre.push(m[0]);
@@ -225,7 +225,9 @@
       if (!F.nat) { const n = [...t.matchAll(/\b([A-Z]{3})\b/g)].find(m=>ISO3[m[1]]); if (n) { F.nat = n[1]; const sx = /\b([MF])\b[^A-Z]*$/.exec(t.slice(0, n.index)); if (sx) F.sexe = sx[1] === 'M' ? 'H' : 'F'; } }
       if (F.dn) break;
     }
-    for (const t of after(/LIEU\s*DE\s*NAISSANCE|Place\s*of\s*birth/i).slice(0,1)) { const u = upper(t.replace(/\([^)]*\)/g,'')); if (u.replace(/[^A-ZÀ-Ý]/g,'').length >= 2) F.lieu = cap(u); }
+    /* lieu : candidats en majuscules sur les deux lignes sous l'intitulé (le bon est vérifié dans la liste des communes) */
+    const lc = []; for (const t of after(/LIEU\s*DE\s*NAISSANCE|Place\s*of\s*birth/i)) { const u = upper(t.replace(/\([^)]*\)/g,'')); if (u.replace(/[^A-ZÀ-Ý]/g,'').length >= 3 && !u.split(/[\s-]+/).some(w=>w.replace(/[^A-ZÀ-Ý]/g,'').length === 1)) lc.push(cap(u)); }
+    if (lc.length) { F.lieuC = lc.sort((a,b)=>b.length - a.length); F.lieu = F.lieuC[0]; }
     for (const t of after(/DU\s*DOCUMENT|Document\s*No/i)) {
       const c = t.replace(/VV/g,'W').replace(/[^A-Za-z0-9 ]/g,' ').trim();
       const d = /([0-9OoDIl]{2})\s?([0-9OoDIl]{2})\s?([0-9OoDIl]{4})\s*\S{0,3}$/.exec(c);
@@ -235,6 +237,8 @@
       for (let i = 0; i < tok.length && !F.num; i++) { let acc = ''; for (let j = i; j < tok.length && acc.length < 9; j++) { acc += tok[j]; if (acc.length === 9 && /\d/.test(acc) && /[A-Z]/.test(acc)) F.num = acc; } }
       if (F.num || F.exp) break;
     }
+    /* date d'expiration aussi imprimée en petit en haut à droite de la carte */
+    if (!F.exp) for (const t of L.slice(0, 3)) { const x = dateIn(t); if (x && +x.v.slice(6) >= new Date().getFullYear() - 1) { F.exp = x.v; break; } }
     return F;
   }
   const isRecto = t => /IDENTIT/i.test(t) && /Surname|Given\s*names|NOM\s*D.?\s*USAGE|Pr[ée]noms/i.test(t);
@@ -385,7 +389,9 @@
       status('Lecture de la pièce…');
       const c = await toCanvas(file);
       let r = null;
-      for (const part of [c, crop(c, .5, 1), crop(c, .25, .8)]) { const {data} = await w.recognize(part), x = parse(data.text || ''); if (x && x.nom && (!r || x.ok)) r = x; if (r && r.ok) break; }
+      for (const part of [c, crop(c, .5, 1), crop(c, .25, .8)]) { const {data} = await w.recognize(part), x = parse(data.text || ''); if (x && x.nom && (!r || x.ok)) r = x; if (r && r.ok) break;
+        /* recto de la nouvelle carte d'identité (sans bande) : inutile d'insister, on passe directement à la lecture du texte */
+        if (!r && /IDENTITYCARD|CARTENATIONALE|SURNAME|GIVENNAMES/.test((data.text || '').replace(/[^A-Z]/g,''))) break; }
       let texts = [];
       if (!r || r.type === 'PC') {
         try { texts = await readText(file, ['6','4'], r ? 'min' : 'max'); } catch (e) { if (!r) throw e; }
@@ -396,6 +402,8 @@
           put('f_nom', R.nom, 'nom'); put('f_prenom', R.prenom, 'prénom'); put('f_dateNaissance', R.dn, 'date de naissance');
           if (R.sexe) { $('#f_sexe').value = R.sexe; syncSexe(); }
           if (R.nat) { const n2 = iso2(R.nat), adj = n2 && PAYS_ADJ[n2]; if (adj && !/^du /.test(adj)) { const a = adjFem(adj); put('f_nationalite', a[0].toUpperCase() + a.slice(1), 'nationalité'); } }
+          R.lieuC = texts.flatMap(t=>rectoFields(t).lieuC || []);
+          if (R.lieuC.length > 1) { try { const C = await loadCities(), set = C._set ||= new Set(C.nk.map(x=>x.trim())); const ok = R.lieuC.find(x=>set.has(norm(x).replace(/[-'’]/g,' ').trim())); if (ok) R.lieu = ok; } catch {} }
           if (R.lieu && $('#f_naisVille')) { $('#f_naisVille').value = R.lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); got.push('lieu de naissance'); }
           put('f_docNumero', R.num, 'numéro'); put('f_docExp', R.exp, 'date d\'expiration');
           if (R.nom || R.num) {
