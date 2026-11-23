@@ -2,9 +2,10 @@
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié).
    Nouveautés : seule la dernière version est détaillée, les précédentes sont résumées. */
 window.CIF = {
-  version: '2.0.4',
+  version: '2.0.5',
   modules: ['pieces.js', 'affichage.js', 'acces.js', 'fiche.js', 'outils.js', 'plaque.js'],
-  changelog: [ ['2.0.4',['Plaques 2 roues : quand le véhicule est en 2RM, le cadre passe au format moto (plus petit, presque carré) et la lecture prend les deux lignes de la plaque (AB-123 / CD, Italie AB 12345)','Lecture des plaques plus sûre : le cadre sombre autour de la plaque ne gêne plus, notamment la nuit']],
+  changelog: [ ['2.0.5',['Scan des pièces : plus de texte sous le cadre, l\'image est dégagée']],
+    ['2.0.4',['Plaques 2 roues : quand le véhicule est en 2RM, le cadre passe au format moto (plus petit, presque carré) et la lecture prend les deux lignes de la plaque (AB-123 / CD, Italie AB 12345)','Lecture des plaques plus sûre : le cadre sombre autour de la plaque ne gêne plus, notamment la nuit']],
     ['2.0.3',['Lecture des plaques : bouton appareil photo à droite de chaque champ Plaque. Cadre au format plaque, plusieurs lectures comparées, mise au format du pays (AB-123-CD, ancien 123 ABC 06, Monaco, Italie). La plaque lue est entourée en orange : à vérifier','Mode développeur : photothèque dans la visée des plaques ; sur une photo entière, l\'appli cherche elle-même la plaque','Scan des pièces : un seul cadre commun à toutes les pièces (carte, permis, titre de séjour, passeport)']],
     ['2.0.2',['Cadre de visée pour scanner les pièces : seule la pièce est gardée, image la plus nette choisie parmi plusieurs prises en rafale, lampe si le téléphone le permet']],
     ['2.0.1',['Correction : en corrigeant une lettre au milieu d\'un mot (adresse, prénom, ville…), le clavier de l\'iPhone la mettait parfois en majuscule (« boulevaRd ») ; elle est maintenant remise en minuscule. Les mots en capitales et le champ Nom ne sont pas touchés']],

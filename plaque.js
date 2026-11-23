@@ -1,6 +1,7 @@
 'use strict';
 /* CIF 2.0 — v2.0.3 : plaque.js, lecture des plaques d'immatriculation et cadre commun à toutes les pièces.
    v2.0.4 : cadre et lecture adaptés aux plaques 2 roues (véhicule 2RM), plaques encadrées mieux lues.
+   v2.0.5 : plus de texte sous le cadre des pièces.
    Chargé après outils.js (utilise sa visée, window.cifVisor). */
 /* ===== cadre pièce commun ===== */
 try {
@@ -9,7 +10,7 @@ try {
 (()=>{
   const btn = document.getElementById('mrzBtn'), inp = document.getElementById('mrzFile');
   if (!window.cifVisor || !btn || !inp || !navigator.mediaDevices?.getUserMedia) return;
-  const FMT = {piece:{label:'Pièce d\'identité', ratio:1.5, hint:'Carte, permis, titre de séjour ou page photo du passeport : la pièce remplit le cadre'}};
+  const FMT = {piece:{label:'Pièce d\'identité', ratio:1.5, hint:''}};   /* v2.0.5 : pas de texte sous le cadre */
   window.cifVisorFormats = FMT;
   const feed = f => { try { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event('change', {bubbles:true})); } catch { toast('Lecture impossible : utilise l\'appareil photo de l\'iPhone'); } };
   const pick = capture => { if (capture) inp.setAttribute('capture', 'environment'); else inp.removeAttribute('capture'); inp.click(); setTimeout(()=>window.cifScanSync?.(), 1000); };
