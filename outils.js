@@ -410,3 +410,131 @@ try {
   { const _fs = ficheSections; ficheSections = function(f){ const S = _fs(f); const L = (f.evts || []).filter(x=>(x.t || '').trim()); if (L.length) S.push(['Chronologie', L.map(x=>[x.h || '—', x.t])]); return S; }; }
 })();
 } catch (e) { console.error('[CIF] chrono.js', e); setTimeout(()=>{ throw e; }); }
+/* ===== visee ===== */
+try {
+/* CIF 2.0 — v2.0.2 : cadre de visée « pièce » (la future lecture des plaques aura son propre cadre, au format plaque).
+   L'appareil photo s'ouvre dans l'appli avec un cadre au format de la pièce (carte ou passeport) :
+   seule la zone du cadre est gardée, la plus nette de plusieurs images prises en rafale.
+   Mode développeur : bouton « Photothèque » pour tester sur des photos. Rien n'est enregistré ni envoyé. */
+(()=>{
+  const FMT = {
+    carte:     {label:'Carte', ratio:85.6/54, hint:'Carte d\'identité, permis ou titre de séjour : la carte remplit le cadre'},
+    passeport: {label:'Passeport', ratio:125/88, hint:'Page photo du passeport, lignes « <<< » comprises'},
+  };
+  document.head.insertAdjacentHTML('beforeend', `<style>
+#visor{position:fixed;inset:0;z-index:2147483600;background:#000;color:#fff;display:flex;flex-direction:column;touch-action:none}
+#visor.hidden{display:none}
+#visor video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#visor .vf{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);border-radius:14px;box-shadow:0 0 0 200vmax rgba(0,0,0,.58);pointer-events:none}
+#visor .vf i{position:absolute;width:28px;height:28px;border:4px solid #3ccf4e}
+#visor .vf i:nth-child(1){left:-3px;top:-3px;border-right:0;border-bottom:0;border-radius:14px 0 0 0}
+#visor .vf i:nth-child(2){right:-3px;top:-3px;border-left:0;border-bottom:0;border-radius:0 14px 0 0}
+#visor .vf i:nth-child(3){left:-3px;bottom:-3px;border-right:0;border-top:0;border-radius:0 0 0 14px}
+#visor .vf i:nth-child(4){right:-3px;bottom:-3px;border-left:0;border-top:0;border-radius:0 0 14px 0}
+#visor .vtop{position:relative;display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px}
+#visor .vtop button{border:0;background:rgba(255,255,255,.16);color:#fff;border-radius:18px;padding:8px 14px;font-size:15px;font-weight:600}
+#visor .vtop button.on{background:#fff;color:#000}
+#visor .vtop .vx{margin-left:auto;width:38px;height:38px;padding:0;font-size:20px}
+#visor .vhint{position:absolute;left:16px;right:16px;text-align:center;font-size:15px;line-height:1.3;text-shadow:0 1px 3px #000}
+#visor .vbot{position:absolute;left:0;right:0;bottom:0;padding:16px 24px calc(env(safe-area-inset-bottom) + 22px);display:flex;align-items:center;justify-content:space-between}
+#visor .vshot{width:76px;height:76px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.25);padding:0}
+#visor .vshot:active{background:#fff}
+#visor .vside{width:76px;border:0;background:none;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:6px 0}
+#visor .vside.hidden{visibility:hidden;display:block!important}
+#visor .vmsg{position:absolute;left:20px;right:20px;top:40%;text-align:center;font-size:16px;line-height:1.4}
+</style>`);
+  document.body.insertAdjacentHTML('beforeend', `<div id="visor" class="hidden" role="dialog" aria-label="Scanner une pièce">
+    <video playsinline muted autoplay></video>
+    <div class="vf"><i></i><i></i><i></i><i></i></div>
+    <div class="vtop"><span class="vfmts"></span><button type="button" class="vx" aria-label="Fermer">✕</button></div>
+    <div class="vhint"></div><div class="vmsg hidden"></div>
+    <div class="vbot"><button type="button" class="vside vlib">Photo-<br>thèque</button><button type="button" class="vshot" aria-label="Prendre la photo"></button><button type="button" class="vside vtorch hidden">Lampe</button></div>
+  </div>`);
+  const V = document.getElementById('visor'), video = V.querySelector('video'), frame = V.querySelector('.vf'), hint = V.querySelector('.vhint'), msg = V.querySelector('.vmsg');
+  let stream = null, done = null, cur = null, fmts = null, torch = false, OPT = {};
+  const LSK = 'cifVisorFmt';
+  function layout(){
+    const f = fmts[cur], w = Math.min(innerWidth * .9, (innerHeight * .55) * f.ratio), h = w / f.ratio;
+    frame.style.width = w + 'px'; frame.style.height = h + 'px';
+    const r = frame.getBoundingClientRect(); hint.style.top = (r.bottom + 14) + 'px'; hint.textContent = f.hint;
+    V.querySelectorAll('.vfmts button').forEach(b=>b.classList.toggle('on', b.dataset.f === cur));
+  }
+  function stop(){ stream?.getTracks().forEach(t=>t.stop()); stream = null; video.srcObject = null; }
+  function close(res){ stop(); V.classList.add('hidden'); const d = done; done = null; d?.(res); }
+  /* netteté d'une image (variance du laplacien sur une version réduite) */
+  function sharp(c){
+    const w = 240, h = Math.round(w * c.height / c.width), s = document.createElement('canvas'); s.width = w; s.height = h;
+    const g = s.getContext('2d'); g.drawImage(c, 0, 0, w, h); const d = g.getImageData(0, 0, w, h).data, y = new Float32Array(w*h);
+    for (let i = 0; i < w*h; i++) y[i] = d[i*4]*.3 + d[i*4+1]*.59 + d[i*4+2]*.11;
+    let m = 0, m2 = 0, n = 0;
+    for (let r = 1; r < h-1; r++) for (let x = 1; x < w-1; x++) { const i = r*w + x, l = 4*y[i] - y[i-1] - y[i+1] - y[i-w] - y[i+w]; m += l; m2 += l*l; n++; }
+    return m2/n - (m/n)**2;
+  }
+  /* image de la vidéo limitée au cadre (+ petite marge) */
+  function grab(){
+    const W = video.videoWidth, H = video.videoHeight; if (!W || !H) return null;
+    const vr = video.getBoundingClientRect(), s = Math.max(vr.width / W, vr.height / H), ox = vr.left + (vr.width - W*s)/2, oy = vr.top + (vr.height - H*s)/2;
+    const r = frame.getBoundingClientRect(), mx = r.width * .04, my = r.height * .06;
+    let x = (r.left - mx - ox)/s, y = (r.top - my - oy)/s, w = (r.width + 2*mx)/s, h = (r.height + 2*my)/s;
+    x = Math.max(0, x); y = Math.max(0, y); w = Math.min(W - x, w); h = Math.min(H - y, h);
+    const c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h);
+    c.getContext('2d').drawImage(video, x, y, w, h, 0, 0, c.width, c.height); return c;
+  }
+  async function shoot(){
+    const btn = V.querySelector('.vshot'); if (btn.disabled) return; btn.disabled = true;
+    try {
+      let best = null, bs = -1;
+      for (let k = 0; k < 6; k++) { const c = grab(); if (c) { const v = sharp(c); if (v > bs) { bs = v; best = c; } } await new Promise(r=>setTimeout(r, 70)); }
+      if (!best) return;
+      navigator.vibrate?.(30);
+      const blob = await new Promise(r=>best.toBlob(r, 'image/jpeg', .95));
+      close(blob ? new File([blob], 'visee.jpg', {type:'image/jpeg'}) : null);
+    } finally { btn.disabled = false; }
+  }
+  async function start(){
+    msg.classList.add('hidden'); stop();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:'environment'}, width:{ideal:3840}, height:{ideal:2160}}});
+      video.srcObject = stream; await video.play().catch(()=>{});
+      const t = stream.getVideoTracks()[0], caps = t.getCapabilities?.() || {};
+      if (caps.focusMode?.includes?.('continuous')) t.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+      V.querySelector('.vtorch').classList.toggle('hidden', !caps.torch);
+    } catch (e) {
+      msg.innerHTML = 'Appareil photo indisponible ici (autorisation refusée ?).<br>Utilise l\'appareil photo de l\'iPhone :';
+      msg.insertAdjacentHTML('beforeend', '<br><br><button type="button" class="vnat" style="border:0;border-radius:12px;padding:12px 18px;font-size:16px;font-weight:700;background:#fff;color:#000">Ouvrir l\'appareil photo</button>');
+      msg.classList.remove('hidden');
+      msg.querySelector('.vnat').onclick = ()=>{ OPT.native?.(); close(null); };
+    }
+  }
+  V.querySelector('.vx').onclick = ()=>close(null);
+  V.querySelector('.vshot').onclick = shoot;
+  video.addEventListener('click', shoot);
+  /* iOS n'ouvre la photothèque que dans l'appui lui-même : appel direct, pas après coup */
+  V.querySelector('.vlib').onclick = ()=>{ OPT.library?.(); close(null); };
+  V.querySelector('.vtorch').onclick = async ()=>{ const t = stream?.getVideoTracks()[0]; if (!t) return; torch = !torch; try { await t.applyConstraints({advanced:[{torch}]}); } catch { torch = false; } V.querySelector('.vtorch').style.color = torch ? '#ffd54a' : '#fff'; };
+  addEventListener('resize', ()=>{ if (!V.classList.contains('hidden')) layout(); });
+  document.addEventListener('visibilitychange', ()=>{ if (document.hidden && stream) close(null); });
+  /* Ouvre la visée. Renvoie une photo recadrée (File) ou null (fermé).
+     opts.library() : photothèque (bouton visible en mode développeur) ; opts.native() : appareil de l'iPhone si la caméra est refusée. */
+  window.cifVisor = (formats = FMT, opts = {}) => new Promise(res=>{
+    done?.(null); done = res; fmts = formats; OPT = opts;
+    const keys = Object.keys(fmts), saved = (()=>{ try { return localStorage.getItem(opts.key || LSK); } catch { return null; } })();
+    cur = keys.includes(saved) ? saved : keys[0];
+    const box = V.querySelector('.vfmts');
+    box.innerHTML = keys.length > 1 ? keys.map(k=>`<button type="button" data-f="${k}">${fmts[k].label}</button>`).join(' ') : `<b style="font-size:16px">${fmts[cur].label}</b>`;
+    box.querySelectorAll('button').forEach(b=>b.onclick = ()=>{ cur = b.dataset.f; try { localStorage.setItem(opts.key || LSK, cur); } catch {} layout(); });
+    V.querySelector('.vlib').classList.toggle('hidden', !opts.library || !window.cifIsDev?.());
+    V.classList.remove('hidden'); layout(); start();
+  });
+  window.cifVisorFormats = FMT;
+  /* Bouton appareil photo de la fiche : visée d'abord ; photothèque (mode développeur) ou appareil de l'iPhone en secours */
+  const btn = document.getElementById('mrzBtn'), inp = document.getElementById('mrzFile');
+  if (!btn || !inp || !navigator.mediaDevices?.getUserMedia) return;
+  const feed = f => { try { const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event('change', {bubbles:true})); } catch { toast('Lecture impossible : utilise l\'appareil photo de l\'iPhone'); } };
+  const pick = capture => { if (capture) inp.setAttribute('capture', 'environment'); else inp.removeAttribute('capture'); inp.click(); setTimeout(()=>window.cifScanSync?.(), 1000); };
+  btn.onclick = async ()=>{
+    const r = await window.cifVisor(FMT, {library:()=>pick(false), native:()=>pick(true)});
+    if (r instanceof File) feed(r);
+  };
+})();
+} catch (e) { console.error('[CIF] visee', e); setTimeout(()=>{ throw e; }); }
