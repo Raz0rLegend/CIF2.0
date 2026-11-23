@@ -1,7 +1,7 @@
 'use strict';
 /* CIF 2.0 — v2.0.3 : plaque.js, lecture des plaques d'immatriculation et cadre commun à toutes les pièces.
    v2.0.4 : cadre et lecture adaptés aux plaques 2 roues (véhicule 2RM), plaques encadrées mieux lues.
-   v2.0.5 : plus de texte sous le cadre des pièces.
+   v2.0.5 / 2.0.6 : plus de texte sous les cadres (pièces, plaques).
    Chargé après outils.js (utilise sa visée, window.cifVisor). */
 /* ===== cadre pièce commun ===== */
 try {
@@ -30,8 +30,8 @@ try {
 (()=>{
   if (!window.cifVisor) return;
   /* v2.0.4 : deux cadres, choisis selon le type du véhicule ; 2RM : plaque moto, plus petite et sur deux lignes (210 × 130) */
-  const FMT = {plaque:{label:'Plaque', ratio:520/110, hint:'La plaque remplit le cadre, de face si possible. Lampe la nuit.'}};
-  const FMT2 = {moto:{label:'Plaque 2 roues', ratio:210/130, hint:'Plaque moto ou scooter : elle remplit le cadre, de face si possible. Lampe la nuit.'}};
+  const FMT = {plaque:{label:'Plaque', ratio:520/110, hint:''}};
+  const FMT2 = {moto:{label:'Plaque 2 roues', ratio:210/130, hint:''}};
   /* Italie 2 roues (AB 12345) : sans ce cas, la mise au format voiture transformait les 2 derniers chiffres en lettres */
   const fp0 = formatPlate;
   formatPlate = function(raw, pays){ if (pays === 'I') { const c = String(raw||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^I(?=[A-Z]{2}\d{5}$)/, ''); if (/^[A-Z]{2}\d{5}$/.test(c)) return c.slice(0,2) + ' ' + c.slice(2); } return fp0.apply(this, arguments); };
