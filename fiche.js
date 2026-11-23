@@ -258,3 +258,23 @@ try {
   };
 })();
 } catch (e) { console.error('[CIF] accomp.js', e); setTimeout(()=>{ throw e; }); }
+/* ===== casse ===== */
+try {
+/* CIF 2.0 — v2.0.1 : majuscule parasite du clavier de l'iPhone.
+   En corrigeant une lettre au milieu d'un mot (« boulevard » → « boulevaRd »), iOS réactive parfois la touche Maj :
+   une majuscule tapée juste après une minuscule est remise en minuscule. Les champs tout en majuscules
+   (nom, numéro de pièce, plaque…) et les mots écrits en capitales (« ZUNINO ») ne sont pas touchés. */
+(()=>{
+  const SKIP = /^(f_nom|d_nom|f_docNumero|f_docType|f_email|adrTop|adrBot|devPin)$/;
+  document.addEventListener('input', e=>{
+    const i = e.target;
+    if (e.inputType !== 'insertText' || !e.data || e.data.length !== 1 || !/[A-ZÀ-ÖØ-Þ]/.test(e.data)) return;
+    if (!(i instanceof HTMLTextAreaElement || (i instanceof HTMLInputElement && /^(text|search)$/.test(i.type)))) return;
+    if (SKIP.test(i.id) || i.dataset.k === 'plaque' || /^characters$/i.test(i.getAttribute('autocapitalize') || '')) return;
+    const p = i.selectionStart; if (p == null || p < 2 || p !== i.selectionEnd || i.value[p - 1] !== e.data) return;
+    if (!/[a-zà-öø-ÿ]/.test(i.value[p - 2])) return;
+    i.value = i.value.slice(0, p - 1) + e.data.toLowerCase() + i.value.slice(p);
+    i.setSelectionRange(p, p);
+  }, true);
+})();
+} catch (e) { console.error('[CIF] casse', e); setTimeout(()=>{ throw e; }); }
