@@ -2,9 +2,10 @@
    Petit fichier mis à jour seul lors des petites mises à jour (app.js n'a plus besoin d'être modifié).
    Nouveautés : seule la dernière version est détaillée, les précédentes sont résumées. */
 window.CIF = {
-  version: '2.0.8',
-  modules: ['pieces.js', 'affichage.js', 'acces.js', 'fiche.js', 'outils.js', 'plaque.js', 'galerie.js'],
-  changelog: [ ['2.0.8',['Photos du contrôle à la volée : bouton appareil photo sur chaque fiche de la liste. La photo est ajoutée à toutes les personnes du même contrôle (chacune garde sa copie)','Bandeau rouge d\'intervention : bouton appareil photo. La photo attend la fiche sans l\'ouvrir (l\'heure de la fiche reste celle de son ouverture) et y est jointe à l\'ouverture','Une personne ajoutée au même contrôle reprend les photos du contrôle. Les photos prises depuis la fiche (documents, « à photographier » de l\'accident) restent propres à la fiche']],
+  version: '2.0.9',
+  modules: ['pieces.js', 'affichage.js', 'acces.js', 'fiche.js', 'outils.js', 'plaque.js', 'galerie.js', 'recherche.js'],
+  changelog: [ ['2.0.9',['Diffusions de recherche : nouvel onglet Véhicules (voiture, 2 roues, autre) avec plaque, pays, description, motif et date d\'établissement de la diffusion','Une plaque saisie ou scannée qui correspond déclenche l\'alerte rouge « VÉHICULE RECHERCHÉ » : sous la plaque, dans la liste, dans la fiche et dans l\'envoi','« Nom diffusé » remplacé par « Personne recherchée ? — même nom, vérifier l\'identité »']],
+    ['2.0.8',['Photos du contrôle à la volée : bouton appareil photo sur chaque fiche de la liste. La photo est ajoutée à toutes les personnes du même contrôle (chacune garde sa copie)','Bandeau rouge d\'intervention : bouton appareil photo. La photo attend la fiche sans l\'ouvrir (l\'heure de la fiche reste celle de son ouverture) et y est jointe à l\'ouverture','Une personne ajoutée au même contrôle reprend les photos du contrôle. Les photos prises depuis la fiche (documents, « à photographier » de l\'accident) restent propres à la fiche']],
     ['2.0.7',['Bouton « Vers la galerie » dans le bloc Photos d\'une fiche : ouvre le partage avec les photos seules, toucher « Enregistrer X images » pour les copier dans la galerie (puis transfert par câble). Pense à les supprimer ensuite, y compris dans « Supprimés récemment »']],
     ['2.0.6',['Plus de texte sous les cadres de l\'appareil photo (pièces et plaques) : l\'image est dégagée']],
     ['2.0.4',['Plaques 2 roues : quand le véhicule est en 2RM, le cadre passe au format moto (plus petit, presque carré) et la lecture prend les deux lignes de la plaque (AB-123 / CD, Italie AB 12345)','Lecture des plaques plus sûre : le cadre sombre autour de la plaque ne gêne plus, notamment la nuit']],
