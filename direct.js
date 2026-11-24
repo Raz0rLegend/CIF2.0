@@ -4,7 +4,8 @@
    nationalité, numéro…) s'affiche en surcouche sous le cadre, en vert quand c'est confirmé par deux lectures.
    Dès que la lecture est sûre (bande « <<< » avec ses chiffres de contrôle justes, ou deux lectures identiques du nom
    et de la date de naissance), le téléphone vibre, la caméra se ferme et la fiche est remplie par la lecture habituelle,
-   à partir de cette même image. Le déclencheur reste disponible. Rien n'est envoyé ni gardé. */
+   à partir de cette même image. Le déclencheur reste disponible. Rien n'est envoyé ni gardé.
+   v2.0.14 : recto puis verso à la suite ; contrôle express par la plaque (bouton bleu au-dessus du « + »). */
 try {
 (()=>{
   const btn = document.getElementById('mrzBtn'), inp = document.getElementById('mrzFile');
@@ -121,16 +122,63 @@ try {
     return {stop: ()=>{ stop = true; }, done};
   }
 
-  btn.onclick = async ()=>{
+  /* v2.0.14 : recto puis verso à la suite — quand la lecture demande l'autre face (carte d'identité, titre de séjour),
+     la caméra se rouvre seule après « Retourne la pièce ». Une seule fois par pièce ; pas pour le passeport ni le permis. */
+  const scanEnd = async () => { for (let i = 0; i < 40 && !btn.disabled; i++) await sleep(100); for (let i = 0; i < 600 && btn.disabled; i++) await sleep(100); };
+  async function chain(){
+    await scanEnd();
+    const t = document.getElementById('mrzInfo')?.textContent || '', type = document.getElementById('f_docType')?.value || '';
+    if (!EDIT || /^(PS|PC)$/.test(type) || !/scanne le verso|scanne-le pour confirmer|scanne aussi l'autre face/.test(t)) return;
+    toast('Retourne la pièce'); await sleep(1100);
+    if (EDIT && document.getElementById('visor')?.classList.contains('hidden') !== false) openPiece(true);
+  }
+  async function openPiece(other){
     let L = null;
-    const p = window.cifVisor(FMT, {key:'cifVisorPiece', library:()=>pick(false), native:()=>pick(true)});
+    const F2 = other ? {piece:{...Object.values(FMT)[0], label:'Autre face'}} : FMT;
+    const p = window.cifVisor(F2, {key:'cifVisorPiece', library:()=>pick(false), native:()=>pick(true)});
     try { await lib(); await engines(); L = live(); } catch (e) { console.warn('[CIF] direct', e.message); }
     const r = await p;
     let f = null; if (L) { L.stop(); f = await L.done; }
     /* moteurs du direct libérés (mémoire du téléphone) : la lecture habituelle prend le relais */
     try { await WM?.terminate(); await WF?.terminate(); } catch {} WM = WF = null;
     /* photo du déclencheur, sinon image lue en direct : la lecture habituelle remplit la fiche */
-    if (r instanceof File) feed(r); else if (f) feed(f);
-  };
+    const got = r instanceof File ? r : f;
+    if (got) { feed(got); if (!other) chain(); }
+    return !!got;
+  }
+  window.cifPiece = openPiece;
+  btn.onclick = ()=>{ openPiece(false); };
+
+  /* v2.0.14 : contrôle express par la plaque (en option, à côté du « + ») : nouvelle fiche, véhicule ajouté,
+     caméra plaque ; la plaque lue (alerte « véhicule recherché » comprise), la caméra pièce s'ouvre pour le conducteur. */
+  const fab = document.getElementById('fab');
+  if (fab) {
+    document.head.insertAdjacentHTML('beforeend', `<style>
+#expressFab{position:fixed;right:26px;bottom:calc(84px + 74px + env(safe-area-inset-bottom) - var(--gb,0px));width:50px;height:50px;border-radius:50%;background:#1f4fbf;color:#fff;border:0;display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.45);z-index:6}
+#expressFab svg{width:28px;height:28px}
+#expressFab:active{transform:scale(.94)}
+#expressFab.hidden{display:none}
+</style>`);
+    fab.insertAdjacentHTML('afterend', `<button id="expressFab" type="button" aria-label="Contrôle express : commencer par la plaque"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l1.5-5h11L19 16"/><path d="M3 16h18v3H3z"/><circle cx="7" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/><path d="M8 7h8"/></svg></button>`);
+    const xf = document.getElementById('expressFab');
+    const sync = () => xf.classList.toggle('hidden', fab.classList.contains('hidden'));
+    new MutationObserver(sync).observe(fab, {attributes:true, attributeFilter:['class']}); sync();
+    xf.onclick = async ()=>{
+      /* contrôle non enregistré en attente : le « + » habituel pose la question, sans caméra automatique */
+      if (DRAFT) return fab.click();
+      openForm(null);
+      document.getElementById('addVeh')?.click();
+      const row = document.querySelector('#vehicles .veh:last-child .platerow'); if (!row) return;
+      let cam = row.querySelector('.pcam');
+      if (!cam) { row.insertAdjacentHTML('beforeend', '<button type="button" class="pcam" aria-label="Photographier la plaque"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>'); cam = row.querySelector('.pcam'); }
+      cam.click();   /* dans le même toucher : iOS autorise la caméra */
+      const V = document.getElementById('visor');
+      for (let i = 0; i < 30 && V?.classList.contains('hidden'); i++) await sleep(100);
+      while (V && !V.classList.contains('hidden')) await sleep(200);
+      const plate = row.querySelector('[data-k=plaque]')?.value;
+      if (!EDIT || !plate) return;
+      await sleep(500); toast('Conducteur : vise sa pièce'); openPiece(false);
+    };
+  }
 })();
 } catch (e) { console.error('[CIF] direct', e); setTimeout(()=>{ throw e; }); }
