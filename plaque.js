@@ -2,7 +2,7 @@
 /* CIF 2.0 — v2.0.3 : plaque.js, lecture des plaques d'immatriculation et cadre commun à toutes les pièces.
    v2.0.4 : cadre et lecture adaptés aux plaques 2 roues (véhicule 2RM), plaques encadrées mieux lues.
    v2.0.5 / 2.0.6 : plus de texte sous les cadres (pièces, plaques).
-   v2.0.10 : M/H et Y/V départagés par la forme de la lettre ; pays reconnu par la lettre de la bande bleue (F, I, D…).
+   v2.0.10 / 2.0.11 : plaque repérée par ses bandes bleues (redressée si penchée, lecture de la seule zone des caractères) ; M/H et Y/V départagés par la forme de la lettre ; pays reconnu par la lettre de la bande bleue (F, I, D…).
    Chargé après outils.js (utilise sa visée, window.cifVisor). */
 /* ===== cadre pièce commun ===== */
 try {
@@ -93,6 +93,11 @@ try {
       while (q.length) { const i = q.pop(), x = i % w; d[i*4] = d[i*4+1] = d[i*4+2] = 255; if (x > 0) push(i-1); if (x < w-1) push(i+1); if (i >= w) push(i-w); if (i < w*(h-1)) push(i+w); }
     }
     g.putImageData(im, 0, 0); return c;
+  }
+  function rotate(img, a){
+    const [iw, ih] = dims(img), c = document.createElement('canvas'), cs = Math.abs(Math.cos(a)), sn = Math.abs(Math.sin(a));
+    c.width = Math.round(iw * cs + ih * sn); c.height = Math.round(iw * sn + ih * cs);
+    const g = c.getContext('2d'); g.fillStyle = '#808080'; g.fillRect(0, 0, c.width, c.height); g.translate(c.width / 2, c.height / 2); g.rotate(a); g.imageSmoothingQuality = 'high'; g.drawImage(img, -iw / 2, -ih / 2); return c;
   }
   function cut(img, [x, y, w, h]){ const c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h); c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, c.width, c.height); return c; }
   /* Recherche de la plaque dans une photo entière : zone claire, au format plaque, pleine de traits verticaux (les caractères).
@@ -210,19 +215,61 @@ try {
   }
 
   /* ----- pays : lettre blanche de la bande bleue (F, I, D, E, B, NL…) à gauche de la plaque ----- */
-  async function bandCode(img){
+  /* Repère de la plaque : les bandes bleues européennes (à gauche, et à droite pour F et I : département, province).
+     Tache bleue haute et étroite, suivie d'une zone claire (le fond de la plaque) ; la plaque fait 4,7 fois la hauteur
+     de la bande (520 × 110), une plaque 2 roues 1,6 fois (210 × 130). Renvoie la zone des caractères, entre les bandes,
+     et la bande gauche, en coordonnées de la photo. */
+  function findPlate(img, moto){
+    const [iw, ih] = dims(img), s = Math.min(1, 900 / Math.max(iw, ih)), w = Math.round(iw * s), h = Math.round(ih * s);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(img, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data, B = new Uint8Array(w*h);
+    /* seuils relatifs à la luminosité de la photo : la bande bleue et le fond clair restent repérables la nuit */
+    const hist = new Uint32Array(256); for (let j = 0; j < d.length; j += 16) hist[Math.max(d[j], d[j+1], d[j+2])]++;
+    let P90 = 255; { const tot = d.length / 16; let a = 0; for (let v = 0; v < 256; v++) { a += hist[v]; if (a >= tot * .9) { P90 = Math.max(60, v); break; } } }
+    for (let i = 0, j = 0; i < w*h; i++, j += 4) B[i] = d[j+2] > Math.max(40, P90 * .35) && d[j+2] > d[j] * 1.4 + 15 && d[j+2] > d[j+1] * 1.1 + 8 ? 1 : 0;
+    const lab = new Int32Array(w*h), bl = [];
+    for (let i = 0; i < w*h; i++) {
+      if (!B[i] || lab[i]) continue;
+      const st = [i]; lab[i] = 1; let n = 0, x0 = w, x1 = 0, y0 = h, y1 = 0;
+      while (st.length) { const j = st.pop(), x = j % w, y = (j / w) | 0; n++; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (const k of [x > 0 ? j-1 : -1, x < w-1 ? j+1 : -1, y > 0 ? j-w : -1, y < h-1 ? j+w : -1]) if (k >= 0 && B[k] && !lab[k]) { lab[k] = 1; st.push(k); } }
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      /* bande : pleine, environ deux fois plus haute que large (pas un caractère bleu d'une plaque de Monaco) */
+      if (bh >= 12 && bh >= bw * 1.2 && bh <= bw * 4 && n > bw * bh * .45) bl.push({x0, x1, y0, y1, bw, bh, strict: bh >= bw * 1.4 && bh <= bw * 2.7 && n > bw * bh * .6});
+    }
+    /* part de pixels clairs (fond de plaque) dans une zone : les caractères n'en couvrent qu'une partie */
+    const light = (x0, y0, x1, y1) => { let t = 0, n = 0; for (let y = Math.max(0, Math.round(y0)); y <= Math.min(h-1, y1); y++) for (let x = Math.max(0, Math.round(x0)); x <= Math.min(w-1, x1); x++) { const j = (y*w + x)*4; const mx = Math.max(d[j], d[j+1], d[j+2]), mn = Math.min(d[j], d[j+1], d[j+2]); if (mx > P90 * .55 && mx - mn < mx * .35 + 12) t++; n++; } return n ? t / n : 0; };
+    let best = null;
+    for (const L of bl.filter(b=>b.strict)) {   /* bande droite : critères plus souples (blason, département) */
+      const ratio = moto ? 1.62 : 4.73, H = L.bh;
+      /* fond de la plaque clair juste à droite de la bande */
+      if (light(L.x1 + 1 + H * .03, L.y0 + H * .15, L.x1 + H * .9, L.y1 - H * .15) < .4) continue;
+      const Rb = bl.filter(R=>R !== L && R.x0 > L.x1 && Math.abs((R.y0 + R.y1) / 2 - (L.y0 + L.y1) / 2) < H * .5 && Math.abs(R.bh - H) < H * .4 && (R.x1 - L.x0) > H * ratio * .75 && (R.x1 - L.x0) < H * ratio * 1.35).sort((a,b)=>b.bh - a.bh)[0];
+      const x1 = Rb ? Rb.x0 - 1 : Math.min(w - 1, Math.round(L.x0 + H * (moto ? ratio : 5.2)));   /* sans bande droite : un peu de marge, la photo réelle est souvent plus longue que la théorie */
+      if (x1 - L.x1 < H * (moto ? .8 : 2.5)) continue;
+      const score = H * (Rb ? 2 : 1);
+      /* inclinaison de la plaque : droite qui joint les centres des deux bandes */
+      const angle = Rb ? Math.atan2((Rb.y0 + Rb.y1) / 2 - (L.y0 + L.y1) / 2, (Rb.x0 + Rb.x1) / 2 - (L.x0 + L.x1) / 2) : 0;
+      if (!best || score > best.score) best = {score, angle, inner:[L.x1 + 1, L.y0 + H * .04, x1 - L.x1 - 1, H * .92], band:[L.x0, L.y0, L.bw, H]};
+    }
+    if (!best) return null;
+    const sc = v => v.map(n=>n / s);
+    return {inner:sc(best.inner), band:sc(best.band), angle:best.angle};
+  }
+  async function bandCode(img, box){
     const [iw, ih] = dims(img), s = Math.min(1, 900 / iw), w = Math.round(iw * s), h = Math.round(ih * s);
     const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(img, 0, 0, w, h);
-    const d = g.getImageData(0, 0, w, h).data, blue = i => d[i+2] > 90 && d[i+2] > d[i] + 45 && d[i+2] > d[i+1] + 20;
-    /* colonnes bleues dans le tiers gauche */
-    const col = []; for (let x = 0; x < Math.round(w * .35); x++) { let n = 0; for (let y = 0; y < h; y++) if (blue((y*w + x)*4)) n++; col.push(n / h); }
-    let x0 = col.findIndex(v=>v > .25); if (x0 < 0) return null; let x1 = x0; while (x1 + 1 < col.length && col[x1+1] > .15) x1++;
-    if (x1 - x0 < 4) return null;
-    let y0 = h, y1 = 0; for (let y = 0; y < h; y++) { let n = 0; for (let x = x0; x <= x1; x++) if (blue((y*w + x)*4)) n++; if (n > (x1 - x0 + 1) * .4) { if (y < y0) y0 = y; y1 = y; } }
-    if (y1 - y0 < (x1 - x0)) return null;
+    let x0, x1, y0, y1;
+    if (!box) return null;   /* pas de bande repérée : pas de pays deviné (une plaque de Monaco a des caractères bleus) */
+    [x0, y0] = [Math.round(box[0] * s), Math.round(box[1] * s)]; x1 = Math.round((box[0] + box[2]) * s) - 1; y1 = Math.round((box[1] + box[3]) * s) - 1;
     /* moitié basse de la bande (sous les étoiles) : la lettre blanche, recadrée et agrandie, devient noire sur blanc */
     const by = y0 + Math.round((y1 - y0) * .45), bw = x1 - x0 + 1, bh = y1 - by + 1, q = g.getImageData(x0, by, bw, bh).data;
-    const wh = (x, y) => { const i = (y*bw + x)*4; return q[i] > 150 && q[i+1] > 150 && q[i+2] > 150; };
+    /* blanc entouré de bleu seulement (pas la carrosserie visible aux coins quand la plaque est de biais) */
+    const isB = (x, y) => { const i = (y*bw + x)*4; return q[i+2] > 90 && q[i+2] > q[i] + 45 && q[i+2] > q[i+1] + 15; };
+    const rL = [], rR = [], cT = [], cB = [];
+    for (let y = 0; y < bh; y++) { rL[y] = bw; rR[y] = -1; for (let x = 0; x < bw; x++) if (isB(x, y)) { if (x < rL[y]) rL[y] = x; rR[y] = x; } }
+    for (let x = 0; x < bw; x++) { cT[x] = bh; cB[x] = -1; for (let y = 0; y < bh; y++) if (isB(x, y)) { if (y < cT[x]) cT[x] = y; cB[x] = y; } }
+    const wh = (x, y) => { const i = (y*bw + x)*4; return q[i] > 150 && q[i+1] > 150 && q[i+2] > 150 && x > rL[y] && x < rR[y] && y > cT[x] && y < cB[x]; };
     let lx0 = bw, lx1 = -1, ly0 = bh, ly1 = -1;
     const m = Math.round(bw * .14);   /* marges : ni le bord de la plaque, ni le cadre */
     for (let y = 0; y < bh; y++) for (let x = m; x < bw - m; x++) if (wh(x, y)) { if (x < lx0) lx0 = x; if (x > lx1) lx1 = x; if (y < ly0) ly0 = y; if (y > ly1) ly1 = y; }
@@ -248,8 +295,12 @@ try {
   async function read(f, pays, moto){
     W ||= await engine();
     await W.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ', preserve_interword_spaces:'1'});
-    const img = await load(f), [iw, ih] = dims(img), texts = [];
-    let band = null; try { band = await bandCode(img); } catch {}
+    let img = await load(f); const [iw, ih] = dims(img), texts = [];
+    let P = null; try { P = findPlate(img, moto); } catch (e) { console.error('[CIF] plaque', e); }
+    /* plaque penchée (plus de 1,5°) : la photo est redressée, puis la plaque repérée à nouveau */
+    if (P && Math.abs(P.angle) > .026) { const R0 = rotate(img, -P.angle); try { const P2 = findPlate(R0, moto); if (P2) { img = R0; P = P2; } } catch {} }
+    window.cifPlateBox = P;
+    let band = null; try { band = await bandCode(img, P && P.band); } catch {}
     window.cifPlateBand = band;
     const opts = new Set([...document.querySelectorAll('#vehicles [data-k=pays] option')].map(o=>o.value));
     const detected = band && BAND[band] && (!opts.size || opts.has(BAND[band])) ? BAND[band] : null;
@@ -261,12 +312,15 @@ try {
     /* photo recadrée par la visée (format plaque) : lecture directe ; sinon (photothèque, plaque petite) : recherche de la plaque */
     /* plaque 2 roues (cadre moto) : lecture d'un bloc de deux lignes */
     const block = async src => { for (const [m, psm, clr] of [['max','6',128],['max','6',200],['lum','6',128],['lum','6',200],['max','6'],['lum','11',200]]) { await ocr(prep(src, m, 200, clr), psm); if (sure()) return true; } };
-    const done = moto ? await block(img) : iw / ih > 2.4 && await line(img);
+    /* plaque repérée par ses bandes bleues : lecture de la seule zone des caractères (la plus fiable) */
+    const zone = P ? cut(img, P.inner) : null;
+    let done = zone ? (moto ? await block(zone) : await line(zone)) : false;
+    if (!done) done = moto ? await block(img) : iw / ih > 2.4 && await line(img);
     if (!done && !moto && !vote(texts, pays, moto)) for (const z of locate(img)) if (await line(cut(img, z))) break;
     if (!vote(texts, pays, moto)) { await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '11'); await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '3'); }
     window.cifPlateDebug = texts;   /* mode test : lectures brutes, consultables depuis la console */
     const r = vote(texts, pays, moto);
-    if (r) { if (moto || iw / ih > 2.4) r.v = refine(r.v, img, moto); r.pays = detected; }
+    if (r) { if (zone || moto || iw / ih > 2.4) r.v = refine(r.v, zone || img, moto); r.pays = detected; }
     return r;
   }
 
