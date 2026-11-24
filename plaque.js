@@ -2,6 +2,7 @@
 /* CIF 2.0 — v2.0.3 : plaque.js, lecture des plaques d'immatriculation et cadre commun à toutes les pièces.
    v2.0.4 : cadre et lecture adaptés aux plaques 2 roues (véhicule 2RM), plaques encadrées mieux lues.
    v2.0.5 / 2.0.6 : plus de texte sous les cadres (pièces, plaques).
+   v2.0.10 : M/H et Y/V départagés par la forme de la lettre ; pays reconnu par la lettre de la bande bleue (F, I, D…).
    Chargé après outils.js (utilise sa visée, window.cifVisor). */
 /* ===== cadre pièce commun ===== */
 try {
@@ -152,10 +153,107 @@ try {
     let best = null, bs = 0; for (const [v, sc] of S) if (sc > bs) { best = v; bs = sc; }
     return best && {v:best, score:bs};
   }
+  /* ----- lettres qui se ressemblent : M/H, Y/V -----
+     (et W, lu parfois à la place de V ou M). Après la lecture, chaque caractère est découpé sur l'image (taches d'encre de la hauteur des caractères, de gauche à
+     droite, ligne par ligne pour les 2 roues) et sa forme est mesurée :
+     • M : le creux entre les deux jambages se referme en descendant (les diagonales) ; H : il reste ouvert jusqu'à la barre ;
+     • V : se rétrécit jusqu'en bas en pointe ; Y : garde une tige de largeur constante dans le bas.
+     Réglé sur 9 polices (nettes, floues, étirées). La lettre n'est changée que si plusieurs traitements de l'image l'indiquent. */
+  function glyphs(c, moto){
+    const w = c.width, h = c.height, d = c.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, w, h).data, L = new Uint8Array(w*h);
+    const hist = new Uint32Array(256); for (let i = 0; i < w*h; i++) { L[i] = d[i*4]; hist[L[i]]++; }
+    const pct = q => { let a = 0; for (let v = 0; v < 256; v++) { a += hist[v]; if (a >= w*h*q) return v; } return 255; };
+    const t = (pct(.05) + pct(.95)) / 2, lab = new Int32Array(w*h), comps = [];
+    for (let i = 0; i < w*h; i++) {
+      if (L[i] >= t || lab[i]) continue;
+      const id = comps.length + 1, st = [i], px = []; lab[i] = id; let x0 = w, x1 = 0, y0 = h, y1 = 0;
+      while (st.length) { const j = st.pop(), x = j % w, y = (j / w) | 0; px.push(j); if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (const k of [x > 0 ? j-1 : -1, x < w-1 ? j+1 : -1, y > 0 ? j-w : -1, y < h-1 ? j+w : -1]) if (k >= 0 && !lab[k] && L[k] < t) { lab[k] = id; st.push(k); } }
+      comps.push({id, x0, x1, y0, y1, px});
+    }
+    let ch = comps.filter(o=>o.x0 > 0 && o.y0 > 0 && o.x1 < w-1 && o.y1 < h-1 && o.y1 - o.y0 > h * (moto ? .12 : .2) && o.px.length > 40);
+    const hs = ch.map(o=>o.y1 - o.y0).sort((a,b)=>a-b), mh = hs[hs.length >> 1] || 0;
+    ch = ch.filter(o=>{ const hh = o.y1 - o.y0; return hh > mh * .75 && hh < mh * 1.25 && o.x1 - o.x0 < mh * 1.4; });
+    /* ordre de lecture : par ligne (centres verticaux éloignés de plus d'une demi-hauteur), puis de gauche à droite */
+    ch.sort((a,b)=>(a.y0 + a.y1) / 2 - (b.y0 + b.y1) / 2);
+    const lines = []; for (const o of ch) { const cy = (o.y0 + o.y1) / 2, l = lines.find(l=>Math.abs(l.cy - cy) < mh * .5); if (l) l.o.push(o); else lines.push({cy, o:[o]}); }
+    return lines.flatMap(l=>l.o.sort((a,b)=>a.x0 - b.x0)).map(o=>{ const ww = o.x1 - o.x0 + 1, hh = o.y1 - o.y0 + 1, m = new Uint8Array(ww*hh); for (const j of o.px) m[((j / w | 0) - o.y0) * ww + (j % w - o.x0)] = 1; return {m, w:ww, h:hh}; });
+  }
+  function shape({m, w, h}){
+    if (w < 5 || h < 10) return null;
+    const ink = (x, y) => m[y*w + x], row = r => Math.min(h - 1, Math.floor(h * r));
+    const gap = r => { const y = row(r), c0 = w >> 1; if (ink(c0, y)) return 0; let a = c0, z = c0; while (a > 0 && !ink(a-1, y)) a--; while (z < w-1 && !ink(z+1, y)) z++; return (z - a + 1) / w; };
+    const span = r => { const y = row(r); let a = -1, z = -1; for (let x = 0; x < w; x++) if (ink(x, y)) { if (a < 0) a = x; z = x; } return a < 0 ? 0 : (z - a + 1) / w; };
+    const mid = r => { const y = row(r); for (let x = Math.floor(w * .44); x <= Math.ceil(w * .56); x++) if (ink(x, y)) return true; return false; };
+    return {mh: gap(.30) / Math.max(.01, Math.max(gap(.08), gap(.12))), vy: span(.93) / Math.max(.01, span(.62)), w: mid(.30) && !mid(.93), foot: span(.93)};
+  }
+  /* W : pointe du milieu en haut, rien au milieu en bas ; M/H : deux jambages jusqu'en bas ; V/Y : étroit en bas.
+     Seules les confusions courantes sont corrigées. */
+  const SWAP = {H:'M', M:'HW', V:'YW', Y:'V', W:'VM'};
+  const judge = (ch, sh) => {
+    if (!sh) return null;
+    const g = sh.w && sh.foot > .5 && sh.foot < .82 ? 'W' : sh.foot >= .85 ? (sh.mh < .78 ? 'M' : sh.mh > .88 ? 'H' : null) : (sh.vy < .72 ? 'V' : sh.vy > .8 ? 'Y' : null);
+    return g && (g === ch || SWAP[ch].includes(g)) ? g : null;
+  };
+  function refine(v, img, moto){
+    const pos = [...v].map((ch, i)=>[ch, i]).filter(([ch])=>/[A-Z0-9]/.test(ch)), comp = pos.map(([ch])=>ch);
+    const want = comp.map((ch, k)=>'HMVYW'.includes(ch) ? k : -1).filter(k=>k >= 0); if (!want.length) return v;
+    const votes = want.map(()=>({}));
+    for (const [mode, clr] of [['lum',128],['max',200],['bin',128]]) {
+      const G = glyphs(prep(img, mode, moto ? 260 : 200, clr), moto); if (G.length !== comp.length) continue;
+      want.forEach((k, j)=>{ const g = judge(comp[k], shape(G[k])); if (g) votes[j][g] = (votes[j][g]||0) + 1; });
+    }
+    window.cifPlateVotes = votes;
+    const out = [...v];
+    want.forEach((k, j)=>{ const e = Object.entries(votes[j]).sort((a,b)=>b[1]-a[1])[0]; const tot = Object.values(votes[j]).reduce((a,b)=>a+b, 0); if (e && e[0] !== comp[k] && e[1] >= 2 && e[1] / tot >= .67) out[pos[k][1]] = e[0]; });
+    return out.join('');
+  }
+
+  /* ----- pays : lettre blanche de la bande bleue (F, I, D, E, B, NL…) à gauche de la plaque ----- */
+  async function bandCode(img){
+    const [iw, ih] = dims(img), s = Math.min(1, 900 / iw), w = Math.round(iw * s), h = Math.round(ih * s);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d', {willReadFrequently:true}); g.drawImage(img, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data, blue = i => d[i+2] > 90 && d[i+2] > d[i] + 45 && d[i+2] > d[i+1] + 20;
+    /* colonnes bleues dans le tiers gauche */
+    const col = []; for (let x = 0; x < Math.round(w * .35); x++) { let n = 0; for (let y = 0; y < h; y++) if (blue((y*w + x)*4)) n++; col.push(n / h); }
+    let x0 = col.findIndex(v=>v > .25); if (x0 < 0) return null; let x1 = x0; while (x1 + 1 < col.length && col[x1+1] > .15) x1++;
+    if (x1 - x0 < 4) return null;
+    let y0 = h, y1 = 0; for (let y = 0; y < h; y++) { let n = 0; for (let x = x0; x <= x1; x++) if (blue((y*w + x)*4)) n++; if (n > (x1 - x0 + 1) * .4) { if (y < y0) y0 = y; y1 = y; } }
+    if (y1 - y0 < (x1 - x0)) return null;
+    /* moitié basse de la bande (sous les étoiles) : la lettre blanche, recadrée et agrandie, devient noire sur blanc */
+    const by = y0 + Math.round((y1 - y0) * .45), bw = x1 - x0 + 1, bh = y1 - by + 1, q = g.getImageData(x0, by, bw, bh).data;
+    const wh = (x, y) => { const i = (y*bw + x)*4; return q[i] > 150 && q[i+1] > 150 && q[i+2] > 150; };
+    let lx0 = bw, lx1 = -1, ly0 = bh, ly1 = -1;
+    const m = Math.round(bw * .14);   /* marges : ni le bord de la plaque, ni le cadre */
+    for (let y = 0; y < bh; y++) for (let x = m; x < bw - m; x++) if (wh(x, y)) { if (x < lx0) lx0 = x; if (x > lx1) lx1 = x; if (y < ly0) ly0 = y; if (y > ly1) ly1 = y; }
+    if (lx1 < 0 || ly1 - ly0 < 5) return null;
+    const lw = lx1 - lx0 + 1, lh = ly1 - ly0 + 1;
+    if (lh / lw > 3.2) return 'I';   /* un simple trait vertical : le moteur lit mal une lettre seule aussi fine */
+    const S = 80 / lh, o = document.createElement('canvas'); o.width = Math.round(lw * S) + 60; o.height = 140;
+    const og = o.getContext('2d'); og.fillStyle = '#fff'; og.fillRect(0, 0, o.width, o.height); og.fillStyle = '#000';
+    for (let y = ly0; y <= ly1; y++) for (let x = lx0; x <= lx1; x++) if (wh(x, y)) og.fillRect(30 + (x - lx0) * S, 30 + (y - ly0) * S, Math.ceil(S), Math.ceil(S));
+    /* une lettre seule est difficile pour le moteur : plusieurs modes, le premier code de pays connu l'emporte */
+    let txt = '';
+    for (const psm of lw / lh > 1.3 ? ['8','7'] : ['10','8','7','13']) {
+      await W.setParameters({tessedit_pageseg_mode:psm, tessedit_char_whitelist:'ABCDEFGHIJKLMNOPRSTUVZ'});
+      txt = ((await W.recognize(o)).data.text || '').toUpperCase().replace(/[^A-Z]/g, '');
+      if (BAND[txt]) break;
+    }
+    await W.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- '});
+    return txt.length >= 1 && txt.length <= 3 ? txt : null;
+  }
+  /* code lu sur la bande → code du menu Pays de la plaque (les mêmes, sauf quelques cas) */
+  const BAND = {F:'F', I:'I', D:'D', E:'E', B:'B', NL:'NL', L:'L', P:'P', A:'A', IRL:'IRL', GR:'GR', PL:'PL', CZ:'CZ', SK:'SK', H:'H', SLO:'SLO', HR:'HR', RO:'RO', BG:'BG', LT:'LT', LV:'LV', EST:'EST', FIN:'FIN', S:'S', DK:'DK', M:'M', CY:'CY', CH:'CH', GB:'GB', UK:'GB'};
+
   async function read(f, pays, moto){
     W ||= await engine();
     await W.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ', preserve_interword_spaces:'1'});
     const img = await load(f), [iw, ih] = dims(img), texts = [];
+    let band = null; try { band = await bandCode(img); } catch {}
+    window.cifPlateBand = band;
+    const opts = new Set([...document.querySelectorAll('#vehicles [data-k=pays] option')].map(o=>o.value));
+    const detected = band && BAND[band] && (!opts.size || opts.has(BAND[band])) ? BAND[band] : null;
+    if (detected) pays = detected;
     const ocr = async (c, psm) => { await W.setParameters({tessedit_pageseg_mode:psm}); texts.push((await W.recognize(c)).data.text || ''); };
     const sure = () => { const r = vote(texts, pays, moto); return texts.length >= 2 && r && r.score >= 18; };
     /* lecture d'une ligne, plusieurs traitements d'image ; arrêt dès que deux lectures concordent */
@@ -167,7 +265,9 @@ try {
     if (!done && !moto && !vote(texts, pays, moto)) for (const z of locate(img)) if (await line(cut(img, z))) break;
     if (!vote(texts, pays, moto)) { await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '11'); await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '3'); }
     window.cifPlateDebug = texts;   /* mode test : lectures brutes, consultables depuis la console */
-    return vote(texts, pays, moto);
+    const r = vote(texts, pays, moto);
+    if (r) { if (moto || iw / ih > 2.4) r.v = refine(r.v, img, moto); r.pays = detected; }
+    return r;
   }
 
   async function scan(f, btn){
@@ -176,12 +276,14 @@ try {
     try {
       const r = await read(f, sel.value, is2R(box));
       if (!r) return toast('Plaque non lue : rapproche-toi, de face, ou saisis-la');
+      /* pays lu sur la bande bleue : le menu Pays suit */
+      if (r.pays && r.pays !== sel.value) { sel.value = r.pays; sel.dispatchEvent(new Event('change', {bubbles:true})); }
       /* 7 caractères AB123CD avec Monaco choisi : c'est une plaque française */
       if (sel.value === 'MC' && /^[A-Z]{2}\d{3}[A-Z]{2}$/.test(r.v)) { sel.value = 'F'; sel.dispatchEvent(new Event('change', {bubbles:true})); }
       inp.value = r.v; plateTidy(inp);
       inp.style.outline = '2px solid #f39c34'; inp.style.outlineOffset = '-2px'; inp.dataset.chk = '1';
       if (typeof draftSoon === "function") draftSoon();
-      toast(`Plaque lue : ${inp.value} — vérifie`);
+      toast(`Plaque lue : ${inp.value}${r.pays ? ` (${r.pays})` : ''} — vérifie`);
     } catch (e) { console.error('[CIF] plaque', e); toast(e?.message === 'offline' ? 'Premier usage : il faut du réseau pour télécharger la lecture' : 'Lecture impossible'); }
     finally { btn.classList.remove('busy'); }
   }
