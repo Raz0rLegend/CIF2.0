@@ -2,6 +2,7 @@
 /* CIF 2.0 — v2.0.3 : plaque.js, lecture des plaques d'immatriculation et cadre commun à toutes les pièces.
    v2.0.4 : cadre et lecture adaptés aux plaques 2 roues (véhicule 2RM), plaques encadrées mieux lues.
    v2.0.5 / 2.0.6 : plus de texte sous les cadres (pièces, plaques).
+   v2.0.12 : lecture en direct dans la visée des plaques : la caméra se ferme seule dès que la plaque est lue.
    v2.0.10 / 2.0.11 : plaque repérée par ses bandes bleues (redressée si penchée, lecture de la seule zone des caractères) ; M/H et Y/V départagés par la forme de la lettre ; pays reconnu par la lettre de la bande bleue (F, I, D…).
    Chargé après outils.js (utilise sa visée, window.cifVisor). */
 /* ===== cadre pièce commun ===== */
@@ -68,6 +69,7 @@ try {
 
   /* ----- image ----- */
   async function load(f){
+    if (f instanceof HTMLCanvasElement) return f;   /* image de la caméra en direct */
     const url = URL.createObjectURL(f);
     try { return await new Promise((res,rej)=>{ const i = new Image(); i.onload = ()=>res(i); i.onerror = rej; i.src = url; }); }
     finally { setTimeout(()=>URL.revokeObjectURL(url), 1000); }
@@ -292,7 +294,7 @@ try {
   /* code lu sur la bande → code du menu Pays de la plaque (les mêmes, sauf quelques cas) */
   const BAND = {F:'F', I:'I', D:'D', E:'E', B:'B', NL:'NL', L:'L', P:'P', A:'A', IRL:'IRL', GR:'GR', PL:'PL', CZ:'CZ', SK:'SK', H:'H', SLO:'SLO', HR:'HR', RO:'RO', BG:'BG', LT:'LT', LV:'LV', EST:'EST', FIN:'FIN', S:'S', DK:'DK', M:'M', CY:'CY', CH:'CH', GB:'GB', UK:'GB'};
 
-  async function read(f, pays, moto){
+  async function read(f, pays, moto, quick){
     W ||= await engine();
     await W.setParameters({tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ', preserve_interword_spaces:'1'});
     let img = await load(f); const [iw, ih] = dims(img), texts = [];
@@ -308,16 +310,17 @@ try {
     const ocr = async (c, psm) => { await W.setParameters({tessedit_pageseg_mode:psm}); texts.push((await W.recognize(c)).data.text || ''); };
     const sure = () => { const r = vote(texts, pays, moto); return texts.length >= 2 && r && r.score >= 18; };
     /* lecture d'une ligne, plusieurs traitements d'image ; arrêt dès que deux lectures concordent */
-    const line = async src => { for (const [m, psm, clr] of [['max','7'],['lum','7'],['bin','7'],['max','6'],['lum','7',128],['max','7',200]]) { await ocr(prep(src, m, 200, clr), psm); if (sure()) return true; } };
+    /* en direct (quick) : moins de passes, une nouvelle image arrive aussitôt */
+    const line = async src => { for (const [m, psm, clr] of [['max','7'],['lum','7'],['bin','7'],['max','6'],['lum','7',128],['max','7',200]].slice(0, quick ? 3 : 6)) { await ocr(prep(src, m, 200, clr), psm); if (sure()) return true; } };
     /* photo recadrée par la visée (format plaque) : lecture directe ; sinon (photothèque, plaque petite) : recherche de la plaque */
     /* plaque 2 roues (cadre moto) : lecture d'un bloc de deux lignes */
-    const block = async src => { for (const [m, psm, clr] of [['max','6',128],['max','6',200],['lum','6',128],['lum','6',200],['max','6'],['lum','11',200]]) { await ocr(prep(src, m, 200, clr), psm); if (sure()) return true; } };
+    const block = async src => { for (const [m, psm, clr] of [['max','6',128],['max','6',200],['lum','6',128],['lum','6',200],['max','6'],['lum','11',200]].slice(0, quick ? 3 : 6)) { await ocr(prep(src, m, 200, clr), psm); if (sure()) return true; } };
     /* plaque repérée par ses bandes bleues : lecture de la seule zone des caractères (la plus fiable) */
     const zone = P ? cut(img, P.inner) : null;
     let done = zone ? (moto ? await block(zone) : await line(zone)) : false;
     if (!done) done = moto ? await block(img) : iw / ih > 2.4 && await line(img);
-    if (!done && !moto && !vote(texts, pays, moto)) for (const z of locate(img)) if (await line(cut(img, z))) break;
-    if (!vote(texts, pays, moto)) { await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '11'); await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '3'); }
+    if (!done && !quick && !moto && !vote(texts, pays, moto)) for (const z of locate(img)) if (await line(cut(img, z))) break;
+    if (!quick && !vote(texts, pays, moto)) { await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '11'); await ocr(prep(img, 'max', iw / ih > 2.4 ? 300 : 1400), '3'); }
     window.cifPlateDebug = texts;   /* mode test : lectures brutes, consultables depuis la console */
     const r = vote(texts, pays, moto);
     if (r) { if (zone || moto || iw / ih > 2.4) r.v = refine(r.v, zone || img, moto); r.pays = detected; }
@@ -325,11 +328,18 @@ try {
   }
 
   async function scan(f, btn){
-    const box = btn.closest('.veh'), inp = box.querySelector('[data-k=plaque]'), sel = box.querySelector('[data-k=pays]');
+    const box = btn.closest('.veh'), sel = box.querySelector('[data-k=pays]');
     btn.classList.add('busy'); toast('Lecture de la plaque…');
     try {
       const r = await read(f, sel.value, is2R(box));
       if (!r) return toast('Plaque non lue : rapproche-toi, de face, ou saisis-la');
+      fill(r, btn);
+    } catch (e) { console.error('[CIF] plaque', e); toast(e?.message === 'offline' ? 'Premier usage : il faut du réseau pour télécharger la lecture' : 'Lecture impossible'); }
+    finally { btn.classList.remove('busy'); }
+  }
+  function fill(r, btn){
+    const box = btn.closest('.veh'), inp = box.querySelector('[data-k=plaque]'), sel = box.querySelector('[data-k=pays]');
+    {
       /* pays lu sur la bande bleue : le menu Pays suit */
       if (r.pays && r.pays !== sel.value) { sel.value = r.pays; sel.dispatchEvent(new Event('change', {bubbles:true})); }
       /* 7 caractères AB123CD avec Monaco choisi : c'est une plaque française */
@@ -338,8 +348,44 @@ try {
       inp.style.outline = '2px solid #f39c34'; inp.style.outlineOffset = '-2px'; inp.dataset.chk = '1';
       if (typeof draftSoon === "function") draftSoon();
       toast(`Plaque lue : ${inp.value}${r.pays ? ` (${r.pays})` : ''} — vérifie`);
-    } catch (e) { console.error('[CIF] plaque', e); toast(e?.message === 'offline' ? 'Premier usage : il faut du réseau pour télécharger la lecture' : 'Lecture impossible'); }
-    finally { btn.classList.remove('busy'); }
+    }
+  }
+  /* ----- lecture en direct dans la visée -----
+     Pendant que la visée est ouverte, l'image du cadre est lue en boucle (lecture allégée). Dès que deux lectures
+     concordent (dans la même image ou sur deux images de suite), la plaque est remplie, le téléphone vibre et la
+     caméra se ferme. Le déclencheur reste utilisable à tout moment. */
+  const sleep = ms => new Promise(r=>setTimeout(r, ms));
+  function frameNow(V){
+    const video = V.querySelector('video'), frame = V.querySelector('.vf'), W0 = video.videoWidth, H0 = video.videoHeight; if (!W0 || !H0) return null;
+    const vr = video.getBoundingClientRect(), s = Math.max(vr.width / W0, vr.height / H0), ox = vr.left + (vr.width - W0*s)/2, oy = vr.top + (vr.height - H0*s)/2;
+    const r = frame.getBoundingClientRect(), mx = r.width * .04, my = r.height * .12;
+    let x = Math.max(0, (r.left - mx - ox)/s), y = Math.max(0, (r.top - my - oy)/s), w = Math.min(W0 - x, (r.width + 2*mx)/s), h = Math.min(H0 - y, (r.height + 2*my)/s);
+    if (w < 20 || h < 10) return null;
+    const k = Math.min(1, 1400 / w), c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+    c.getContext('2d').drawImage(video, x, y, w, h, 0, 0, c.width, c.height); return c;
+  }
+  function live(btn){
+    const V = document.getElementById('visor'), box = btn.closest('.veh'), sel = box.querySelector('[data-k=pays]'), moto = is2R(box);
+    let stop = false;
+    const open = () => V && !V.classList.contains('hidden');
+    const done = (async ()=>{
+      await sleep(600);   /* aucun texte sous le cadre (choix de Kevin) */
+      let last = null;
+      while (!stop && open()) {
+        const c = frameNow(V); if (!c) { await sleep(250); continue; }
+        let r = null; try { r = await read(c, sel.value, moto, true); } catch { await sleep(500); }
+        if (stop || !open()) break;
+        if (r && (r.score >= 18 || last === r.v)) {
+          stop = true; navigator.vibrate?.(80); fill(r, btn);
+          V.querySelector('.vx')?.click();   /* referme la caméra */
+          return true;
+        }
+        last = r ? r.v : null;
+        await sleep(120);
+      }
+      return false;
+    })();
+    return {stop: ()=>{ stop = true; }, done};
   }
   window.cifPlateRead = read;
   file.addEventListener('change', ()=>{ const f = file.files[0], b = target; file.value = ''; if (f && b) scan(f, b); });
@@ -348,7 +394,11 @@ try {
   document.addEventListener('click', async e=>{
     const b = e.target.closest('.pcam'); if (!b) return;
     if (!navigator.mediaDevices?.getUserMedia) return pick(b, true);
-    const r = await window.cifVisor(is2R(b.closest('.veh')) ? FMT2 : FMT, {key:'cifVisorPlaque', library:()=>pick(b, false), native:()=>pick(b, true)});
+    let L = null;
+    const p = window.cifVisor(is2R(b.closest('.veh')) ? FMT2 : FMT, {key:'cifVisorPlaque', library:()=>pick(b, false), native:()=>pick(b, true)});
+    try { W ||= await engine(); L = live(b); } catch {}
+    const r = await p;
+    if (L) { L.stop(); await L.done; }   /* une lecture en cours se termine avant la photo prise au déclencheur */
     if (r instanceof File) scan(r, b);
   });
   /* bouton ajouté à chaque champ Plaque */
