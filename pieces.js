@@ -155,6 +155,8 @@ try {
   const word = t => t.replace(/[^A-Za-zÀ-ÿ' -]/g,' ').replace(/\s+/g,' ').trim();
   function permisFields(text){
     const F = {};
+    /* bord de la carte lu comme un chiffre devant la rubrique (« 2 1. FLOHIC ») : retiré (v2.0.16) */
+    text = text.replace(/^[^\n]{1,4}?(?=(?:[1-5]|4\s?[a-dA-D])\s?[.,:;]\s+\S)/gm, m=>/^[^A-Za-z]*$/.test(m) ? '' : m);
     for (const raw of text.split(/\n/)) {
       const t = raw.trim();
       /* numéro de rubrique en début de ligne, parfois précédé de quelques signes parasites (« (ss 3. », « = a 4a ») */
@@ -247,12 +249,20 @@ try {
     if (mz && !F.num) F.num = mz[1];
     const n1 = texts.map(t=>permisFields(t)[1]).filter(Boolean), n2 = texts.map(t=>permisFields(t)[2]).filter(Boolean);
     if (n1.length) {
-      const core = commonPart(n1), comp = x => x.replace(/[^A-ZÀ-Ý]/g, '');
+      let core = commonPart(n1); const comp = x => x.replace(/[^A-ZÀ-Ý]/g, '');
+      core = core.split(' ').filter((w, i, a)=>a.length === 1 || w.replace(/[^A-ZÀ-Ý]/g, '').length > 1 || (i > 0 && i < a.length - 1)).join(' ');
       /* nom de la bande contenu dans la lecture : c'est lui (sauf s'il est coupé à 8 lettres) */
-      F[1] = ref && comp(core).includes(comp(ref)) ? (cut ? core.slice(core.replace(/[^A-ZÀ-Ý]/g, ' ').indexOf(ref[0])) : ref) : core;
+      /* nom de la bande proche de la lecture (une ou deux lettres de différence, « FYOHICS ») : c'est lui (v2.0.16) */
+      const lev = (x, y) => { const d = Array.from({length:x.length + 1}, (_, i)=>[i]); for (let j = 1; j <= y.length; j++) d[0][j] = j;
+        for (let i = 1; i <= x.length; i++) for (let j = 1; j <= y.length; j++) d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (x[i-1] === y[j-1] ? 0 : 1)); return d[x.length][y.length]; };
+      const near = (x, y) => { if (y.length < 4) return false; const thr = y.length >= 6 ? 2 : 1;
+        for (let i = 0; i < x.length; i++) for (const L of [y.length - 1, y.length, y.length + 1]) if (i + L <= x.length && lev(x.slice(i, i + L), y) <= thr) return true; return false; };
+      F[1] = ref && comp(core).includes(comp(ref)) ? (cut ? core.slice(core.replace(/[^A-ZÀ-Ý]/g, ' ').indexOf(ref[0])) : ref) : ref && !cut && near(comp(core), comp(ref)) ? ref : core;
     }
     if (n2.length) {
       const core = commonPart(n2), P = await prenoms(), ws = core.split(' ').filter(Boolean);
+      while (ws.length > 1 && ws[ws.length - 1].replace(/[^A-ZÀ-Ý]/g, '').length <= 1) ws.pop();   /* symbole lu comme une lettre isolée (« KEVIN A ») */
+      while (ws.length > 1 && ws[0].replace(/[^A-ZÀ-Ý]/g, '').length <= 1) ws.shift();
       if (ws.length && !P.has(pkey(ws[0]))) {
         /* on n'enlève que des caractères que le symbole produit d'habitude, une lettre devant, une ou deux derrière */
         const w = ws[0], tries = [[1,0],[0,1],[1,1],[0,2],[1,2]], lead = /^[SÉÈÊË«"“'^X]$/, tail = /^[SAEÉÈ«"”'^]+$/;
@@ -655,7 +665,9 @@ try {
         }
         const F = merge(texts, permisFields), n = ['1','2','dn'].filter(k=>F[k]).length + (F.num ? 1 : 0);
         const PERMIS = /PERMIS|LICEN[CS]E|F[ÜU]HRER|PATENTE|CONDU[CÇ]|RIJBEWIJS|K[ÖO]RKORT|PRAWO|^\W{0,3}4\s?[abc]\b/im;
-        if (!r && (n < 2 || !texts.some(t=>PERMIS.test(t)))) {   /* pas d'en-tête de permis : carte d'identité, même si des dates ressemblent aux rubriques */
+        /* en-tête illisible (image de la caméra) : permis reconnu aussi à ses rubriques 1, 2, 3 et 4a/4b (v2.0.16) */
+        const rub = F[1] && F[2] && F.dn && (F.del || F.exp);
+        if (!r && (n < 2 || !(rub || texts.some(t=>PERMIS.test(t))))) {   /* pas d'en-tête de permis : carte d'identité, même si des dates ressemblent aux rubriques */
           const V = merge(texts, versoFields);
           if (V.rue || V.cp || V.del || V.exp) {
             const got = await fillVerso(V);
