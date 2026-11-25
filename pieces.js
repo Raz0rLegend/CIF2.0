@@ -217,6 +217,50 @@ try {
     return F;
   }
   /* Pays de délivrance d'après l'en-tête imprimé (permis et cartes sans bande) */
+  /* v2.0.15 — Permis : petits symboles avant et après le nom et le prénom (permis français), lus comme une lettre
+     de trop (« ÉFLOHICA », « SFLOHICS », « KEVINS »). On garde la partie commune aux lectures, le nom de la bande du bas
+     (« D1FRA… FLOHIC<< ») quand il est lisible, et pour le prénom la forme connue de la liste des prénoms. */
+  let PREN = null;
+  const prenoms = () => PREN || (PREN = new Promise(res=>{
+    const done = () => res(new Set(((window.PRENOMS_M||'') + '|' + (window.PRENOMS_F||'')).split('|').filter(Boolean)));
+    if (window.PRENOMS_M) return done();
+    const sc = document.createElement('script'); sc.src = 'prenoms.js?v=' + (window.CIF?.version || ''); sc.onload = done; sc.onerror = () => res(new Set()); document.head.appendChild(sc);
+  }));
+  const pkey = w => w.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  /* partie commune : la plus longue chaîne présente dans au moins 2/3 des lectures */
+  function commonPart(cands){
+    const C = cands.map(c=>c.toUpperCase().replace(/[^A-ZÀ-Ý' -]/g, '').replace(/\s+/g, ' ').trim()).filter(c=>c.length >= 2);
+    if (C.length < 2) return C[0] || '';
+    const need = C.length <= 2 ? C.length : Math.ceil(C.length * 2 / 3);
+    let best = '';
+    for (const c of C) for (let i = 0; i < c.length; i++) for (let j = c.length; j - i > best.length; j--) {
+      const sub = c.slice(i, j).trim(); if (sub.length <= best.length || sub.length < 2) continue;
+      if (C.filter(x=>x.includes(sub)).length >= need) { best = sub; break; }
+    }
+    return best.length >= 3 ? best : C[0];
+  }
+  async function permisNames(F, texts, r){
+    const all = texts.join('\n');
+    /* bande du bas du permis lue dans le texte : D1FRA + numéro (9) + clé et date + nom */
+    const mz = /D[1I]FRA([0-9A-Z]{9})\d{6,7}([A-Z]{2,})/.exec(all.toUpperCase().replace(/[\s«»"“”']/g, ''));
+    const ref = (r && r.nom) || (mz && mz[2]) || '', cut = r && r.nom ? r.cut : ref.length >= 8;
+    if (mz && !F.num) F.num = mz[1];
+    const n1 = texts.map(t=>permisFields(t)[1]).filter(Boolean), n2 = texts.map(t=>permisFields(t)[2]).filter(Boolean);
+    if (n1.length) {
+      const core = commonPart(n1), comp = x => x.replace(/[^A-ZÀ-Ý]/g, '');
+      /* nom de la bande contenu dans la lecture : c'est lui (sauf s'il est coupé à 8 lettres) */
+      F[1] = ref && comp(core).includes(comp(ref)) ? (cut ? core.slice(core.replace(/[^A-ZÀ-Ý]/g, ' ').indexOf(ref[0])) : ref) : core;
+    }
+    if (n2.length) {
+      const core = commonPart(n2), P = await prenoms(), ws = core.split(' ').filter(Boolean);
+      if (ws.length && !P.has(pkey(ws[0]))) {
+        /* on n'enlève que des caractères que le symbole produit d'habitude, une lettre devant, une ou deux derrière */
+        const w = ws[0], tries = [[1,0],[0,1],[1,1],[0,2],[1,2]], lead = /^[SÉÈÊË«"“'^X]$/, tail = /^[SAEÉÈ«"”'^]+$/;
+        for (const [a, b] of tries) { const v = w.slice(a, w.length - b); if (v.length >= 3 && (!a || lead.test(w[0])) && (!b || tail.test(w.slice(w.length - b))) && P.has(pkey(v))) { ws[0] = v; break; } }
+      }
+      F[2] = cap(ws.join(' '));
+    }
+  }
   function paysDoc(text){
     const u = text.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z]/g,'');
     if (/PATENTEDIGUIDA|REPUBBLICAITALIANA|REPUBBLICA|CARTADIIDENTITA/.test(u)) return 'IT';
@@ -286,6 +330,53 @@ try {
   }
   window.labelFields = (...a) => labelFields(...a);
   /* Recto d'une carte d'identité, d'un passeport ou d'un titre de séjour : lieu de naissance (absent de la bande) */
+  /* v2.0.15 — Ancienne carte d'identité : le petit « à : » devant le lieu est souvent illisible (« + 0 NICE »).
+     Le lieu est le mot en majuscules de la ligne qui suit la date de naissance, avant « Taille ». */
+  function ancienLieu(texts, dn){
+    const d = (dn || '').split('/'), re = d.length === 3 ? new RegExp(d[0] + '\\D{0,4}' + d[1] + '\\D{0,4}' + d[2]) : null, votes = {};
+    for (const t of texts) {
+      const L = t.split(/\n/).map(x=>x.trim()).filter(Boolean);
+      const i = L.findIndex(x=>re ? re.test(x) : /N[ée]\S*\s*le/i.test(x));
+      if (i < 0) continue;
+      for (const x of L.slice(i + 1, i + 3)) {
+        if (/taille|signat|<</i.test(x)) break;
+        const w = (x.match(/[A-ZÀ-Ý][A-ZÀ-Ý' -]*[A-ZÀ-Ý]/g) || []).map(y=>y.trim()).filter(y=>/[A-ZÀ-Ý]{3}/.test(y) && y.split(/[ '-]+/).every(z=>z.length >= 2)).sort((a,b)=>b.length - a.length)[0];
+        if (w) { const v = cap(w.toLowerCase()); votes[v] = (votes[v] || 0) + 1; break; }
+      }
+    }
+    return Object.keys(votes).sort((a,b)=>votes[b] - votes[a])[0] || '';
+  }
+  /* Si le texte entier ne l'a pas donné : on repère la date de naissance dans l'image et on relit, agrandie,
+     la zone juste en dessous à gauche (« à : NICE »), où le lieu est imprimé sur toutes les anciennes cartes. */
+  async function ancienLieuZone(file, dn){
+    const d = (dn || '').split('/'); if (d.length !== 3) return '';
+    const w = await getFra(), c = clean(await toCanvas(file, 2400, ''));
+    await w.setParameters({tessedit_pageseg_mode:'6'});
+    const lines = ((await w.recognize(c, {}, {blocks:true})).data.blocks || []).flatMap(b=>(b.paragraphs||[]).flatMap(p=>p.lines||[]));
+    let box = null;
+    for (const l of lines) {
+      const ws = (l.words || []).filter(x=>/\d/.test(x.text)), t = ws.map(x=>x.text).join('').replace(/\D/g,'');
+      if (!ws.length || !(t.includes(d[0] + d[1] + d[2]) || t.endsWith(d[1] + d[2]))) continue;
+      const k = ws.findIndex((x, i)=>ws.slice(i).map(y=>y.text).join('').replace(/\D/g,'').length <= 10), g = ws.slice(Math.max(0, k));
+      box = {x0: Math.min(...g.map(x=>x.bbox.x0)), x1: Math.max(...g.map(x=>x.bbox.x1)), y0: Math.min(...g.map(x=>x.bbox.y0)), y1: Math.max(...g.map(x=>x.bbox.y1))};
+      break;
+    }
+    if (!box) return '';
+    const W = box.x1 - box.x0, H = box.y1 - box.y0;
+    const x0 = Math.max(0, box.x0 - 2.8*W), y0 = box.y1 + .1*H, cw = Math.min(c.width - x0, 3*W), ch = Math.min(c.height - y0, 1.6*H);
+    if (cw < 20 || ch < 10) return '';
+    const o = document.createElement('canvas'), k = Math.max(1, Math.min(3, 120 / ch)); o.width = cw*k; o.height = ch*k;
+    const g = o.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, o.width, o.height); g.drawImage(c, x0, y0, cw, ch, 0, 0, o.width, o.height);
+    const votes = {};
+    for (const psm of ['7', '6']) {
+      await w.setParameters({tessedit_pageseg_mode:psm});
+      const t = (await w.recognize(o)).data.text || '';
+      const v = (t.match(/[A-ZÀ-Ý][A-ZÀ-Ý' -]*[A-ZÀ-Ý]/g) || []).map(y=>y.trim()).filter(y=>y.replace(/[^A-ZÀ-Ý]/g,'').length >= 3 && !/^TAILLE/.test(y)).sort((a,b)=>b.length - a.length)[0];
+      if (v) votes[v] = (votes[v] || 0) + 1;
+    }
+    const v = Object.keys(votes).sort((a,b)=>votes[b] - votes[a])[0];
+    return v ? cap(v.toLowerCase()) : '';
+  }
   function lieuFields(text){
     const L = text.split(/\n/).map(x=>x.trim()).filter(Boolean), out = {};
     const clean = t => { const w = word(t.replace(/\([^)]*\)/g,'')).replace(/\b(lieu|de|naissance|place|of|birth|luogo|di|nascita|lugar|nacimiento|geburtsort)\b/gi,'').trim(); return w.length >= 2 ? cap(w) : ''; };
@@ -510,7 +601,7 @@ try {
   function fillPermis(r, F){
     const got = [];
     const put = (id, v, lbl) => { const el = $('#'+id); if (!el || !v) return; el.value = v; mark(id); got.push(lbl); };
-    if (F[1] && (!r.nom || F[1].replace(/\s/g,'').startsWith(r.nom.replace(/\s/g,'')))) { if (!r.nom || F[1].length > r.nom.length) put('f_nom', F[1], 'nom'); }
+    if (F[1] && (!r.nom || F[1].replace(/\s/g,'').startsWith(r.nom.replace(/\s/g,'')))) { if (!r.nom || (r.cut && F[1].length > r.nom.length)) put('f_nom', F[1], 'nom'); }
     put('f_prenom', F[2], 'prénom'); put('f_dateNaissance', F.dn, 'date de naissance');
     if (F.lieu && $('#f_naisVille')) { $('#f_naisVille').value = F.lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); got.push('lieu de naissance'); }
     put('f_docDate', F.del, 'date de délivrance'); put('f_docExp', F.exp, 'date d\'expiration'); put('f_docLieu', F.aut, 'autorité');
@@ -619,6 +710,7 @@ try {
           status('Rien de lisible. Passeport : page photo · carte d\'identité : les deux faces, l\'une après l\'autre · titre de séjour : face avec les lignes « <<< » · permis : recto. Pièce à plat, nette, sans reflet, cadrée de près.'); return;
         }
         if (r) fill(r);
+        try { await permisNames(F, texts, r); } catch (e) { console.warn('[CIF] permis', e); }
         const got = fillPermis(r || {}, F);
         status(`${r && r.ok ? '✓ Permis lu (nom et numéro sûrs)' : '⚠ Permis lu sans bande : tout vérifier'}` + (got.length ? ` · à vérifier, en orange : ${got.join(', ')}` : ' · champs du permis illisibles : prénom et date de naissance à saisir'));
         toast('Permis lu : vérifie les champs en orange');
@@ -633,6 +725,12 @@ try {
         texts = await readText(file, ['6']);
         if (r.kind !== 'TD1') lieu = merge(texts, lieuFields).lieu || '';
         else { const V = merge(texts, versoFields); delete V.exp; vgot = await fillVerso(V); }
+        if (!lieu && r.kind === 'FR') {
+          /* lieu lu dans le texte gardé seulement s'il est dans la liste des communes, sinon relecture de la zone */
+          const t = ancienLieu(texts, r.dn); let ok = false;
+          if (t) try { const C = await loadCities(), set = C._set ||= new Set(C.nk.map(x=>x.trim())); ok = set.has(norm(t).replace(/[-'’]/g,' ').trim()); } catch {}
+          lieu = ok ? t : await ancienLieuZone(file, r.dn).catch(()=>'');
+        }
       } catch {}
       if (lieu && $('#f_naisVille')) { $('#f_naisVille').value = lieu; if (window.naisJoin) naisJoin(); mark('f_naisVille'); draftSoon(); }
       status(`${r.ok ? '✓ Lu' : '⚠ Lecture incertaine, vérifie les champs'} : ${KIND[r.type] || 'document'} ${r.pays.replace(/</g,'')} — ${r.nom} ${r.prenom}` + (vgot.length ? ` · à vérifier, en orange : ${vgot.join(', ')}` : '') + (lieu ? ` · lieu de naissance « ${lieu} » à vérifier (orange)` : ' · lieu de naissance absent de cette face : scanne aussi l\'autre face'));
