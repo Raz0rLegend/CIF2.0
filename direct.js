@@ -5,7 +5,8 @@
    Dès que la lecture est sûre (bande « <<< » avec ses chiffres de contrôle justes, ou deux lectures identiques du nom
    et de la date de naissance), le téléphone vibre, la caméra se ferme et la fiche est remplie par la lecture habituelle,
    à partir de cette même image. Le déclencheur reste disponible. Rien n'est envoyé ni gardé.
-   v2.0.14 : recto puis verso à la suite ; contrôle express par la plaque (bouton bleu au-dessus du « + »). */
+   v2.0.14 : recto puis verso à la suite ; contrôle express par la plaque (bouton bleu au-dessus du « + »).
+   v2.0.16 : permis reconnu à ses rubriques quand l'en-tête est mal lu ; nom et prénom stabilisés d'une image à l'autre. */
 try {
 (()=>{
   const btn = document.getElementById('mrzBtn'), inp = document.getElementById('mrzFile');
@@ -18,7 +19,7 @@ try {
     const src = await (await fetch(`pieces.js?v=${window.CIF?.version || ''}`)).text();
     const a = src.indexOf('  /* ----- Analyse de la bande ----- */'), b = src.indexOf('  /* ----- Formulaire ----- */');
     if (a < 0 || b < a) throw new Error('lecture');
-    P = new Function(`'use strict';\n${src.slice(a, b).replace(/^\s*window\.\w+\s*=.*$/gm, '')}\nreturn {parse, iso2, toCanvas, clean, crop, isRecto, rectoFields, permisFields, versoFields, labelFields, genericFields, paysDoc};`)();
+    P = new Function(`'use strict';\n${src.slice(a, b).replace(/^\s*window\.\w+\s*=.*$/gm, '')}\nreturn {parse, iso2, toCanvas, clean, crop, isRecto, rectoFields, permisFields, versoFields, labelFields, genericFields, paysDoc, permisNames, commonPart};`)();
     return P;
   }
   /* moteurs de lecture (les mêmes modèles que pour les pièces, déjà gardés sur le téléphone) */
@@ -81,7 +82,13 @@ try {
     const t = (await fw.recognize(P.clean(await P.toCanvas(file, 1800, ''), 'max'))).data.text || '';
     const PERMIS = /PERMIS|LICEN[CS]E|F[ÜU]HRER|PATENTE|CONDU[CÇ]|RIJBEWIJS|^\W{0,3}4\s?[abc]\b/im;
     if (P.isRecto(t)) { const R = P.rectoFields(t); return {type:'CNI', F:{nom:R.nom, prenom:R.prenom, dn:R.dn, lieu:R.lieu, sexe:R.sexe, nat:R.nat || (P.paysDoc(t) === 'MC' ? 'MCO' : 'FRA'), num:R.num || R.numJ, exp:R.exp}}; }
-    if (PERMIS.test(t) || (r && r.type === 'PC')) { const F = P.permisFields(t); return {type:'PC', F:{nom:F[1] || r?.nom, prenom:F[2] || r?.prenom, dn:F.dn, lieu:F.lieu, num:r?.num || F.num, del:F.del, exp:F.exp}}; }
+    /* permis : en-tête souvent mal lu sur une image de la caméra (« FERMID DE LUNDUIKE ») → reconnu aussi à ses rubriques numérotées */
+    const F = P.permisFields(t), np = ['1','2','dn','del','exp','num'].filter(k=>F[k]).length;
+    if (PERMIS.test(t) || (r && r.type === 'PC') || (np >= 3 && (F[1] || F[2]))) {
+      const raw = {nom:F[1], prenom:F[2]};
+      try { await P.permisNames(F, [t], r); } catch {}
+      return {type:'PC', raw, F:{nom:F[1] || r?.nom, prenom:F[2] || r?.prenom, dn:F.dn, lieu:F.lieu, num:r?.num || F.num, del:F.del, exp:F.exp}};
+    }
     const B = P.labelFields(t); if (B.nom && (B.dn || B.prenom)) return {type:'CNI', F:{nom:B.nom, prenom:B.prenom, dn:B.dn, lieu:B.lieu, sexe:B.sexe, nat:B.nat, num:B.num, exp:B.exp}};
     const G = P.genericFields(t); if (G.nat && (G.nom || G.dn)) return {type:'CNI', F:{nom:G.nom, prenom:G.prenom, dn:G.dn, sexe:G.sexe, nat:G.nat, num:G.num, exp:G.exp}};
     const V = P.versoFields(t); if (V.rue || V.cp) return {type:'verso', F:{adr:[V.rue, V.cp, V.ville].filter(Boolean).join(' '), del:V.del, exp:V.exp}};
@@ -107,12 +114,17 @@ try {
     let stop = false;
     const open = () => !V.classList.contains('hidden');
     const done = (async ()=>{
-      await sleep(700); let prev = null;
+      await sleep(700); let prev = null; const HN = [], HP = [];
       while (!stop && open()) {
         const c = frameNow(V); if (!c) { await sleep(300); continue; }
         const f = await toFile(c); let a = null;
         try { a = f && await analyze(f); } catch { await sleep(600); }
         if (stop || !open()) break;
+        /* permis : symboles autour du nom et du prénom lus différemment d'une image à l'autre → on garde la partie commune */
+        if (a && a.type === 'PC' && a.raw) {
+          if (a.raw.nom) { HN.push(a.raw.nom); if (HN.length > 4) HN.shift(); if (HN.length >= 2) { const c = P.commonPart(HN); if (c && c.length >= 2 && a.F.nom === a.raw.nom) a.F.nom = c; } }
+          if (a.raw.prenom) { HP.push(a.raw.prenom); if (HP.length > 4) HP.shift(); if (HP.length >= 2 && a.F.prenom === a.raw.prenom) { const c = P.commonPart(HP.map(x=>x.toUpperCase())); if (c && c.length >= 2) a.F.prenom = c[0] + c.slice(1).toLowerCase(); } }
+        }
         place(); const ok = a && (a.sure || same(a, prev)); show(box, a, prev, ok);
         if (ok) { stop = true; navigator.vibrate?.(80); await sleep(450); box.innerHTML = ''; V.querySelector('.vx')?.click(); return f; }
         prev = a; await sleep(100);
