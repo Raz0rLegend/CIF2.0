@@ -94,9 +94,17 @@ try {
 
   /* v2.0.18 : nature de l'appel saisie tout de suite (champ libre + choix rapides), modifiable depuis le bandeau.
      Gardée comme l'heure de l'appel, sur le téléphone, jusqu'à l'ouverture de la fiche : elle devient le motif. */
-  const NAT = ['AVP corporel', 'AVP matériel', 'Altercation verbale', 'Altercation physique'];
-  document.body.insertAdjacentHTML('beforeend', `<div id="ivNat" class="hidden"><div class="box"><h3></h3>
-    <input id="ivNatIn" autocomplete="off" spellcheck="false" autocapitalize="sentences" placeholder="Nature de l'appel (accident, altercation…)">
+  const NAT = ['AVP corporel', 'AVP matériel', 'Altercation verbale', 'Altercation physique', 'VIF', 'Différend familial', 'Trouble à l\'ordre public'];
+  /* natures plus rares : proposées dès les premières lettres tapées (les natures écrites à la main s'y ajoutent) */
+  SG_BASE.natures = [...NAT, 'Accident du travail', 'Accident de deux-roues', 'Chute de personne', 'Malaise sur la voie publique', 'Personne en détresse',
+    'Personne vulnérable', 'Personne disparue', 'Mineur en fugue', 'Ivresse publique (IPM)', 'Rixe', 'Violences', 'Violences sur mineur', 'Menaces', 'Outrage',
+    'Rébellion', 'Harcèlement', 'Exhibitionnisme', 'Différend de voisinage', 'Tapage nocturne', 'Tapage diurne', 'Bruit de voisinage', 'Vol à l\'étalage',
+    'Vol à la tire', 'Vol à l\'arraché', 'Vol de véhicule', 'Vol dans véhicule', 'Cambriolage', 'Tentative de cambriolage', 'Dégradations', 'Tags / graffitis',
+    'Escroquerie', 'Délit de fuite', 'Refus d\'obtempérer', 'Conduite dangereuse', 'Rodéo urbain', 'Stationnement gênant', 'Véhicule ventouse', 'Individu suspect',
+    'Véhicule suspect', 'Colis suspect', 'Port d\'arme', 'Stupéfiants', 'Mendicité', 'Squat', 'Alarme', 'Incendie', 'Dégât des eaux', 'Animal errant',
+    'Animal dangereux', 'Objet trouvé', 'Découverte de corps', 'Tentative de suicide', 'Personne agitée', 'Trouble au voisinage', 'Nuisances', 'Rassemblement'];
+  document.body.insertAdjacentHTML('beforeend', `<div id="ivNat" class="hidden"><div class="box body" style="overflow:visible;position:relative"><h3></h3>
+    <input id="ivNatIn" data-sg="natures" autocomplete="off" spellcheck="false" autocapitalize="sentences" placeholder="Nature de l'appel (accident, altercation…)">
     <div class="natc">${NAT.map(n=>`<button type="button" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
     <div class="natb"><button type="button" class="no">Plus tard</button><button type="button" class="ok">Enregistrer</button></div></div></div>`);
   let natFor = null;
@@ -106,7 +114,10 @@ try {
   }
   async function natDone(ok){
     const s = natFor; natFor = null; $('#ivNat').classList.add('hidden'); $('#ivNatIn').blur();
-    if (ok && s) { const v = $('#ivNatIn').value.trim(); if (v) s.nature = v; else delete s.nature; await save(); }
+    sgHide();
+    if (ok && s) { const v = $('#ivNatIn').value.trim(); if (v) s.nature = v; else delete s.nature; await save();
+      /* nature écrite à la main : proposée la prochaine fois (si l'appli est déverrouillée) */
+      if (v && KEY && !sgList('natures').some(x=>norm(x) === norm(v))) { (LEARN.natures ||= []).push(v); saveLearn().catch(()=>{}); } }
     lockInfo(); if (KEY && !EDIT) render();
   }
   $('#ivNat .ok').onclick = ()=>natDone(true);
