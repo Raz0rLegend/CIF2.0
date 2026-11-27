@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v2.0.17 : secours.js, secours intervenus sur la fiche (pompiers, SMUR).
+/* CIF 2.0 — v2.0.17 / 2.0.18 : secours.js, secours intervenus sur la fiche (pompiers, SMUR).
    Case « Secours » dans le contexte : Pompiers (chef d'agrès et chef des opérations de secours, grade et nom) et/ou
    SMUR (nom du médecin). Les noms déjà saisis sont proposés à la frappe (le grade connu revient avec le nom).
    Réglable à la création comme après l'enregistrement (bouton dans la fiche). Une personne ajoutée au même contrôle
@@ -18,6 +18,9 @@ try {
 #secBox .secRow select{flex:0 0 92px}
 #secBox .secRow input{flex:1;min-width:0}
 #secBox .secRow .dr{flex:0 0 auto;font-weight:600;color:var(--muted)}
+.secI{display:inline-flex;vertical-align:-3px;margin:0 3px;font-size:17px;line-height:1}
+.secI.gyro{filter:hue-rotate(215deg) saturate(1.5)}
+.secI svg{width:17px;height:17px}
 </style>`);
   const wrap = document.createElement('div');
   wrap.innerHTML = `<label class="switch" style="margin-top:14px"><input type="checkbox" id="f_secours"><span class="sw"></span><span class="swl">Secours</span></label>
@@ -34,7 +37,9 @@ try {
     <div class="secRow"><span class="dr">Dr</span><input id="sec_med" data-sg="medecins" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="Nom du médecin"></div>
   </div>
 </div>`;
-  obs.after(...wrap.childNodes);
+  /* v2.0.18 : à l'endroit du résultat (juste sous la ligne Résultat / Antécédents) */
+  const res = document.getElementById('f_resultat'), anchor = res?.closest('.cr') || res || obs;
+  anchor.after(...wrap.childNodes);
   const $s = id => document.getElementById(id);
   const ST = {sp:false, smur:false};
   function sync(){
@@ -114,20 +119,29 @@ try {
       if (!s || !(s.sp || s.smur) || /sapeurs-pompiers sont intervenus|Le SMUR est intervenu/.test(t)) return t;
       return t + '\n\n' + phrase(s); }; }
 
-  /* Fiche enregistrée : bloc Secours avec bouton pour régler, ou bouton pour en ajouter */
+  /* Icônes dans le titre : gyrophare bleu (pompiers), croix verte (SMUR) */
+  const GYRO = '<span class="secI gyro" title="Pompiers">🚨</span>';
+  const CROSS = '<span class="secI" title="SMUR"><svg viewBox="0 0 24 24"><path fill="#1fae4b" d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z"/></svg></span>';
+  const icons = f => (f.secours?.sp ? GYRO : '') + (f.secours?.smur ? CROSS : '');
+  { const _r = render; render = function(){ _r();
+      document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id === c.dataset.id), ic = f && icons(f); if (ic) c.querySelector('.name')?.insertAdjacentHTML('beforeend', ic); });
+    }; }
+
+  /* Fiche enregistrée : réglage des secours à côté du résultat, bloc Secours sous l'en-tête */
   function editSec(f){
     closeDetail(); openForm(f);
     if (!$s('f_secours').checked) { $s('f_secours').checked = true; ST.sp = true; sync(); }
-    setTimeout(()=>$s('f_secours').closest('label').scrollIntoView({block:'start', behavior:'smooth'}), 80);
+    setTimeout(()=>$s('f_secours').closest('label').scrollIntoView({block:'center', behavior:'smooth'}), 80);
   }
   { const _od = openDetail; openDetail = async function(f){ await _od(f); if (DETAIL !== f.id) return;
       const body = document.getElementById('detBody'); if (!body) return;
-      const s = f.secours, btn = `<button type="button" class="secEdit" style="margin-left:auto;border:0;background:none;color:#7fb3ff;font-size:14px;padding:0 2px">${s && (s.sp || s.smur) ? 'Régler' : '＋ Secours'}</button>`;
-      const html = s && (s.sp || s.smur) ? panel('Secours', rows(s), btn) : `<div style="display:flex;justify-content:flex-end;margin-top:8px">${btn}</div>`;
-      const ctx = [...body.querySelectorAll('section.panel')].find(x=>x.querySelector('h4 span')?.textContent === 'Contexte');
-      const last = [...body.querySelectorAll('section.panel')].pop();
-      if (ctx) ctx.insertAdjacentHTML('afterend', html); else if (last) last.insertAdjacentHTML('afterend', html); else body.insertAdjacentHTML('beforeend', html);
-      body.querySelector('.secEdit').onclick = ()=>editSec(FICHES.find(x=>x.id === f.id) || f);
+      const s = f.secours, on = !!(s && (s.sp || s.smur)), ic = icons(f);
+      if (ic) { const t = document.getElementById('detTitle'), b = [...t.querySelectorAll('.badge')].pop(); b ? b.insertAdjacentHTML('afterend', ic) : t.insertAdjacentHTML('afterbegin', ic); }
+      const chip = `<button type="button" class="chip secEdit" style="${on ? 'border:1px solid #3a5f9e;color:#cfe0ff' : 'border:1px dashed #666;color:#bdbdbd'}">${on ? `${ic} Secours` : '＋ Secours'}</button>`;
+      const verif = body.querySelector('#detVerif'), chips = body.querySelector('.hero .chips2');
+      verif ? verif.insertAdjacentHTML('afterend', chip) : chips?.insertAdjacentHTML('beforeend', chip);
+      if (on) body.querySelector('.hero')?.insertAdjacentHTML('afterend', panel('Secours', rows(s), '<button type="button" class="secEdit" style="margin-left:auto;border:0;background:none;color:#7fb3ff;font-size:14px;padding:0 2px">Régler</button>'));
+      body.querySelectorAll('.secEdit').forEach(b=>b.onclick = ()=>editSec(FICHES.find(x=>x.id === f.id) || f));
     }; }
 })();
 } catch (e) { console.error('[CIF] secours', e); setTimeout(()=>{ throw e; }); }
