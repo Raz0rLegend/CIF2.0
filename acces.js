@@ -59,12 +59,23 @@ try {
 .ivBan .ivDrop{color:#e7a49e;font-size:14px;padding:6px}
 #intHint{font-size:13px;color:#ff8a80;margin-top:6px}
 #ivAppel.hidden,#intUnlock.hidden{display:none}
+#ivNat{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:calc(70px + env(safe-area-inset-top)) 16px 16px}
+#ivNat.hidden{display:none}
+#ivNat .box{width:min(100%,460px);background:var(--panel);border:1px solid #8a1f1f;border-radius:16px;padding:16px}
+#ivNat h3{margin:0 0 10px;color:#ff8a80;font-size:18px}
+#ivNat input{width:100%}
+#ivNat .natc{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#ivNat .natc button{padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:inherit;font-size:14px}
+#ivNat .natb{display:flex;gap:10px;margin-top:14px}
+#ivNat .natb button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:none;color:inherit;font-size:16px}
+#ivNat .natb .ok{background:#d32f2f;border-color:#d32f2f;color:#fff;font-weight:700}
+.ivBan .ivNatB{color:#ffd0cc;font-size:13px;border:1px dashed #8a1f1f!important;border-radius:999px;padding:4px 9px!important}
 </style>`);
-  $('#forgot').insertAdjacentHTML('beforebegin', `<button id="interBtn" type="button" aria-label="Intervention : figer l'heure de l'appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg><span>INTERVENTION<small>figer l'heure de l'appel du PC</small></span></button><div id="ivLock" class="hidden"></div>`);
+  $('#forgot').insertAdjacentHTML('beforebegin', `<button id="interBtn" type="button" aria-label="Intervention : appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg><span>INTERVENTION<small>appel du PC</small></span></button><div id="ivLock" class="hidden"></div>`);
   /* Doublon sur la liste des fiches, en bas à gauche face au bouton + */
-  $('#fab').insertAdjacentHTML('afterend', `<button id="interFab" type="button" aria-label="Intervention : figer l'heure de l'appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg>INTER</button>`);
+  $('#fab').insertAdjacentHTML('afterend', `<button id="interFab" type="button" aria-label="Intervention : appel du PC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 18h14v3H5z"/><path d="M12 2v2M4.2 5.2l1.4 1.4M19.8 5.2l-1.4 1.4M2 12h2M20 12h2"/></svg>INTER</button>`);
   /* Écran du code : bouton visible au déverrouillage (pas à la création du code), rappel des appels figés */
-  const lockInfo = () => { const el = $('#ivLock'); el.textContent = INTERV.length ? `🚨 Appel${INTERV.length>1?'s':''} PC figé${INTERV.length>1?'s':''} : ${INTERV.map(x=>hm(x.at)).join(', ')}` : ''; el.classList.toggle('hidden', !INTERV.length || lockMode !== 'unlock'); };
+  const lockInfo = () => { const el = $('#ivLock'); el.textContent = INTERV.length ? `🚨 Appel${INTERV.length>1?'s':''} PC : ${INTERV.map(x=>hm(x.at) + (x.nature ? ` (${x.nature})` : '')).join(', ')}` : ''; el.classList.toggle('hidden', !INTERV.length || lockMode !== 'unlock'); };
   $('#interBtn').classList.toggle('hidden', lockMode === 'setup');
   { const _sl = showLock; showLock = function(setup){ const r = _sl(setup); $('#interBtn').classList.toggle('hidden', !!setup); lockInfo(); return r; }; }
 
@@ -72,8 +83,8 @@ try {
     const mins = Math.max(0, Math.round((Date.now() - s.ts)/6e4));
     const ago = mins < 1 ? 'à l\'instant' : mins < 60 ? `il y a ${mins} min` : mins < 1440 ? `il y a ${Math.round(mins/60)} h` : `le ${fmtD(s.ts)}`;
     return `<div class="ivBan" data-iv="${s.id}"><span style="font-size:20px">🚨</span>
-      <button type="button" class="ivOpen"><b>Intervention — appel PC à ${hm(s.at)}</b><br><small>${esc(fmtDT(s.at))} · ${ago} · ouvrir la fiche</small></button>
-      <button type="button" class="ivDrop">Annuler</button></div>`;
+      <button type="button" class="ivOpen"><b>${s.nature ? esc(s.nature) : 'Intervention'} — appel PC à ${hm(s.at)}</b><br><small>${esc(fmtDT(s.at))} · ${ago} · ouvrir la fiche</small></button>
+      ${s.nature ? '' : '<button type="button" class="ivNatB">＋ Nature</button>'}<button type="button" class="ivDrop">Annuler</button></div>`;
   }).join('');
   { const _r = render; render = function(){
     _r();
@@ -81,22 +92,47 @@ try {
     if (INTERV.length && !EDIT) $('#list').insertAdjacentHTML('afterbegin', banner());
   }; }
 
+  /* v2.0.18 : nature de l'appel saisie tout de suite (champ libre + choix rapides), modifiable depuis le bandeau.
+     Gardée comme l'heure de l'appel, sur le téléphone, jusqu'à l'ouverture de la fiche : elle devient le motif. */
+  const NAT = ['AVP corporel', 'AVP matériel', 'Altercation verbale', 'Altercation physique'];
+  document.body.insertAdjacentHTML('beforeend', `<div id="ivNat" class="hidden"><div class="box"><h3></h3>
+    <input id="ivNatIn" autocomplete="off" spellcheck="false" autocapitalize="sentences" placeholder="Nature de l'appel (accident, altercation…)">
+    <div class="natc">${NAT.map(n=>`<button type="button" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+    <div class="natb"><button type="button" class="no">Plus tard</button><button type="button" class="ok">Enregistrer</button></div></div></div>`);
+  let natFor = null;
+  function askNature(s){
+    natFor = s; $('#ivNat h3').textContent = `🚨 Appel PC : ${hm(s.at)}`;
+    const i = $('#ivNatIn'); i.value = s.nature || ''; $('#ivNat').classList.remove('hidden'); i.focus();
+  }
+  async function natDone(ok){
+    const s = natFor; natFor = null; $('#ivNat').classList.add('hidden'); $('#ivNatIn').blur();
+    if (ok && s) { const v = $('#ivNatIn').value.trim(); if (v) s.nature = v; else delete s.nature; await save(); }
+    lockInfo(); if (KEY && !EDIT) render();
+  }
+  $('#ivNat .ok').onclick = ()=>natDone(true);
+  $('#ivNat .no').onclick = ()=>natDone(false);
+  $('#ivNatIn').addEventListener('keydown', e=>{ if (e.key === 'Enter') { e.preventDefault(); natDone(true); } });
+  $('#ivNat .natc').addEventListener('click', e=>{ const b = e.target.closest('[data-n]'); if (!b) return; $('#ivNatIn').value = b.dataset.n; natDone(true); });
   $('#interBtn').onclick = $('#interFab').onclick = async ()=>{
     const s = {id: uid(), at: nowLocal(), ts: Date.now()};
-    INTERV.push(s); await save();
+    INTERV.push(s);
+    askNature(s);   /* dans le même toucher : le clavier de l'iPhone s'ouvre */
     navigator.vibrate?.(80);
-    toast(`Appel PC à ${hm(s.at)} : heure figée`);
+    await save();
+    toast(`Appel PC : ${hm(s.at)}`);
     lockInfo(); if (KEY) render();
   };
   $('#list').addEventListener('click', async e=>{
     const ban = e.target.closest('.ivBan'); if (!ban) return;
     const s = INTERV.find(x=>x.id === ban.dataset.iv); if (!s) return;
+    if (e.target.closest('.ivNatB')) return askNature(s);
     if (e.target.closest('.ivDrop')) {
       if (await ask(`Annuler l'intervention de ${hm(s.at)} ?`, 'Annuler l\'intervention', true, 'Garder')) { INTERV = INTERV.filter(x=>x !== s); await save(); render(); }
       return;
     }
     openForm(null);
     EDIT.f.intervId = s.id; EDIT.f.appelPC = s.at;   /* date & heure de la fiche = maintenant (ouverture) */
+    if (s.nature && !$('#f_motif').value.trim()) { $('#f_motif').value = s.nature; window.syncMotif?.(); }   /* nature de l'appel = motif */
     lockTime(); placeMotif();
     draftSoon();
   });
