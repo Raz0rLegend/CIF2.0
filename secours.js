@@ -1,5 +1,5 @@
 'use strict';
-/* CIF 2.0 — v2.0.17 à 2.0.19 : secours.js, secours intervenus sur la fiche (pompiers, SMUR).
+/* CIF 2.0 — v2.0.17 à 2.1.1 : secours.js, secours intervenus sur la fiche (pompiers, SMUR) et case « Requérant ».
    Case « Secours » dans le contexte : Pompiers (chef d'agrès et chef des opérations de secours, grade et nom) et/ou
    SMUR (nom du médecin). Les noms déjà saisis sont proposés à la frappe (le grade connu revient avec le nom).
    Réglable à la création comme après l'enregistrement (fenêtre rapide depuis la fiche, sans rouvrir l'édition). Une personne ajoutée au même contrôle
@@ -41,6 +41,15 @@ try {
   const res = document.getElementById('f_resultat'), anchor = res?.closest('.cr') || res || obs;
   anchor.after(...wrap.childNodes);
   const $s = id => document.getElementById(id);
+  /* v2.1.1 : case « Requérant » à côté de « Secours » (la personne qui a sollicité l'intervention) */
+  { const sw = $s('f_secours').closest('label'), row = document.createElement('div'); row.className = 'cr'; row.style.marginTop = '14px';
+    sw.before(row); sw.style.margin = '0';
+    const c1 = document.createElement('div'), c2 = document.createElement('div'); c1.className = c2.className = 'cc';
+    c1.append(sw); c2.innerHTML = '<label class="switch" style="margin:0"><input type="checkbox" id="f_requerant"><span class="sw"></span><span class="swl">Requérant</span></label>';
+    row.append(c1, c2);
+    $s('f_requerant').addEventListener('change', ()=>draftSoon()); }
+  const REQ = f => f.sexe === 'F' ? 'Requérante' : 'Requérant';
+  const REQ_B = f => `<span class="badge" style="background:#6b4ea8;color:#fff">${REQ(f).toUpperCase()}</span>`;
   const ST = {sp:false, smur:false};
   function sync(){
     const on = $s('f_secours').checked;
@@ -75,11 +84,11 @@ try {
   /* ----- Formulaire ----- */
   /* noms des fiches déjà enregistrées (archives comprises) proposés aussi : relevés une fois, à la première fiche ouverte */
   let scanned = false;
-  { const _of = openForm; openForm = function(f, d){ _of(f, d); load(EDIT?.f?.secours);
+  { const _of = openForm; openForm = function(f, d){ _of(f, d); load(EDIT?.f?.secours); $s('f_requerant').checked = !!EDIT?.f?.requerant;
       if (!scanned && KEY) { scanned = true; try { for (const x of FICHES) if (x.secours) learn(x.secours); } catch {} } }; }
-  { const _sn = snapshot; snapshot = function(){ const f = _sn(); f.secours = read(); return f; }; }
+  { const _sn = snapshot; snapshot = function(){ const f = _sn(); f.secours = read(); f.requerant = $s('f_requerant').checked; return f; }; }
   { const _cf = closeForm; closeForm = async function(save){
-      if (save && EDIT) EDIT.f.secours = read();
+      if (save && EDIT) { EDIT.f.secours = read(); EDIT.f.requerant = $s('f_requerant').checked; }
       const s = save && EDIT ? EDIT.f.secours : null;
       await _cf(save);
       if (s && !EDIT) learn(s);
@@ -105,6 +114,7 @@ try {
     ...(s.sp ? [['Pompiers', 'sur place'], ['Chef d\'agrès', who(s.caGr, s.caNom)], ['Chef des opérations de secours', who(s.cosGr, s.cosNom)]] : []),
     ...(s.smur ? [['SMUR', s.med ? `Dr ${s.med.toUpperCase()}` : 'sur place']] : [])];
   { const _fs = ficheSections; ficheSections = function(f){ const S = _fs(f); const s = f.secours;
+      if (f.requerant && S[0]) S[0][1].push(['Qualité', REQ(f)]);
       if (s && (s.sp || s.smur)) { const r = rows(s).filter(x=>x[1]); const i = S.findIndex(x=>x[0] === 'Contexte'); i >= 0 ? S.splice(i, 0, ['Secours', r]) : S.push(['Secours', r]); }
       return S; }; }
   function phrase(s){
@@ -115,6 +125,9 @@ try {
     if (s.smur) out.push(`Le SMUR est intervenu sur les lieux${s.med ? `, avec le docteur ${s.med.toUpperCase()}` : ''}.`);
     return out.join(' ');
   }
+  { const _mc = mcText; mcText = function(f, i, arr){ const t = _mc(f, i, arr);
+      if (!f.requerant || /est (le requérant|la requérante) de l'intervention/.test(t)) return t;
+      const p = t.split('\n\n'); p.splice(1, 0, `${f.sexe === 'F' ? 'L\'intéressée est la requérante' : 'L\'intéressé est le requérant'} de l'intervention.`); return p.join('\n\n'); }; }
   { const _mc = mcText; mcText = function(f, i, arr){ const t = _mc(f, i, arr), s = f.secours;
       if (!s || !(s.sp || s.smur) || /sapeurs-pompiers sont intervenus|Le SMUR est intervenu/.test(t)) return t;
       return t + '\n\n' + phrase(s); }; }
@@ -124,7 +137,8 @@ try {
   const CROSS = '<span class="secI" title="SMUR"><svg viewBox="0 0 24 24"><path fill="#1fae4b" d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z"/></svg></span>';
   const icons = f => (f.secours?.sp ? GYRO : '') + (f.secours?.smur ? CROSS : '');
   { const _r = render; render = function(){ _r();
-      document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id === c.dataset.id), ic = f && icons(f); if (ic) c.querySelector('.name')?.insertAdjacentHTML('beforeend', ic); });
+      document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id === c.dataset.id), ic = f && icons(f); if (ic) c.querySelector('.name')?.insertAdjacentHTML('beforeend', ic);
+        if (f?.requerant) { const n = c.querySelector('.name'), b = n && [...n.querySelectorAll('.badge')].pop(); b ? b.insertAdjacentHTML('afterend', '<span class="badge" style="background:#6b4ea8;color:#fff" title="Requérant">REQ</span>') : null; } });
     }; }
 
   /* Fiche enregistrée : réglage des secours à la volée (v2.0.19), sans rouvrir l'édition de la fiche */
@@ -191,6 +205,11 @@ try {
       const chip = `<button type="button" class="chip secEdit" style="${on ? 'border:1px solid #3a5f9e;color:#cfe0ff' : 'border:1px dashed #666;color:#bdbdbd'}">${on ? `${ic} Secours` : '＋ Secours'}</button>`;
       const verif = body.querySelector('#detVerif'), chips = body.querySelector('.hero .chips2');
       verif ? verif.insertAdjacentHTML('afterend', chip) : chips?.insertAdjacentHTML('beforeend', chip);
+      /* Requérant : réglable d'un toucher dans la fiche, comme VERIF */
+      if (f.requerant) { const t = document.getElementById('detTitle'), b = [...t.querySelectorAll('.badge')].pop(); b ? b.insertAdjacentHTML('afterend', REQ_B(f)) : t.insertAdjacentHTML('afterbegin', REQ_B(f)); }
+      body.querySelector('.secEdit')?.insertAdjacentHTML('afterend', `<button type="button" class="chip" id="detReq" style="${f.requerant ? 'background:#6b4ea8;color:#fff;border:1px solid #6b4ea8;font-weight:700' : 'border:1px dashed #666;color:#bdbdbd'}">${REQ(f).toUpperCase()}</button>`);
+      const rq = body.querySelector('#detReq'); if (rq) rq.onclick = async ()=>{ const x = FICHES.find(y=>y.id === f.id) || f, sc = document.querySelector('#detail .body')?.scrollTop || 0;
+        x.requerant = !x.requerant; await saveFiche(x); render(); await openDetail(x); const bd = document.querySelector('#detail .body'); if (bd) bd.scrollTop = sc; toast(x.requerant ? `Marqué${x.sexe === 'F' ? 'e' : ''} ${REQ(x).toLowerCase()}` : 'Requérant retiré'); };
       if (on) body.querySelector('.hero')?.insertAdjacentHTML('afterend', panel('Secours', rows(s), '<button type="button" class="secEdit" style="margin-left:auto;border:0;background:none;color:#7fb3ff;font-size:14px;padding:0 2px">Régler</button>'));
       body.querySelectorAll('.secEdit').forEach(b=>b.onclick = ()=>editSec(FICHES.find(x=>x.id === f.id) || f));
     }; }
