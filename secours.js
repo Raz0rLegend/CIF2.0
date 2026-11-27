@@ -1,8 +1,8 @@
 'use strict';
-/* CIF 2.0 — v2.0.17 / 2.0.18 : secours.js, secours intervenus sur la fiche (pompiers, SMUR).
+/* CIF 2.0 — v2.0.17 à 2.0.19 : secours.js, secours intervenus sur la fiche (pompiers, SMUR).
    Case « Secours » dans le contexte : Pompiers (chef d'agrès et chef des opérations de secours, grade et nom) et/ou
    SMUR (nom du médecin). Les noms déjà saisis sont proposés à la frappe (le grade connu revient avec le nom).
-   Réglable à la création comme après l'enregistrement (bouton dans la fiche). Une personne ajoutée au même contrôle
+   Réglable à la création comme après l'enregistrement (fenêtre rapide depuis la fiche, sans rouvrir l'édition). Une personne ajoutée au même contrôle
    reprend les secours du contrôle. */
 try {
 (()=>{
@@ -127,12 +127,63 @@ try {
       document.querySelectorAll('#list .card[data-id]').forEach(c=>{ const f = FICHES.find(x=>x.id === c.dataset.id), ic = f && icons(f); if (ic) c.querySelector('.name')?.insertAdjacentHTML('beforeend', ic); });
     }; }
 
-  /* Fiche enregistrée : réglage des secours à côté du résultat, bloc Secours sous l'en-tête */
+  /* Fiche enregistrée : réglage des secours à la volée (v2.0.19), sans rouvrir l'édition de la fiche */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+#secSheet{position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:calc(60px + env(safe-area-inset-top)) 14px 14px}
+#secSheet.hidden{display:none}
+#secSheet .box{width:min(100%,480px);background:var(--panel);border:1px solid #3a5f9e;border-radius:16px;padding:14px 16px;position:relative;overflow:visible}
+#secSheet h3{margin:0 0 10px;font-size:18px}
+#secSheet .secChips{display:flex;gap:8px}
+#secSheet .secChips button{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:inherit;font-size:15px;font-weight:600}
+#secSheet .secChips button.on{background:#fff;color:#111}
+#secSheet .secRow{display:flex;gap:8px;align-items:center}
+#secSheet .secRow select{flex:0 0 92px}
+#secSheet .secRow input{flex:1;min-width:0}
+#secSheet .secRow .dr{flex:0 0 auto;font-weight:600;color:var(--muted)}
+#secSheet .natb{display:flex;gap:10px;margin-top:16px}
+#secSheet .natb button{flex:1;padding:12px;border-radius:12px;border:1px solid var(--line);background:none;color:inherit;font-size:16px}
+#secSheet .natb .ok{background:#1f4fbf;border-color:#1f4fbf;color:#fff;font-weight:700}
+</style>`);
+  document.body.insertAdjacentHTML('beforeend', `<div id="secSheet" class="hidden"><div class="box body"><h3>Secours</h3>
+  <div class="secChips"><button type="button" data-s="sp">Pompiers</button><button type="button" data-s="smur">SMUR</button></div>
+  <div id="ssSp" class="hidden">
+    <label class="f" for="ss_caNom">Chef d'agrès</label>
+    <div class="secRow"><select id="ss_caGr" aria-label="Grade du chef d'agrès">${opts}</select><input id="ss_caNom" data-sg="spNoms" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="Nom"></div>
+    <label class="f" for="ss_cosNom">Chef des opérations de secours (COS)</label>
+    <div class="secRow"><select id="ss_cosGr" aria-label="Grade du chef des opérations de secours">${opts}</select><input id="ss_cosNom" data-sg="spNoms" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="Nom"></div>
+  </div>
+  <div id="ssSmur" class="hidden">
+    <label class="f" for="ss_med">Médecin du SMUR</label>
+    <div class="secRow"><span class="dr">Dr</span><input id="ss_med" data-sg="medecins" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="Nom du médecin"></div>
+  </div>
+  <div class="natb"><button type="button" class="no">Annuler</button><button type="button" class="ok">Enregistrer</button></div></div></div>`);
+  const SS = {sp:false, smur:false}; let ssId = null;
+  const ssSync = () => { document.querySelectorAll('#secSheet [data-s]').forEach(b=>b.classList.toggle('on', !!SS[b.dataset.s])); $s('ssSp').classList.toggle('hidden', !SS.sp); $s('ssSmur').classList.toggle('hidden', !SS.smur); };
   function editSec(f){
-    closeDetail(); openForm(f);
-    if (!$s('f_secours').checked) { $s('f_secours').checked = true; ST.sp = true; sync(); }
-    setTimeout(()=>$s('f_secours').closest('label').scrollIntoView({block:'center', behavior:'smooth'}), 80);
+    const s = f.secours || {}; ssId = f.id;
+    SS.sp = !!s.sp || !(s.sp || s.smur); SS.smur = !!s.smur;   /* rien encore : Pompiers proposé d'office */
+    for (const k of ['caGr','caNom','cosGr','cosNom','med']) $s('ss_' + k).value = s[k] || '';
+    ssSync(); $s('secSheet').classList.remove('hidden');
   }
+  const ssClose = () => { sgHide(); document.activeElement?.blur?.(); $s('secSheet').classList.add('hidden'); ssId = null; };
+  $s('secSheet').addEventListener('click', async e=>{
+    const b = e.target.closest('[data-s]'); if (b) { SS[b.dataset.s] = !SS[b.dataset.s]; ssSync(); return; }
+    if (e.target === $s('secSheet') || e.target.closest('.no')) return ssClose();
+    if (!e.target.closest('.ok')) return;
+    const f = FICHES.find(x=>x.id === ssId); if (!f) return ssClose();
+    const v = id => $s('ss_' + id).value.trim();
+    const n = {sp:SS.sp, smur:SS.smur};
+    if (SS.sp) Object.assign(n, {caGr:v('caGr'), caNom:v('caNom'), cosGr:v('cosGr'), cosNom:v('cosNom')});
+    if (SS.smur) n.med = v('med');
+    f.secours = n.sp || n.smur ? n : null;
+    ssClose();
+    await saveFiche(f); if (f.secours) learn(f.secours);
+    toast(f.secours ? 'Secours enregistrés' : 'Secours retirés');
+    render(); if (DETAIL === f.id) openDetail(f);
+  });
+  /* nom déjà connu : son grade revient tout seul (fenêtre rapide) */
+  for (const [g, n] of [['ss_caGr','ss_caNom'], ['ss_cosGr','ss_cosNom']])
+    $s(n).addEventListener('change', ()=>{ const gr = (LEARN.spGrade || {})[norm($s(n).value)]; if (gr && !$s(g).value) $s(g).value = gr; });
   { const _od = openDetail; openDetail = async function(f){ await _od(f); if (DETAIL !== f.id) return;
       const body = document.getElementById('detBody'); if (!body) return;
       const s = f.secours, on = !!(s && (s.sp || s.smur)), ic = icons(f);
