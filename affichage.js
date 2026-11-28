@@ -58,7 +58,8 @@ try {
    Une position relevée dans le rayon donne directement ce nom comme lieu du contrôle. */
 GEO_PLACES.push(
   {n:'Place du Casino', lat:43.7395761, lng:7.4272088, r:15},
-  {n:'Place d\'Armes', lat:43.7324213, lng:7.4189224, r:20}
+  {n:'Place d\'Armes', lat:43.7324213, lng:7.4189224, r:20},
+  {n:'Point 3', lat:43.7305862, lng:7.4246436, r:10}
 );
 } catch (e) { console.error('[CIF] lieux.js', e); setTimeout(()=>{ throw e; }); }
 /* ===== docs.js ===== */
